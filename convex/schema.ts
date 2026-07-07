@@ -1,0 +1,83 @@
+import { defineSchema, defineTable } from 'convex/server'
+import { v } from 'convex/values'
+import { authTables } from '@convex-dev/auth/server'
+
+// The whole database is described here. Convex generates TypeScript types
+// from this file, so queries/mutations and even the React components know
+// the exact shape of every document.
+export default defineSchema({
+  // Tables Convex Auth needs (users, sessions, accounts, ...).
+  ...authTables,
+
+  // One per user; app-level settings.
+  profiles: defineTable({
+    userId: v.id('users'),
+    displayName: v.optional(v.string()),
+    unitPreference: v.union(v.literal('kg'), v.literal('lb')),
+  }).index('by_user', ['userId']),
+
+  // Built-in exercises have no ownerId; custom ones belong to a user.
+  exercises: defineTable({
+    ownerId: v.optional(v.id('users')),
+    name: v.string(),
+    muscleGroup: v.string(),
+    equipment: v.optional(v.string()),
+    isCustom: v.boolean(),
+  }).index('by_owner', ['ownerId']),
+
+  // A reusable workout template.
+  routines: defineTable({
+    ownerId: v.id('users'),
+    name: v.string(),
+    notes: v.optional(v.string()),
+  }).index('by_owner', ['ownerId']),
+
+  // Which exercises a routine contains, in order, with a target set count.
+  routineExercises: defineTable({
+    routineId: v.id('routines'),
+    exerciseId: v.id('exercises'),
+    position: v.number(),
+    targetSets: v.number(),
+  }).index('by_routine', ['routineId']),
+
+  // One logged gym session.
+  workouts: defineTable({
+    ownerId: v.id('users'),
+    name: v.string(),
+    startedAt: v.number(), // ms since epoch (Date.now())
+    endedAt: v.optional(v.number()), // undefined = still in progress
+    notes: v.optional(v.string()),
+  }).index('by_owner', ['ownerId']),
+
+  // An exercise inside a workout, in order.
+  workoutExercises: defineTable({
+    workoutId: v.id('workouts'),
+    exerciseId: v.id('exercises'),
+    position: v.number(),
+  })
+    .index('by_workout', ['workoutId'])
+    .index('by_exercise', ['exerciseId']),
+
+  // A single set: "100 kg x 5 reps".
+  sets: defineTable({
+    workoutExerciseId: v.id('workoutExercises'),
+    setNumber: v.number(),
+    weightKg: v.number(),
+    reps: v.number(),
+    isWarmup: v.boolean(),
+    completed: v.boolean(),
+  }).index('by_workoutExercise', ['workoutExerciseId']),
+
+  // Cached best-ever numbers per user+exercise so PR checks are one read.
+  personalRecords: defineTable({
+    ownerId: v.id('users'),
+    exerciseId: v.id('exercises'),
+    bestWeightKg: v.number(),
+    bestWeightReps: v.number(), // reps on the heaviest set (for "100kg x 5" display)
+    bestEst1rm: v.number(), // Epley: weight * (1 + reps/30)
+    achievedAt: v.number(),
+    workoutId: v.id('workouts'),
+  })
+    .index('by_owner', ['ownerId'])
+    .index('by_owner_exercise', ['ownerId', 'exerciseId']),
+})
