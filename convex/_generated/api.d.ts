@@ -17,6 +17,7 @@ import type * as http from "../http.js";
 import type * as prs from "../prs.js";
 import type * as routines from "../routines.js";
 import type * as seedData from "../seedData.js";
+import type * as validation from "../validation.js";
 import type * as workouts from "../workouts.js";
 
 import type {
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   prs: typeof prs;
   routines: typeof routines;
   seedData: typeof seedData;
+  validation: typeof validation;
   workouts: typeof workouts;
 }>;
 

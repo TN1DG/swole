@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy": "convex deploy --cmd \"npm run build\" && node -e \"require('fs').copyFileSync('vercel.json','dist/vercel.json')\" && vercel deploy --prod --yes --cwd dist --scope tn1dgs-projects"
+    "test": "vitest run",
+    "deploy": "convex deploy -y --cmd \"npm run build\" && node -e \"require('fs').copyFileSync('vercel.json','dist/vercel.json')\" && vercel link --yes --project swole --cwd dist --scope tn1dgs-projects && vercel deploy --prod --yes --cwd dist --scope tn1dgs-projects"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.94",
@@ -19,18 +20,21 @@
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.2",
+    "convex-test": "^0.0.54",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.16",
     "sharp": "^0.35.3",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
   }
 }

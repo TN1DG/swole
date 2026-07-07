@@ -1,8 +1,13 @@
 import { v } from 'convex/values'
+import { paginationOptsValidator } from 'convex/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
+
+// exerciseHistory looks at this many recent completed workouts at most, so
+// the query stays within Convex read limits as history grows for years.
+const HISTORY_SCAN_LIMIT = 200
 
 // Working sets = completed, not warm-up, with real weight/reps.
 function workingSets(sets: Doc<'sets'>[]) {
@@ -11,23 +16,25 @@ function workingSets(sets: Doc<'sets'>[]) {
 
 // ---------- queries ----------
 
-// Completed workouts, newest first, each with summary stats for the list cards.
+// Completed workouts, newest first, paginated (the list grows forever, so
+// the client asks for pages instead of the whole table).
 export const listCompleted = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
-    if (userId === null) return []
+    if (userId === null) {
+      return { page: [], isDone: true, continueCursor: '' }
+    }
 
-    const workouts = await ctx.db
+    const result = await ctx.db
       .query('workouts')
       .withIndex('by_owner', (q) => q.eq('ownerId', userId))
       .order('desc')
-      .collect()
+      .filter((q) => q.neq(q.field('endedAt'), undefined))
+      .paginate(args.paginationOpts)
 
-    return Promise.all(
-      workouts
-        .filter((w) => w.endedAt !== undefined)
-        .map(async (workout) => {
+    const page = await Promise.all(
+      result.page.map(async (workout) => {
           const workoutExercises = await ctx.db
             .query('workoutExercises')
             .withIndex('by_workout', (q) => q.eq('workoutId', workout._id))
@@ -59,6 +66,9 @@ export const listCompleted = query({
           }
         }),
     )
+
+    // Same pagination envelope Convex produced, with our enriched page.
+    return { ...result, page }
   },
 })
 
@@ -113,9 +123,12 @@ export const exerciseHistory = query({
     const userId = await getAuthUserId(ctx)
     if (userId === null) return []
 
+    // Newest-first, capped scan — old history beyond the cap simply falls
+    // off the chart rather than blowing up the query.
     const workouts = await ctx.db
       .query('workouts')
       .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .order('desc')
       .collect()
 
     const sessions: {
@@ -128,7 +141,9 @@ export const exerciseHistory = query({
       setCount: number
     }[] = []
 
-    for (const workout of workouts.filter((w) => w.endedAt !== undefined)) {
+    for (const workout of workouts
+      .filter((w) => w.endedAt !== undefined)
+      .slice(0, HISTORY_SCAN_LIMIT)) {
       const workoutExercises = await ctx.db
         .query('workoutExercises')
         .withIndex('by_workout', (q) => q.eq('workoutId', workout._id))

@@ -3,6 +3,7 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
+import { assertRange, cleanName, LIMITS } from './validation'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -20,13 +21,23 @@ async function getOwnedWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
   return { userId, workout }
 }
 
+// Same, but also rejects completed workouts — history must stay immutable
+// (records are computed at finish time and would silently drift otherwise).
+async function getOwnedActiveWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
+  const result = await getOwnedWorkout(ctx, workoutId)
+  if (result.workout.endedAt !== undefined) {
+    throw new Error('Workout is already finished')
+  }
+  return result
+}
+
 async function getOwnedWorkoutExercise(
   ctx: MutationCtx,
   workoutExerciseId: Id<'workoutExercises'>,
 ) {
   const workoutExercise = await ctx.db.get(workoutExerciseId)
   if (!workoutExercise) throw new Error('Not found')
-  const { userId, workout } = await getOwnedWorkout(ctx, workoutExercise.workoutId)
+  const { userId, workout } = await getOwnedActiveWorkout(ctx, workoutExercise.workoutId)
   return { userId, workout, workoutExercise }
 }
 
@@ -100,7 +111,10 @@ export const start = mutation({
       .first()
     if (existing) return existing._id
 
-    const hour = args.localHour ?? new Date().getUTCHours()
+    const hour =
+      args.localHour !== undefined
+        ? assertRange(args.localHour, 0, 23, 'localHour')
+        : new Date().getUTCHours()
     const name =
       hour < 5 ? 'Night Workout'
       : hour < 12 ? 'Morning Workout'
@@ -120,9 +134,7 @@ export const rename = mutation({
   args: { workoutId: v.id('workouts'), name: v.string() },
   handler: async (ctx, args) => {
     await getOwnedWorkout(ctx, args.workoutId)
-    const name = args.name.trim()
-    if (!name) throw new Error('Name is required')
-    await ctx.db.patch(args.workoutId, { name })
+    await ctx.db.patch(args.workoutId, { name: cleanName(args.name) })
   },
 })
 
@@ -130,7 +142,7 @@ export const rename = mutation({
 export const addExercise = mutation({
   args: { workoutId: v.id('workouts'), exerciseId: v.id('exercises') },
   handler: async (ctx, args) => {
-    const { userId } = await getOwnedWorkout(ctx, args.workoutId)
+    const { userId } = await getOwnedActiveWorkout(ctx, args.workoutId)
 
     // The exercise must be a built-in or one of the caller's customs.
     const exercise = await ctx.db.get(args.exerciseId)
@@ -139,6 +151,9 @@ export const addExercise = mutation({
     }
 
     const existing = await exercisesOf(ctx, args.workoutId)
+    if (existing.length >= LIMITS.exercisesPerWorkout) {
+      throw new Error(`Max ${LIMITS.exercisesPerWorkout} exercises per workout`)
+    }
     const workoutExerciseId = await ctx.db.insert('workoutExercises', {
       workoutId: args.workoutId,
       exerciseId: args.exerciseId,
@@ -162,6 +177,9 @@ export const addSet = mutation({
   handler: async (ctx, args) => {
     await getOwnedWorkoutExercise(ctx, args.workoutExerciseId)
     const sets = await setsOf(ctx, args.workoutExerciseId)
+    if (sets.length >= LIMITS.setsPerExercise) {
+      throw new Error(`Max ${LIMITS.setsPerExercise} sets per exercise`)
+    }
     const last = sets[sets.length - 1]
     return await ctx.db.insert('sets', {
       workoutExerciseId: args.workoutExerciseId,
@@ -186,8 +204,12 @@ export const updateSet = mutation({
     await getOwnedSet(ctx, args.setId)
 
     const patch: Partial<Doc<'sets'>> = {}
-    if (args.weightKg !== undefined) patch.weightKg = Math.max(0, args.weightKg)
-    if (args.reps !== undefined) patch.reps = Math.max(0, Math.round(args.reps))
+    if (args.weightKg !== undefined) {
+      patch.weightKg = assertRange(args.weightKg, 0, LIMITS.weightKg, 'Weight')
+    }
+    if (args.reps !== undefined) {
+      patch.reps = Math.round(assertRange(args.reps, 0, LIMITS.reps, 'Reps'))
+    }
     if (args.completed !== undefined) patch.completed = args.completed
     if (args.isWarmup !== undefined) patch.isWarmup = args.isWarmup
     await ctx.db.patch(args.setId, patch)

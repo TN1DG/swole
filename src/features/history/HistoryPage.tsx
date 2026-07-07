@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from 'convex/react'
+import { usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
@@ -34,9 +34,14 @@ export function HistoryPage() {
 }
 
 function WorkoutList() {
-  const workouts = useQuery(api.history.listCompleted)
+  // Paginated: loads 20 at a time instead of the entire (ever-growing) table.
+  const { results: workouts, status, loadMore } = usePaginatedQuery(
+    api.history.listCompleted,
+    {},
+    { initialNumItems: 20 },
+  )
 
-  if (workouts === undefined)
+  if (status === 'LoadingFirstPage')
     return <p className="mt-8 text-center text-muted">Loading…</p>
   if (workouts.length === 0)
     return (
@@ -73,6 +78,17 @@ function WorkoutList() {
           </ul>
         </Link>
       ))}
+
+      {status !== 'Exhausted' && (
+        <button
+          type="button"
+          onClick={() => loadMore(20)}
+          disabled={status === 'LoadingMore'}
+          className="rounded-xl border border-border py-3 font-semibold text-muted disabled:opacity-50"
+        >
+          {status === 'LoadingMore' ? 'Loading…' : 'Load more'}
+        </button>
+      )}
     </div>
   )
 }

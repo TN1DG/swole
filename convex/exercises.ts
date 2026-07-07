@@ -1,8 +1,28 @@
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { internalMutation, mutation, query } from './_generated/server'
-import { MUSCLE_GROUPS } from './constants'
+import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from './constants'
 import { BUILT_IN_EXERCISES } from './seedData'
+import { cleanName, LIMITS } from './validation'
+
+// Both create and update take the same user-supplied fields.
+function validateExerciseFields(args: {
+  name: string
+  muscleGroup: string
+  equipment?: string
+}) {
+  const name = cleanName(args.name)
+  if (!(MUSCLE_GROUPS as readonly string[]).includes(args.muscleGroup)) {
+    throw new Error('Unknown muscle group')
+  }
+  if (
+    args.equipment !== undefined &&
+    !(EQUIPMENT_TYPES as readonly string[]).includes(args.equipment)
+  ) {
+    throw new Error('Unknown equipment type')
+  }
+  return { name, muscleGroup: args.muscleGroup, equipment: args.equipment }
+}
 
 // All exercises visible to the signed-in user: built-ins + their customs.
 export const list = query({
@@ -35,17 +55,19 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx)
     if (userId === null) throw new Error('Not signed in')
 
-    const name = args.name.trim()
-    if (!name) throw new Error('Name is required')
-    if (!(MUSCLE_GROUPS as readonly string[]).includes(args.muscleGroup)) {
-      throw new Error('Unknown muscle group')
+    const fields = validateExerciseFields(args)
+
+    const existing = await ctx.db
+      .query('exercises')
+      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .collect()
+    if (existing.length >= LIMITS.customExercisesPerUser) {
+      throw new Error(`Max ${LIMITS.customExercisesPerUser} custom exercises`)
     }
 
     return await ctx.db.insert('exercises', {
       ownerId: userId,
-      name,
-      muscleGroup: args.muscleGroup,
-      equipment: args.equipment,
+      ...fields,
       isCustom: true,
     })
   },
@@ -68,17 +90,7 @@ export const update = mutation({
       throw new Error('Exercise not found')
     }
 
-    const name = args.name.trim()
-    if (!name) throw new Error('Name is required')
-    if (!(MUSCLE_GROUPS as readonly string[]).includes(args.muscleGroup)) {
-      throw new Error('Unknown muscle group')
-    }
-
-    await ctx.db.patch(args.id, {
-      name,
-      muscleGroup: args.muscleGroup,
-      equipment: args.equipment,
-    })
+    await ctx.db.patch(args.id, validateExerciseFields(args))
   },
 })
 

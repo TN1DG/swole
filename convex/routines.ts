@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
+import { cleanName, LIMITS } from './validation'
 
 async function requireUserId(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx)
@@ -16,12 +17,21 @@ async function validateExercises(
   entries: { exerciseId: Id<'exercises'>; targetSets: number }[],
 ) {
   if (entries.length === 0) throw new Error('Add at least one exercise')
+  if (entries.length > LIMITS.exercisesPerRoutine) {
+    throw new Error(`Max ${LIMITS.exercisesPerRoutine} exercises per routine`)
+  }
   for (const entry of entries) {
     const exercise = await ctx.db.get(entry.exerciseId)
     if (!exercise || (exercise.ownerId !== undefined && exercise.ownerId !== userId)) {
       throw new Error('Exercise not found')
     }
   }
+}
+
+function cleanNotes(notes: string | undefined) {
+  if (notes === undefined) return undefined
+  const trimmed = notes.trim().slice(0, LIMITS.noteLength)
+  return trimmed || undefined
 }
 
 const exercisesArg = v.array(
@@ -68,14 +78,21 @@ export const create = mutation({
   args: { name: v.string(), notes: v.optional(v.string()), exercises: exercisesArg },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx)
-    const name = args.name.trim()
-    if (!name) throw new Error('Name is required')
+    const name = cleanName(args.name)
     await validateExercises(ctx, userId, args.exercises)
+
+    const existing = await ctx.db
+      .query('routines')
+      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .collect()
+    if (existing.length >= LIMITS.routinesPerUser) {
+      throw new Error(`Max ${LIMITS.routinesPerUser} routines`)
+    }
 
     const routineId = await ctx.db.insert('routines', {
       ownerId: userId,
       name,
-      notes: args.notes,
+      notes: cleanNotes(args.notes),
     })
     for (const [position, entry] of args.exercises.entries()) {
       await ctx.db.insert('routineExercises', {
@@ -101,11 +118,10 @@ export const update = mutation({
     const routine = await ctx.db.get(args.routineId)
     if (!routine || routine.ownerId !== userId) throw new Error('Routine not found')
 
-    const name = args.name.trim()
-    if (!name) throw new Error('Name is required')
+    const name = cleanName(args.name)
     await validateExercises(ctx, userId, args.exercises)
 
-    await ctx.db.patch(args.routineId, { name, notes: args.notes })
+    await ctx.db.patch(args.routineId, { name, notes: cleanNotes(args.notes) })
 
     // Replace the exercise list wholesale — simpler than diffing.
     const existing = await ctx.db
