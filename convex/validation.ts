@@ -31,4 +31,28 @@ export const LIMITS = {
   exercisesPerRoutine: 30,
   noteLength: 500,
   favoritesPerUser: 300,
+  usernameMinLength: 3,
+  usernameMaxLength: 20,
+  friendsPerUser: 200,
+  friendRequestsPerUser: 50, // pending outgoing requests
 } as const
+
+const USERNAME_PATTERN = /^[a-z0-9_]+$/
+
+// Lowercased, trimmed, charset/length-checked. Usernames are how friends
+// find each other, so they're normalized before ever touching the index.
+export function cleanUsername(raw: string): string {
+  const username = raw.trim().toLowerCase()
+  if (
+    username.length < LIMITS.usernameMinLength ||
+    username.length > LIMITS.usernameMaxLength
+  ) {
+    throw new Error(
+      `Username must be ${LIMITS.usernameMinLength}-${LIMITS.usernameMaxLength} characters`,
+    )
+  }
+  if (!USERNAME_PATTERN.test(username)) {
+    throw new Error('Username can only contain lowercase letters, numbers, and underscores')
+  }
+  return username
+}

@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { mutation, query, type MutationCtx } from './_generated/server'
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
 
@@ -12,6 +12,41 @@ const HISTORY_SCAN_LIMIT = 200
 // Working sets = completed, not warm-up, with real weight/reps.
 function workingSets(sets: Doc<'sets'>[]) {
   return sets.filter((s) => s.completed && !s.isWarmup && s.weightKg > 0 && s.reps > 0)
+}
+
+// One workout's summary card: exercises + set count + total volume. Shared
+// by the owner's own history list and the friend-workouts view (same shape,
+// different whose workouts).
+export async function summarizeWorkout(ctx: QueryCtx | MutationCtx, workout: Doc<'workouts'>) {
+  const workoutExercises = await ctx.db
+    .query('workoutExercises')
+    .withIndex('by_workout', (q) => q.eq('workoutId', workout._id))
+    .collect()
+
+  let totalVolumeKg = 0
+  let setCount = 0
+  const exercises: { name: string; setCount: number }[] = []
+
+  for (const we of workoutExercises.sort((a, b) => a.position - b.position)) {
+    const sets = await ctx.db
+      .query('sets')
+      .withIndex('by_workoutExercise', (q) => q.eq('workoutExerciseId', we._id))
+      .collect()
+    const exercise = await ctx.db.get(we.exerciseId)
+    setCount += sets.length
+    totalVolumeKg += workingSets(sets).reduce((sum, s) => sum + s.weightKg * s.reps, 0)
+    exercises.push({ name: exercise?.name ?? '?', setCount: sets.length })
+  }
+
+  return {
+    _id: workout._id,
+    name: workout.name,
+    startedAt: workout.startedAt,
+    durationMs: (workout.endedAt ?? workout.startedAt) - workout.startedAt,
+    totalVolumeKg,
+    setCount,
+    exercises,
+  }
 }
 
 // ---------- queries ----------
@@ -33,39 +68,7 @@ export const listCompleted = query({
       .filter((q) => q.neq(q.field('endedAt'), undefined))
       .paginate(args.paginationOpts)
 
-    const page = await Promise.all(
-      result.page.map(async (workout) => {
-          const workoutExercises = await ctx.db
-            .query('workoutExercises')
-            .withIndex('by_workout', (q) => q.eq('workoutId', workout._id))
-            .collect()
-
-          let totalVolumeKg = 0
-          let setCount = 0
-          const exercises: { name: string; setCount: number }[] = []
-
-          for (const we of workoutExercises.sort((a, b) => a.position - b.position)) {
-            const sets = await ctx.db
-              .query('sets')
-              .withIndex('by_workoutExercise', (q) => q.eq('workoutExerciseId', we._id))
-              .collect()
-            const exercise = await ctx.db.get(we.exerciseId)
-            setCount += sets.length
-            totalVolumeKg += workingSets(sets).reduce((sum, s) => sum + s.weightKg * s.reps, 0)
-            exercises.push({ name: exercise?.name ?? '?', setCount: sets.length })
-          }
-
-          return {
-            _id: workout._id,
-            name: workout.name,
-            startedAt: workout.startedAt,
-            durationMs: (workout.endedAt ?? workout.startedAt) - workout.startedAt,
-            totalVolumeKg,
-            setCount,
-            exercises,
-          }
-        }),
-    )
+    const page = await Promise.all(result.page.map((workout) => summarizeWorkout(ctx, workout)))
 
     // Same pagination envelope Convex produced, with our enriched page.
     return { ...result, page }

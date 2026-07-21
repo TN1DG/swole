@@ -11,6 +11,8 @@ import { ExercisesPage } from './features/exercises/ExercisesPage'
 import { FavoritesPage } from './features/favorites/FavoritesPage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { StatsPage } from './features/stats/StatsPage'
+import { FriendsPage } from './features/friends/FriendsPage'
+import { FriendWorkoutsPage } from './features/friends/FriendWorkoutsPage'
 
 export default function App() {
   return (
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/stats" element={<StatsPage />} />
+            <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
             <Route path="/routines" element={<RoutinesPage />} />
             <Route path="/exercises" element={<ExercisesPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

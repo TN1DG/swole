@@ -127,3 +127,49 @@ export function macroTargets(calories: number, bodyWeightKg: number, goal: Goal)
   const fiberG = Math.round((calories / 1000) * 14)
   return { calories, proteinG, fatG, carbsG, fiberG }
 }
+
+// ---------- Friends leaderboard: weekly volume + consistency bonus ----------
+// A rolling 7-day window (not calendar weeks) anchored to "now", so the
+// leaderboard doesn't reset at a fixed clock time.
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const STREAK_BONUS_PER_WEEK = 0.05 // +5% per consecutive week logged
+const STREAK_BONUS_CAP_WEEKS = 10 // max +50% bonus
+
+// How many rolling weeks ago a timestamp falls — 0 = this week, 1 = last week…
+export function weeksAgo(startedAt: number, now: number): number {
+  return Math.floor((now - startedAt) / WEEK_MS)
+}
+
+// How many *consecutive* weeks, counting back from this one, had at least
+// one workout. A gap anywhere stops the count — one big week last month
+// doesn't cover for going quiet since.
+export function consistencyStreakWeeks(startedAts: number[], now: number): number {
+  const weeksWithWorkout = new Set(startedAts.map((t) => weeksAgo(t, now)))
+  let streak = 0
+  while (weeksWithWorkout.has(streak)) streak++
+  return streak
+}
+
+// This week's volume, boosted by the consistency streak.
+export function leaderboardScore(weekVolumeKg: number, streakWeeks: number): number {
+  const bonusWeeks = Math.min(streakWeeks, STREAK_BONUS_CAP_WEEKS)
+  return Math.round(weekVolumeKg * (1 + STREAK_BONUS_PER_WEEK * bonusWeeks))
+}
+
+export type ConsistencyTier = 'none' | 'consistent' | 'dedicated' | 'relentless' | 'iron_will'
+
+// Named badges for a streak — "Consistency Accolades". Checked longest-first.
+export const CONSISTENCY_TIERS = [
+  { min: 12, value: 'iron_will', label: 'Iron Will' },
+  { min: 8, value: 'relentless', label: 'Relentless' },
+  { min: 4, value: 'dedicated', label: 'Dedicated' },
+  { min: 2, value: 'consistent', label: 'Consistent' },
+] as const satisfies readonly { min: number; value: ConsistencyTier; label: string }[]
+
+export function consistencyTier(streakWeeks: number): ConsistencyTier {
+  for (const tier of CONSISTENCY_TIERS) {
+    if (streakWeeks >= tier.min) return tier.value
+  }
+  return 'none'
+}

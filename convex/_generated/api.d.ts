@@ -13,6 +13,7 @@ import type * as constants from "../constants.js";
 import type * as exercises from "../exercises.js";
 import type * as favorites from "../favorites.js";
 import type * as fitness from "../fitness.js";
+import type * as friends from "../friends.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as profiles from "../profiles.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   exercises: typeof exercises;
   favorites: typeof favorites;
   fitness: typeof fitness;
+  friends: typeof friends;
   history: typeof history;
   http: typeof http;
   profiles: typeof profiles;

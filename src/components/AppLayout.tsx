@@ -5,6 +5,7 @@ const tabs = [
   { to: '/', label: 'Workout', icon: DumbbellIcon },
   { to: '/history', label: 'History', icon: ClockIcon },
   { to: '/favorites', label: 'Favorites', icon: HeartIcon },
+  { to: '/friends', label: 'Friends', icon: PeopleIcon },
   { to: '/routines', label: 'Routines', icon: ListIcon },
   { to: '/exercises', label: 'Exercises', icon: BookIcon },
 ]
@@ -87,6 +88,17 @@ function HeartIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5 6 5c2 0 3.5 1.2 4 2.5C10.5 6.2 12 5 14 5c3.5 0 5 3.5 3.5 6.5C19.5 15.65 12 20 12 20z" />
+    </svg>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+      <circle cx="17" cy="8" r="2.5" />
+      <path d="M15.5 14.7c2.6.3 4.5 2.3 4.5 5.3" />
     </svg>
   )
 }

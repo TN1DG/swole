@@ -27,7 +27,31 @@ export default defineSchema({
         v.literal('very_active'),
       ),
     ),
-  }).index('by_user', ['userId']),
+    // Lowercase, unique — how friends find you.
+    username: v.optional(v.string()),
+    // Opt-in: anyone (not just accepted friends) can view your workout history.
+    workoutsPublic: v.optional(v.boolean()),
+  })
+    .index('by_user', ['userId'])
+    .index('by_username', ['username']),
+
+  // A pending "add friend by username" request, until accepted or declined.
+  friendRequests: defineTable({
+    fromUserId: v.id('users'),
+    toUserId: v.id('users'),
+  })
+    .index('by_to', ['toUserId'])
+    .index('by_from', ['fromUserId'])
+    .index('by_from_to', ['fromUserId', 'toUserId']),
+
+  // One row per direction, so "my friends" is a single index read. Created
+  // in a pair (both directions) when a friendRequest is accepted.
+  friendships: defineTable({
+    userId: v.id('users'),
+    friendId: v.id('users'),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_friend', ['userId', 'friendId']),
 
   // Built-in exercises have no ownerId; custom ones belong to a user.
   exercises: defineTable({

@@ -126,3 +126,23 @@ export function FlameIcon({ className = 'h-4 w-4' }: IconProps) {
     </svg>
   )
 }
+
+// Friends / leaderboard.
+export function PeopleIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+      <circle cx="17" cy="8" r="2.5" />
+      <path d="M15.5 14.7c2.6.3 4.5 2.3 4.5 5.3" />
+    </svg>
+  )
+}

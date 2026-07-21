@@ -14,6 +14,7 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 - **Favorites** — star any exercise from the library, its detail sheet, or mid-workout; the Favorites tab lists them with their PR at a glance. Tapping one opens the same detail sheet used everywhere else in the app (PR, lifetime volume, progress chart, recent sessions) — one unified view of a lift's stats regardless of where you tapped in from.
 - **Profile** — display name, member-since date, and quick lifetime counts (workouts, PRs, favorites), plus sign out.
 - **My Stats & calorie calculator** — enter height, weight, age, sex, and activity level once; get your BMR/TDEE plus four calorie + macro targets (Maintain, Cut, Bulk, Recomp) computed live as you type — protein set by bodyweight, fat as a %, carbs from what's left, fiber from the standard dietary guideline.
+- **Friends & leaderboard** — add friends by username (request/accept, or opt in to a fully public profile); see a friend's workout history read-only, and a leaderboard ranked by this week's volume with a consistency-streak bonus (+5%/consecutive week, capped +50%) and "Consistency Accolades" badges (Consistent/Dedicated/Relentless/Iron Will).
 - **Photo share** — after a workout, take or pick a photo and export a 1080×1920 PNG with your session overlaid (exercises, sets, volume, duration, PR badges), ready for the share sheet. Skip the photo and it exports a compact, square, branded card instead — no giant empty frame. The photo never leaves your device.
 - **PWA** — installable, app-like, with a cached shell.
 - **Gym-themed UI** — a dark gunmetal/rust color palette, a faint metal-grain texture, and a small hand-drawn icon set (barbell, plate, stopwatch, checklist, heart) standing in wherever a stat or empty state had no visual before.
@@ -34,19 +35,23 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 
 ```
 convex/                 # Backend: schema + all queries/mutations
-  schema.ts             #   9 tables: exercises, workouts, sets, routines, PRs, favorites…
-  workouts.ts           #   active-workout lifecycle (start → log → finish)
-  history.ts            #   past workouts, progress data, PR recomputation
+  schema.ts             #   11 tables: exercises, workouts, sets, routines, PRs,
+                        #   favorites, friendRequests, friendships…
+  workouts.ts           #   active-workout lifecycle (start → log → finish), reordering
+  history.ts            #   past workouts, progress data, PR recomputation;
+                        #   summarizeWorkout is shared with friends.ts
   exercises.ts          #   built-in library (70 seeded) + custom exercises
   routines.ts           #   templates + start-from-routine with prefill
   favorites.ts          #   star/unstar an exercise, list favorites joined with PRs
-  profiles.ts           #   display name, lifetime stats, body stats for TDEE
-  prs.ts, fitness.ts    #   PRs (Epley 1RM), TDEE/BMR + macro math — all shared with UI
+  friends.ts            #   requests/accept, leaderboard, permission-gated
+                        #   friend-workouts read (first cross-user data access)
+  profiles.ts           #   display name, username, body stats for TDEE
+  prs.ts, fitness.ts    #   PRs (Epley 1RM), TDEE/BMR/macros, leaderboard scoring
   validation.ts         #   server-side input sanitization used by all mutations
   *.test.ts             #   test suite (never deployed — see Testing)
 src/
   features/<feature>/   # UI grouped by feature: workouts, history, routines,
-                        #   exercises, favorites, profile, stats, share, auth
+                        #   exercises, favorites, friends, profile, stats, share, auth
   components/           # AppLayout (nav), ErrorBoundary, shared icons.tsx
   lib/
 scripts/                # one-time setup: auth keys, PWA icon generation
@@ -54,7 +59,7 @@ scripts/                # one-time setup: auth keys, PWA icon generation
 
 **How data flows:** components call `useQuery(api.…)` / `useMutation(api.…)`. Convex pushes query updates over a websocket, so the UI is always a live render of the database — there is no manual refetching, no cache invalidation, and an in-progress workout survives refreshes and device switches.
 
-**Security model:** there is no row-level security layer — instead **every** Convex function starts by resolving the signed-in user (`getAuthUserId`) and walks ownership before touching anything (`workout → workoutExercise → set`). Finished workouts are immutable. All inputs are sanitized server-side (`convex/validation.ts`): non-finite numbers rejected, lengths capped, enums whitelisted, growth caps enforced. The frontend ships with a strict Content-Security-Policy and friends via `vercel.json`.
+**Security model:** there is no row-level security layer — instead **every** Convex function starts by resolving the signed-in user (`getAuthUserId`) and walks ownership before touching anything (`workout → workoutExercise → set`). Finished workouts are immutable. All inputs are sanitized server-side (`convex/validation.ts`): non-finite numbers rejected, lengths capped, enums whitelisted, growth caps enforced. The frontend ships with a strict Content-Security-Policy and friends via `vercel.json`. The one deliberate exception is `friends.friendWorkouts`, which shows one user's data to another *by design* — gated on an explicit accepted-friendship check or an opt-in `workoutsPublic` flag, checked before any workout data is read.
 
 **PR logic:** a set is a record if it beats your best weight *or* your best estimated 1RM — `e1RM = weight × (1 + reps/30)`, with a 1-rep set counting as itself. Warm-ups never count. Records are cached per `(user, exercise)` and recomputed from remaining history if you delete a workout.
 
@@ -84,7 +89,7 @@ npm run dev           # Vite dev server → http://localhost:5173
 ## Testing
 
 ```bash
-npm test              # 67 tests, ~1.8s
+npm test              # 87 tests, ~2s
 ```
 
 The suite runs the **actual backend functions** against an in-memory Convex (`convex-test`):
@@ -94,8 +99,9 @@ The suite runs the **actual backend functions** against an in-memory Convex (`co
 - `history.test.ts` — record recomputation after deleting workouts, pagination.
 - `routines.test.ts` — CRUD, last-performance prefill, active-workout guard.
 - `favorites.test.ts` — toggle on/off, joined PR data, rejects favoriting an exercise you can't see, cross-user isolation.
+- `friends.test.ts` — request/accept/decline, two-way friendship on accept, leaderboard scoring, and the security matrix for the one query that intentionally crosses users: a stranger can't view your workouts, a friend can, a public opt-in overrides for anyone.
 - `profiles.test.ts` — defaults before a profile row exists, set/clear display name and body stats, validation, cross-user isolation.
-- `fitness.test.ts` — the pure math: Epley 1RM/PR checks and the TDEE/BMR/macro calculations.
+- `fitness.test.ts` — the pure math: Epley 1RM/PR checks, TDEE/BMR/macro calculations, and the consistency-streak/leaderboard scoring.
 
 Test files live in `convex/` next to the code they test; the Convex CLI skips any file whose basename has more than one dot (`*.test.ts`, `test.helpers.ts`), so they are never deployed.
 

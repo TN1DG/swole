@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { assertRange } from './validation'
+import { assertRange, cleanUsername } from './validation'
 
 // Plausibility bounds for the body-stats form — not abuse prevention (there's
 // no query-cost concern here), just sane limits for a calorie calculator.
@@ -68,7 +68,44 @@ export const getMine = query({
       age: profile?.age ?? null,
       sex: profile?.sex ?? null,
       activityLevel: profile?.activityLevel ?? null,
+      username: profile?.username ?? null,
+      workoutsPublic: profile?.workoutsPublic ?? false,
     }
+  },
+})
+
+// One-time (well, changeable) handle — how friends find you. Lowercase and
+// unique; the friends feature is unusable until this is set.
+export const setUsername = mutation({
+  args: { username: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const username = cleanUsername(args.username)
+
+    const existing = await ctx.db
+      .query('profiles')
+      .withIndex('by_username', (q) => q.eq('username', username))
+      .unique()
+    if (existing && existing.userId !== userId) {
+      throw new Error('That username is taken')
+    }
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { username })
+  },
+})
+
+// Opt in/out of letting anyone (not just accepted friends) see your workouts.
+export const setWorkoutsPublic = mutation({
+  args: { workoutsPublic: v.boolean() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { workoutsPublic: args.workoutsPublic })
   },
 })
 
