@@ -104,12 +104,14 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
 
       {/* Exercise cards */}
       <div className="mt-5 flex flex-col gap-4">
-        {workout.exercises.map((entry) => (
+        {workout.exercises.map((entry, i) => (
           <ExerciseCard
             key={entry.workoutExerciseId}
             entry={entry}
             record={recordByExercise.get(entry.exercise._id)}
             onSaveError={reportSaveError}
+            isFirst={i === 0}
+            isLast={i === workout.exercises.length - 1}
           />
         ))}
       </div>
@@ -159,22 +161,59 @@ function ExerciseCard({
   entry,
   record,
   onSaveError,
+  isFirst,
+  isLast,
 }: {
   entry: ActiveWorkoutData['exercises'][number]
   record: { bestWeightKg: number; bestWeightReps: number; bestEst1rm: number } | undefined
   onSaveError: () => void
+  isFirst: boolean
+  isLast: boolean
 }) {
   const addSet = useMutation(api.workouts.addSet)
   const removeExercise = useMutation(api.workouts.removeExercise)
+  const moveExercise = useMutation(api.workouts.moveExercise)
   const [detailOpen, setDetailOpen] = useState(false)
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* reorder */}
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={() =>
+              moveExercise({
+                workoutExerciseId: entry.workoutExerciseId,
+                direction: 'up',
+              }).catch(onSaveError)
+            }
+            disabled={isFirst}
+            className="px-1 text-muted disabled:opacity-30"
+            aria-label="Move up"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              moveExercise({
+                workoutExerciseId: entry.workoutExerciseId,
+                direction: 'down',
+              }).catch(onSaveError)
+            }
+            disabled={isLast}
+            className="px-1 text-muted disabled:opacity-30"
+            aria-label="Move down"
+          >
+            ▼
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
-          className="font-semibold text-accent underline-offset-4 hover:underline"
+          className="flex-1 text-left font-semibold text-accent underline-offset-4 hover:underline"
         >
           {entry.exercise.name}
         </button>

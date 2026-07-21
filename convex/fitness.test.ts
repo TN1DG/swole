@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { beatsRecord, epley1rm, formatDuration } from './fitness'
+import {
+  beatsRecord,
+  epley1rm,
+  formatDuration,
+  goalCalories,
+  macroTargets,
+  mifflinStJeorBmr,
+  tdee,
+} from './fitness'
 
 describe('epley1rm', () => {
   it('a single rep IS the max', () => {
@@ -53,5 +61,51 @@ describe('formatDuration', () => {
   })
   it('formats hours', () => {
     expect(formatDuration(3_665_000)).toBe('1:01:05')
+  })
+})
+
+describe('mifflinStJeorBmr', () => {
+  it('adds 5 for men, subtracts 161 for women', () => {
+    expect(mifflinStJeorBmr(80, 180, 30, 'male')).toBe(1780)
+    expect(mifflinStJeorBmr(80, 180, 30, 'female')).toBe(1614)
+  })
+})
+
+describe('tdee', () => {
+  it('scales BMR by the activity multiplier', () => {
+    expect(tdee(1780, 'sedentary')).toBeCloseTo(2136, 5)
+    expect(tdee(1780, 'moderate')).toBeCloseTo(2759, 5)
+  })
+})
+
+describe('goalCalories', () => {
+  const t = 2759
+
+  it('applies each goal\'s offset', () => {
+    expect(goalCalories(t, 'maintain')).toBe(2759)
+    expect(goalCalories(t, 'cut')).toBe(2259)
+    expect(goalCalories(t, 'bulk')).toBe(3059)
+    expect(goalCalories(t, 'recomp')).toBe(2509)
+  })
+
+  it('never suggests below the safe floor', () => {
+    expect(goalCalories(1000, 'cut')).toBe(1200)
+  })
+})
+
+describe('macroTargets', () => {
+  it('sets protein by bodyweight, fat by %, carbs from what remains', () => {
+    expect(macroTargets(2259, 80, 'cut')).toEqual({
+      calories: 2259,
+      proteinG: 176,
+      fatG: 63,
+      carbsG: 247,
+      fiberG: 32,
+    })
+  })
+
+  it('never returns negative carbs even at very low calories', () => {
+    const result = macroTargets(1200, 100, 'cut')
+    expect(result.carbsG).toBeGreaterThanOrEqual(0)
   })
 })

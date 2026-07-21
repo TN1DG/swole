@@ -9,11 +9,24 @@ export default defineSchema({
   // Tables Convex Auth needs (users, sessions, accounts, ...).
   ...authTables,
 
-  // One per user; app-level settings.
+  // One per user; app-level settings + body stats for the TDEE calculator.
   profiles: defineTable({
     userId: v.id('users'),
     displayName: v.optional(v.string()),
     unitPreference: v.union(v.literal('kg'), v.literal('lb')),
+    heightCm: v.optional(v.number()),
+    weightKg: v.optional(v.number()),
+    age: v.optional(v.number()),
+    sex: v.optional(v.union(v.literal('male'), v.literal('female'))),
+    activityLevel: v.optional(
+      v.union(
+        v.literal('sedentary'),
+        v.literal('light'),
+        v.literal('moderate'),
+        v.literal('active'),
+        v.literal('very_active'),
+      ),
+    ),
   }).index('by_user', ['userId']),
 
   // Built-in exercises have no ownerId; custom ones belong to a user.

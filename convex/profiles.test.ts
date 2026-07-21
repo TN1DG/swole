@@ -56,3 +56,75 @@ describe('profiles', () => {
     expect(bobProfile!.email).toBe('bob@test.local')
   })
 })
+
+describe('updateBodyStats', () => {
+  it('defaults to null before anything is set', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({
+      heightCm: null,
+      weightKg: null,
+      age: null,
+      sex: null,
+      activityLevel: null,
+    })
+  })
+
+  it('saves and returns body stats', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.updateBodyStats, {
+      heightCm: 180,
+      weightKg: 80,
+      age: 30,
+      sex: 'male',
+      activityLevel: 'moderate',
+    })
+
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({
+      heightCm: 180,
+      weightKg: 80,
+      age: 30,
+      sex: 'male',
+      activityLevel: 'moderate',
+    })
+  })
+
+  it('rejects implausible values', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const valid = {
+      heightCm: 180,
+      weightKg: 80,
+      age: 30,
+      sex: 'male' as const,
+      activityLevel: 'moderate' as const,
+    }
+
+    await expect(
+      user.mutation(api.profiles.updateBodyStats, { ...valid, heightCm: 900 }),
+    ).rejects.toThrow(/height/i)
+    await expect(
+      user.mutation(api.profiles.updateBodyStats, { ...valid, weightKg: -5 }),
+    ).rejects.toThrow(/weight/i)
+    await expect(
+      user.mutation(api.profiles.updateBodyStats, { ...valid, age: 3 }),
+    ).rejects.toThrow(/age/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.updateBodyStats, {
+        heightCm: 180,
+        weightKg: 80,
+        age: 30,
+        sex: 'male',
+        activityLevel: 'moderate',
+      }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})

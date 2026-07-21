@@ -231,6 +231,26 @@ export const removeSet = mutation({
   },
 })
 
+// Swap this exercise's position with its neighbor in the given direction.
+// A no-op past either end of the list (nothing to swap with).
+export const moveExercise = mutation({
+  args: {
+    workoutExerciseId: v.id('workoutExercises'),
+    direction: v.union(v.literal('up'), v.literal('down')),
+  },
+  handler: async (ctx, args) => {
+    const { workoutExercise } = await getOwnedWorkoutExercise(ctx, args.workoutExerciseId)
+    const ordered = await exercisesOf(ctx, workoutExercise.workoutId)
+    const index = ordered.findIndex((we) => we._id === workoutExercise._id)
+    const targetIndex = args.direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= ordered.length) return
+
+    const target = ordered[targetIndex]
+    await ctx.db.patch(workoutExercise._id, { position: target.position })
+    await ctx.db.patch(target._id, { position: workoutExercise.position })
+  },
+})
+
 export const removeExercise = mutation({
   args: { workoutExerciseId: v.id('workoutExercises') },
   handler: async (ctx, args) => {

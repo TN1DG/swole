@@ -294,3 +294,64 @@ describe('misc lifecycle', () => {
     expect(records[0].bestEst1rm).toBeCloseTo(epley1rm(100, 5), 5)
   })
 })
+
+describe('moveExercise', () => {
+  it('swaps order with the neighbor above/below, no-op past either end', async () => {
+    const { t, user } = await oneUser()
+    const bench = await createBuiltInExercise(t, 'Bench')
+    const squat = await createBuiltInExercise(t, 'Squat')
+    const row = await createBuiltInExercise(t, 'Row')
+
+    const workoutId = await user.mutation(api.workouts.start, {})
+    await user.mutation(api.workouts.addExercise, { workoutId, exerciseId: bench })
+    await user.mutation(api.workouts.addExercise, { workoutId, exerciseId: squat })
+    await user.mutation(api.workouts.addExercise, { workoutId, exerciseId: row })
+
+    async function names() {
+      const active = await user.query(api.workouts.getActive, {})
+      return active!.exercises.map((e) => e.exercise.name)
+    }
+
+    expect(await names()).toEqual(['Bench', 'Squat', 'Row'])
+
+    let active = await user.query(api.workouts.getActive, {})
+    await user.mutation(api.workouts.moveExercise, {
+      workoutExerciseId: active!.exercises[1].workoutExerciseId, // Squat
+      direction: 'up',
+    })
+    expect(await names()).toEqual(['Squat', 'Bench', 'Row'])
+
+    active = await user.query(api.workouts.getActive, {})
+    await user.mutation(api.workouts.moveExercise, {
+      workoutExerciseId: active!.exercises[0].workoutExerciseId, // Squat, now first
+      direction: 'up',
+    })
+    expect(await names()).toEqual(['Squat', 'Bench', 'Row']) // no-op past the top
+
+    active = await user.query(api.workouts.getActive, {})
+    await user.mutation(api.workouts.moveExercise, {
+      workoutExerciseId: active!.exercises[2].workoutExerciseId, // Row, last
+      direction: 'down',
+    })
+    expect(await names()).toEqual(['Squat', 'Bench', 'Row']) // no-op past the bottom
+  })
+
+  it("bob cannot reorder alice's workout", async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    const workoutId = await alice.mutation(api.workouts.start, {})
+    await alice.mutation(api.workouts.addExercise, { workoutId, exerciseId })
+    await alice.mutation(api.workouts.addExercise, { workoutId, exerciseId })
+    const active = await alice.query(api.workouts.getActive, {})
+
+    await expect(
+      bob.mutation(api.workouts.moveExercise, {
+        workoutExerciseId: active!.exercises[0].workoutExerciseId,
+        direction: 'down',
+      }),
+    ).rejects.toThrow(/not found/i)
+  })
+})

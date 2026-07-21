@@ -109,3 +109,20 @@ export function ClipboardIcon({ className = 'h-4 w-4' }: IconProps) {
     </svg>
   )
 }
+
+// Calories, for the My Stats / TDEE calculator page.
+export function FlameIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 22c4 0 7-2.7 7-7 0-2.8-1.8-4.7-2.8-6.4-.7 1.4-1.7 2.4-2.7 2.4.7-3-.7-6-3.5-8 0 2.8-1 4.5-2.8 6.3C5.8 11 5 13 5 15c0 4.3 3 7 7 7Z" />
+    </svg>
+  )
+}

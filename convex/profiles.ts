@@ -2,6 +2,15 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
+import { assertRange } from './validation'
+
+// Plausibility bounds for the body-stats form — not abuse prevention (there's
+// no query-cost concern here), just sane limits for a calorie calculator.
+const STATS_BOUNDS = {
+  heightCm: [50, 260] as const,
+  weightKg: [20, 400] as const,
+  age: [13, 120] as const,
+}
 
 // No profile row exists until the user first sets something (display name or
 // unit preference) — create one on demand instead of on every sign-up.
@@ -54,7 +63,47 @@ export const getMine = query({
       workoutCount: workouts.filter((w) => w.endedAt !== undefined).length,
       prCount: prs.length,
       favoriteCount: favorites.length,
+      heightCm: profile?.heightCm ?? null,
+      weightKg: profile?.weightKg ?? null,
+      age: profile?.age ?? null,
+      sex: profile?.sex ?? null,
+      activityLevel: profile?.activityLevel ?? null,
     }
+  },
+})
+
+// Body stats for the My Stats / TDEE calculator page. All five are required
+// together — the calorie math needs every one of them to mean anything.
+export const updateBodyStats = mutation({
+  args: {
+    heightCm: v.number(),
+    weightKg: v.number(),
+    age: v.number(),
+    sex: v.union(v.literal('male'), v.literal('female')),
+    activityLevel: v.union(
+      v.literal('sedentary'),
+      v.literal('light'),
+      v.literal('moderate'),
+      v.literal('active'),
+      v.literal('very_active'),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const heightCm = assertRange(args.heightCm, ...STATS_BOUNDS.heightCm, 'Height')
+    const weightKg = assertRange(args.weightKg, ...STATS_BOUNDS.weightKg, 'Weight')
+    const age = Math.round(assertRange(args.age, ...STATS_BOUNDS.age, 'Age'))
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, {
+      heightCm,
+      weightKg,
+      age,
+      sex: args.sex,
+      activityLevel: args.activityLevel,
+    })
   },
 })
 

@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
-import { BarbellIcon, HeartOutlineIcon } from '../../components/icons'
+import { BarbellIcon, FlameIcon, HeartOutlineIcon } from '../../components/icons'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
@@ -95,10 +96,17 @@ export function ProfilePage() {
         />
       </div>
 
+      <Link
+        to="/stats"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3 font-semibold"
+      >
+        <FlameIcon /> My Stats
+      </Link>
+
       <button
         type="button"
         onClick={() => void signOut()}
-        className="mt-6 w-full rounded-xl border border-border py-3 font-semibold text-red-400"
+        className="mt-3 w-full rounded-xl border border-border py-3 font-semibold text-red-400"
       >
         Sign out
       </button>
