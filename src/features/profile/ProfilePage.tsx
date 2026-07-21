@@ -65,13 +65,15 @@ export function ProfilePage() {
           </form>
         ) : (
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-lg font-bold">{profile?.displayName ?? profile?.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold">
+                {profile?.displayName ?? profile?.email}
+              </p>
               {profile?.displayName && (
-                <p className="text-sm text-muted">{profile.email}</p>
+                <p className="truncate text-sm text-muted">{profile.email}</p>
               )}
               {profile?.username && (
-                <p className="text-sm text-accent">@{profile.username}</p>
+                <p className="truncate text-sm text-accent">@{profile.username}</p>
               )}
               <p className="mt-1 text-xs text-muted">
                 Member since {formatShortDate(profile!.memberSince)}

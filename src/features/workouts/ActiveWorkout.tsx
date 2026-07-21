@@ -189,7 +189,7 @@ function ExerciseCard({
               }).catch(onSaveError)
             }
             disabled={isFirst}
-            className="px-1 text-muted disabled:opacity-30"
+            className="px-2 py-1.5 text-muted disabled:opacity-30"
             aria-label="Move up"
           >
             ▲
@@ -203,7 +203,7 @@ function ExerciseCard({
               }).catch(onSaveError)
             }
             disabled={isLast}
-            className="px-1 text-muted disabled:opacity-30"
+            className="px-2 py-1.5 text-muted disabled:opacity-30"
             aria-label="Move down"
           >
             ▼
@@ -226,7 +226,7 @@ function ExerciseCard({
               }).catch(onSaveError)
             }
           }}
-          className="px-2 text-muted"
+          className="px-2 py-2 text-muted"
           aria-label="Remove exercise"
         >
           ✕
@@ -361,7 +361,7 @@ function SetRow({
       <button
         type="button"
         onClick={() => removeSet({ setId: set._id }).catch(onSaveError)}
-        className="justify-self-center text-muted"
+        className="justify-self-center rounded-md p-2 text-muted"
         aria-label="Remove set"
       >
         ✕

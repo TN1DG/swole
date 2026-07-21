@@ -41,13 +41,13 @@ export function AppLayout() {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs ${
+                `flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-[10px] leading-tight [&>svg]:h-5 [&>svg]:w-5 ${
                   isActive ? 'text-accent' : 'text-muted'
                 }`
               }
             >
               <Icon />
-              {label}
+              <span className="w-full truncate text-center">{label}</span>
             </NavLink>
           ))}
         </div>

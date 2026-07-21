@@ -60,9 +60,9 @@ function WorkoutList() {
           to={`/history/${w._id}`}
           className="rounded-2xl border border-border bg-surface p-4"
         >
-          <div className="flex items-baseline justify-between">
-            <p className="font-semibold">{w.name}</p>
-            <p className="text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="min-w-0 truncate font-semibold">{w.name}</p>
+            <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
           </div>
           <p className="mt-1 text-sm text-muted">
             {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg ·{' '}

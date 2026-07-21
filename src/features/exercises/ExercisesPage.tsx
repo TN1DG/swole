@@ -97,18 +97,18 @@ export function ExercisesPage() {
                     type="button"
                     // Opens the detail sheet: chart, PRs, recent sessions.
                     onClick={() => setSelected(ex)}
-                    className="flex w-full items-center justify-between rounded-xl border border-border bg-surface py-3 pr-12 pl-4 text-left"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface py-3 pr-12 pl-4 text-left"
                   >
-                    <div>
-                      <p className="font-medium">{ex.name}</p>
-                      <p className="text-sm text-muted">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{ex.name}</p>
+                      <p className="truncate text-sm text-muted">
                         {ex.equipment}
                         {recordByExercise.has(ex._id) &&
                           ` · 🏆 ${recordByExercise.get(ex._id)!.bestWeightKg} kg`}
                       </p>
                     </div>
                     {ex.isCustom && (
-                      <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent">
+                      <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent">
                         Custom
                       </span>
                     )}

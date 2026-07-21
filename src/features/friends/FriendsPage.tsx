@@ -139,9 +139,9 @@ function FriendsHub() {
             <p className="text-sm text-muted">That's you!</p>
           ) : (
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="font-medium">{searchResult.displayName}</p>
-                <p className="text-sm text-muted">@{searchResult.username}</p>
+              <div className="min-w-0">
+                <p className="truncate font-medium">{searchResult.displayName}</p>
+                <p className="truncate text-sm text-muted">@{searchResult.username}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <Link
@@ -184,10 +184,10 @@ function FriendsHub() {
             {incoming.map((r) => (
               <div
                 key={r.requestId}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-4 py-3"
               >
-                <p className="font-medium">{r.from.displayName}</p>
-                <div className="flex gap-2">
+                <p className="min-w-0 truncate font-medium">{r.from.displayName}</p>
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -222,15 +222,15 @@ function FriendsHub() {
             {outgoing.map((r) => (
               <div
                 key={r.requestId}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-4 py-3"
               >
-                <p className="font-medium">{r.to.displayName}</p>
+                <p className="min-w-0 truncate font-medium">{r.to.displayName}</p>
                 <button
                   type="button"
                   onClick={() =>
                     runAction(() => declineFriendRequest({ requestId: r.requestId }))
                   }
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+                  className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
                 >
                   Cancel
                 </button>
@@ -255,17 +255,19 @@ function FriendsHub() {
                 entry.isMe ? 'border-accent/40 bg-surface' : 'border-border bg-surface'
               }`}
             >
-              <span className="w-5 text-center text-sm font-bold text-muted">{i + 1}</span>
-              <div className="flex-1">
-                <p className="font-medium">
+              <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">
                   {entry.displayName}
                   {entry.isMe && <span className="text-muted"> (you)</span>}
                 </p>
                 {TIER_LABELS[entry.tier] && (
-                  <p className="text-xs text-accent">{TIER_LABELS[entry.tier]}</p>
+                  <p className="truncate text-xs text-accent">{TIER_LABELS[entry.tier]}</p>
                 )}
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <p className="font-bold">{entry.score} pts</p>
                 <p className="text-xs text-muted">{formatKg(entry.weekVolumeKg)} kg</p>
               </div>
@@ -288,15 +290,15 @@ function FriendsHub() {
           {friends.map((f) => (
             <div
               key={f.userId}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-4 py-3"
             >
-              <Link to={`/friends/${f.userId}`} className="font-medium">
+              <Link to={`/friends/${f.userId}`} className="min-w-0 flex-1 truncate font-medium">
                 {f.displayName}
               </Link>
               <button
                 type="button"
                 onClick={() => runAction(() => removeFriend({ friendId: f.userId }))}
-                className="text-sm text-muted"
+                className="shrink-0 text-sm text-muted"
               >
                 Remove
               </button>
