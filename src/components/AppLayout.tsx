@@ -13,8 +13,9 @@ const tabs = [
 export function AppLayout() {
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 pt-4">
+      {/* Top bar. iOS status bar is translucent (viewport-fit=cover), so this
+          needs its own safe-area padding or it renders under the notch/clock. */}
+      <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <span className="text-lg font-black uppercase tracking-[0.15em] text-accent">SWOLE</span>
         <NavLink
           to="/profile"

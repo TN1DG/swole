@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'Swole — Workout Logger',
         short_name: 'Swole',
         description: 'Log workouts, track PRs, share your session.',
-        theme_color: '#0b0c10',
-        background_color: '#0b0c10',
+        theme_color: '#131210',
+        background_color: '#131210',
         display: 'standalone',
         start_url: '/',
         icons: [
