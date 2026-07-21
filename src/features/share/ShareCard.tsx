@@ -48,9 +48,12 @@ export const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
   return (
     <div
       ref={ref}
-      className="relative aspect-[9/16] w-full overflow-hidden bg-bg"
+      className={`relative w-full overflow-hidden bg-bg ${
+        photoUrl ? 'aspect-[9/16]' : 'aspect-square'
+      }`}
     >
-      {/* Background: the photo, or a gradient if none was added */}
+      {/* Background: the photo, or — no picture taken — a compact branded
+          card with a big SWOLE mark instead of a tall empty gradient. */}
       {photoUrl ? (
         <img
           src={photoUrl}
@@ -58,7 +61,9 @@ export const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-[#2d1b4e] via-[#0b0c10] to-[#0b3a33]" />
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#3a2015] via-[#131210] to-[#241f1a]">
+          <SwoleMark />
+        </div>
       )}
 
       {/* Overlay card, bottom-anchored like Hevy */}
@@ -108,3 +113,23 @@ export const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
     </div>
   )
 })
+
+// Big centered wordmark shown instead of an empty gradient when no photo
+// was added — the card leans on branding rather than blank space.
+function SwoleMark() {
+  return (
+    <div className="flex flex-col items-center gap-3 text-accent">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        className="h-20 w-20 opacity-90"
+      >
+        <path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11" />
+      </svg>
+      <p className="text-3xl font-black text-text uppercase tracking-[0.2em]">SWOLE</p>
+    </div>
+  )
+}

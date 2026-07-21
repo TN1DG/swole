@@ -30,4 +30,5 @@ export const LIMITS = {
   routinesPerUser: 100,
   exercisesPerRoutine: 30,
   noteLength: 500,
+  favoritesPerUser: 300,
 } as const

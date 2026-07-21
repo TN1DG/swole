@@ -1,9 +1,11 @@
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
+import { ExerciseDetail } from '../exercises/ExerciseDetail'
 
 export function WorkoutDetailPage() {
   const { workoutId } = useParams()
@@ -13,6 +15,13 @@ export function WorkoutDetailPage() {
   const detail = useQuery(api.history.getDetail, {
     workoutId: workoutId as Id<'workouts'>,
   })
+
+  const prs = useQuery(api.prs.listMine)
+  const recordByExercise = useMemo(
+    () => new Map((prs ?? []).map((r) => [r.exerciseId, r])),
+    [prs],
+  )
+  const [selected, setSelected] = useState<Doc<'exercises'> | null>(null)
 
   if (detail === undefined)
     return <p className="mt-8 text-center text-muted">Loading…</p>
@@ -58,10 +67,14 @@ export function WorkoutDetailPage() {
             key={entry.workoutExerciseId}
             className="rounded-2xl border border-border bg-surface p-3"
           >
-            <h2 className="font-semibold text-accent">
+            <button
+              type="button"
+              onClick={() => setSelected(entry.exercise)}
+              className="font-semibold text-accent underline-offset-4 hover:underline"
+            >
               {entry.exercise.name}
               {prSet.has(entry.exercise._id) && ' 🏆'}
-            </h2>
+            </button>
             <table className="mt-2 w-full text-sm">
               <thead>
                 <tr className="text-left text-xs tracking-wide text-muted uppercase">
@@ -99,6 +112,14 @@ export function WorkoutDetailPage() {
       >
         Delete Workout
       </button>
+
+      {selected && (
+        <ExerciseDetail
+          exercise={selected}
+          record={recordByExercise.get(selected._id)}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

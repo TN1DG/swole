@@ -8,6 +8,8 @@ import { WorkoutDetailPage } from './features/history/WorkoutDetailPage'
 import { SharePage } from './features/share/SharePage'
 import { RoutinesPage } from './features/routines/RoutinesPage'
 import { ExercisesPage } from './features/exercises/ExercisesPage'
+import { FavoritesPage } from './features/favorites/FavoritesPage'
+import { ProfilePage } from './features/profile/ProfilePage'
 
 export default function App() {
   return (
@@ -32,6 +34,8 @@ export default function App() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/history/:workoutId" element={<WorkoutDetailPage />} />
             <Route path="/share/:workoutId" element={<SharePage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/routines" element={<RoutinesPage />} />
             <Route path="/exercises" element={<ExercisesPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

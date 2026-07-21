@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
+import { ChecklistIcon, PlateIcon, StopwatchIcon } from '../../components/icons'
 import { ActiveWorkout, type FinishSummary } from './ActiveWorkout'
 
 export function WorkoutsPage() {
@@ -34,9 +35,21 @@ export function WorkoutsPage() {
             <>
               <p className="text-lg font-bold">Workout saved! 💪</p>
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <Stat label="Duration" value={formatDuration(summary.durationMs)} />
-                <Stat label="Volume" value={`${formatKg(summary.totalVolumeKg)} kg`} />
-                <Stat label="Sets" value={String(summary.completedSetCount)} />
+                <Stat
+                  icon={<StopwatchIcon />}
+                  label="Duration"
+                  value={formatDuration(summary.durationMs)}
+                />
+                <Stat
+                  icon={<PlateIcon />}
+                  label="Volume"
+                  value={`${formatKg(summary.totalVolumeKg)} kg`}
+                />
+                <Stat
+                  icon={<ChecklistIcon />}
+                  label="Sets"
+                  value={String(summary.completedSetCount)}
+                />
                 <Stat
                   label="New PRs"
                   value={summary.prCount > 0 ? `🏆 ${summary.prCount}` : '—'}
@@ -100,10 +113,21 @@ export function WorkoutsPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: string
+  icon?: React.ReactNode
+}) {
   return (
     <div className="rounded-xl bg-surface-2 p-3">
-      <p className="text-xs text-muted uppercase">{label}</p>
+      <p className="flex items-center gap-1 text-xs text-muted uppercase">
+        {icon}
+        {label}
+      </p>
       <p className="mt-1 text-lg font-bold">{value}</p>
     </div>
   )

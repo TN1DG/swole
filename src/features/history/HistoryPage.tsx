@@ -4,6 +4,7 @@ import { usePaginatedQuery, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
+import { BarbellIcon } from '../../components/icons'
 
 export function HistoryPage() {
   const [tab, setTab] = useState<'workouts' | 'records'>('workouts')
@@ -45,9 +46,10 @@ function WorkoutList() {
     return <p className="mt-8 text-center text-muted">Loading…</p>
   if (workouts.length === 0)
     return (
-      <p className="mt-8 text-center text-muted">
-        No workouts yet — go lift something!
-      </p>
+      <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
+        <BarbellIcon className="h-8 w-8" />
+        <p>No workouts yet — go lift something!</p>
+      </div>
     )
 
   return (
@@ -101,7 +103,7 @@ function RecordList() {
   if (records.length === 0)
     return (
       <p className="mt-8 text-center text-muted">
-        Finish a workout to set your first records.
+        🏆 Finish a workout to set your first records.
       </p>
     )
 

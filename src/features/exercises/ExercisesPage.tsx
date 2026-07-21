@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { MUSCLE_GROUPS } from '../../../convex/constants'
+import { BarbellIcon } from '../../components/icons'
 import { ExerciseDetail } from './ExerciseDetail'
 import { ExerciseForm } from './ExerciseForm'
 
@@ -15,6 +16,10 @@ export function ExercisesPage() {
     () => new Map((prs ?? []).map((r) => [r.exerciseId, r])),
     [prs],
   )
+
+  const favoriteIds = useQuery(api.favorites.myFavoriteIds)
+  const favoriteIdSet = useMemo(() => new Set(favoriteIds ?? []), [favoriteIds])
+  const toggleFavorite = useMutation(api.favorites.toggle)
 
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
@@ -75,7 +80,10 @@ export function ExercisesPage() {
       {exercises === undefined ? (
         <p className="mt-8 text-center text-muted">Loading…</p>
       ) : sections.length === 0 ? (
-        <p className="mt-8 text-center text-muted">No exercises found.</p>
+        <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
+          <BarbellIcon className="h-8 w-8" />
+          <p>No exercises found.</p>
+        </div>
       ) : (
         sections.map(({ group, items }) => (
           <section key={group} className="mt-5">
@@ -84,12 +92,12 @@ export function ExercisesPage() {
             </h2>
             <ul className="mt-2 flex flex-col gap-2">
               {items.map((ex) => (
-                <li key={ex._id}>
+                <li key={ex._id} className="relative">
                   <button
                     type="button"
                     // Opens the detail sheet: chart, PRs, recent sessions.
                     onClick={() => setSelected(ex)}
-                    className="flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-left"
+                    className="flex w-full items-center justify-between rounded-xl border border-border bg-surface py-3 pr-12 pl-4 text-left"
                   >
                     <div>
                       <p className="font-medium">{ex.name}</p>
@@ -104,6 +112,16 @@ export function ExercisesPage() {
                         Custom
                       </span>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleFavorite({ exerciseId: ex._id })}
+                    aria-label={
+                      favoriteIdSet.has(ex._id) ? 'Remove from favorites' : 'Add to favorites'
+                    }
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-lg leading-none"
+                  >
+                    {favoriteIdSet.has(ex._id) ? '❤️' : '🤍'}
                   </button>
                 </li>
               ))}

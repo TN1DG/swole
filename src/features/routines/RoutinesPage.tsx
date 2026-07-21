@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
+import { ClipboardIcon } from '../../components/icons'
 import { RoutineEditor, type RoutineDraft } from './RoutineEditor'
 
 export function RoutinesPage() {
@@ -46,9 +47,10 @@ export function RoutinesPage() {
       {routines === undefined ? (
         <p className="mt-8 text-center text-muted">Loading…</p>
       ) : routines.length === 0 ? (
-        <p className="mt-8 text-center text-muted">
-          No routines yet. Build one and start workouts with two taps.
-        </p>
+        <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
+          <ClipboardIcon className="h-8 w-8" />
+          <p>No routines yet. Build one and start workouts with two taps.</p>
+        </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           {routines.map((routine) => (

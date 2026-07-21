@@ -1,17 +1,18 @@
 @import 'tailwindcss';
 
-/* Design tokens for the app. Tailwind v4 reads these via the @theme block. */
+/* Design tokens for the app. Tailwind v4 reads these via the @theme block.
+   Palette: gunmetal/iron base with an oxidized-rust accent and brass PR gold. */
 @theme {
-  --color-bg: #0b0c10;
-  --color-surface: #16171d;
-  --color-surface-2: #1f2028;
-  --color-border: #2e303a;
-  --color-text: #e8e9ee;
-  --color-muted: #9ca3af;
-  --color-accent: #a855f7;
-  --color-accent-fg: #ffffff;
-  --color-success: #22c55e;
-  --color-pr: #f59e0b;
+  --color-bg: #131210;
+  --color-surface: #1e1c19;
+  --color-surface-2: #292522;
+  --color-border: #453d35;
+  --color-text: #f0ebe3;
+  --color-muted: #a89a8c;
+  --color-accent: #c1541f;
+  --color-accent-fg: #fff7f0;
+  --color-success: #7a9a52;
+  --color-pr: #d9a441;
 }
 
 html,
@@ -26,6 +27,25 @@ body {
   color: var(--color-text);
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+/* Faint oxidized-metal grain over the whole app; subliminal texture, not noise
+   you consciously notice. Sits behind #root so it never blocks interaction. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 /* Prevent iOS from zooming when focusing inputs (font-size >= 16px). */

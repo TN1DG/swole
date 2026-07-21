@@ -4,6 +4,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { beatsRecord, formatDuration, formatKg } from '../../../convex/fitness'
+import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { ExercisePicker } from './ExercisePicker'
 
 // The exact shape getActive returns, minus null — TypeScript derives it
@@ -160,16 +161,23 @@ function ExerciseCard({
   onSaveError,
 }: {
   entry: ActiveWorkoutData['exercises'][number]
-  record: { bestWeightKg: number; bestEst1rm: number } | undefined
+  record: { bestWeightKg: number; bestWeightReps: number; bestEst1rm: number } | undefined
   onSaveError: () => void
 }) {
   const addSet = useMutation(api.workouts.addSet)
   const removeExercise = useMutation(api.workouts.removeExercise)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-accent">{entry.exercise.name}</h2>
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          className="font-semibold text-accent underline-offset-4 hover:underline"
+        >
+          {entry.exercise.name}
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -210,6 +218,14 @@ function ExerciseCard({
       >
         + Add Set
       </button>
+
+      {detailOpen && (
+        <ExerciseDetail
+          exercise={entry.exercise}
+          record={record}
+          onClose={() => setDetailOpen(false)}
+        />
+      )}
     </section>
   )
 }

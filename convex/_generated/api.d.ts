@@ -11,9 +11,11 @@
 import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
 import type * as exercises from "../exercises.js";
+import type * as favorites from "../favorites.js";
 import type * as fitness from "../fitness.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
+import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
 import type * as routines from "../routines.js";
 import type * as seedData from "../seedData.js";
@@ -30,9 +32,11 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   constants: typeof constants;
   exercises: typeof exercises;
+  favorites: typeof favorites;
   fitness: typeof fitness;
   history: typeof history;
   http: typeof http;
+  profiles: typeof profiles;
   prs: typeof prs;
   routines: typeof routines;
   seedData: typeof seedData;

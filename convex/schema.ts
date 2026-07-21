@@ -68,6 +68,14 @@ export default defineSchema({
     completed: v.boolean(),
   }).index('by_workoutExercise', ['workoutExerciseId']),
 
+  // Exercises a user has starred, for the Favorites page.
+  favorites: defineTable({
+    ownerId: v.id('users'),
+    exerciseId: v.id('exercises'),
+  })
+    .index('by_owner', ['ownerId'])
+    .index('by_owner_exercise', ['ownerId', 'exerciseId']),
+
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({
     ownerId: v.id('users'),
