@@ -18,6 +18,7 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 - **Photo share** — after a workout, take or pick a photo and export a 1080×1920 PNG with your session overlaid (exercises, sets, volume, duration, PR badges), ready for the share sheet. Skip the photo and it exports a compact, square, branded card instead — no giant empty frame. The photo never leaves your device.
 - **PWA** — installable, app-like, with a cached shell.
 - **Gym-themed UI** — a dark gunmetal/rust color palette, a faint metal-grain texture, and a small hand-drawn icon set (barbell, plate, stopwatch, checklist, heart) standing in wherever a stat or empty state had no visual before.
+- **Feature requests** — a "Suggest a feature" box on the Profile page; submissions email the developer instantly via Resend.
 
 ## Tech Stack
 
@@ -28,6 +29,7 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 | Backend | [Convex](https://convex.dev) | Reactive database + serverless functions; `useQuery` results update live across devices with zero refetch code |
 | Auth | [Convex Auth](https://labs.convex.dev/auth) | Email/password, JWTs signed server-side, no third-party service |
 | Image export | [modern-screenshot](https://github.com/qq15725/modern-screenshot) | Renders the share-card DOM node to a high-res PNG (what you preview is exactly what exports) |
+| Email | [Resend](https://resend.com) | One `fetch` call from a Convex action, no SDK — used to email the developer on feature-request submissions |
 | Testing | [Vitest](https://vitest.dev) + [convex-test](https://github.com/get-convex/convex-test) | Runs the real backend functions against an in-memory Convex |
 | Hosting | [Vercel](https://vercel.com) (frontend) + Convex Cloud (backend) | Free tiers, one-command deploys |
 
@@ -35,8 +37,8 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 
 ```
 convex/                 # Backend: schema + all queries/mutations
-  schema.ts             #   11 tables: exercises, workouts, sets, routines, PRs,
-                        #   favorites, friendRequests, friendships…
+  schema.ts             #   12 tables: exercises, workouts, sets, routines, PRs,
+                        #   favorites, friendRequests, friendships, featureRequests…
   workouts.ts           #   active-workout lifecycle (start → log → finish), reordering
   history.ts            #   past workouts, progress data, PR recomputation;
                         #   summarizeWorkout is shared with friends.ts
@@ -45,6 +47,7 @@ convex/                 # Backend: schema + all queries/mutations
   favorites.ts          #   star/unstar an exercise, list favorites joined with PRs
   friends.ts            #   requests/accept, leaderboard, permission-gated
                         #   friend-workouts read (first cross-user data access)
+  featureRequests.ts    #   saves a suggestion, schedules a Resend email to the owner
   profiles.ts           #   display name, username, body stats for TDEE
   prs.ts, fitness.ts    #   PRs (Epley 1RM), TDEE/BMR/macros, leaderboard scoring
   validation.ts         #   server-side input sanitization used by all mutations
@@ -86,10 +89,12 @@ npx convex dev        # watches convex/ and pushes functions
 npm run dev           # Vite dev server → http://localhost:5173
 ```
 
+Optional: `npx convex env set RESEND_API_KEY re_...` to enable feature-request emails (get a free key at [resend.com](https://resend.com)). Without it, submissions still save — the email send is just skipped with a console warning.
+
 ## Testing
 
 ```bash
-npm test              # 87 tests, ~2s
+npm test              # 92 tests, ~2s
 ```
 
 The suite runs the **actual backend functions** against an in-memory Convex (`convex-test`):
@@ -100,6 +105,7 @@ The suite runs the **actual backend functions** against an in-memory Convex (`co
 - `routines.test.ts` — CRUD, last-performance prefill, active-workout guard.
 - `favorites.test.ts` — toggle on/off, joined PR data, rejects favoriting an exercise you can't see, cross-user isolation.
 - `friends.test.ts` — request/accept/decline, two-way friendship on accept, leaderboard scoring, and the security matrix for the one query that intentionally crosses users: a stranger can't view your workouts, a friend can, a public opt-in overrides for anyone.
+- `featureRequests.test.ts` — validation, per-user cap, and the scheduled Resend email path with `fetch` mocked (never hits the real network in tests).
 - `profiles.test.ts` — defaults before a profile row exists, set/clear display name and body stats, validation, cross-user isolation.
 - `fitness.test.ts` — the pure math: Epley 1RM/PR checks, TDEE/BMR/macro calculations, and the consistency-streak/leaderboard scoring.
 
@@ -119,7 +125,7 @@ One command: pushes functions to the production Convex deployment, rebuilds the 
 - kg/lb display toggle (weights are stored canonically in kg; the profile's `unitPreference` field exists but isn't wired into any display yet)
 - Bodyweight / rep-only PR tracking
 - Workout notes UI (schema field already exists)
-- Password reset + email verification (needs an email provider)
+- Password reset + email verification (Resend is already wired up for feature-request emails — reusing it here is mostly template work now)
 - Offline logging with sync
 - Native iOS/Android wrap via Capacitor
 

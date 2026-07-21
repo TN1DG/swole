@@ -113,6 +113,12 @@ export default defineSchema({
     .index('by_owner', ['ownerId'])
     .index('by_owner_exercise', ['ownerId', 'exerciseId']),
 
+  // A user-submitted feature suggestion, emailed to the app owner on submit.
+  featureRequests: defineTable({
+    userId: v.id('users'),
+    text: v.string(),
+  }).index('by_user', ['userId']),
+
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({
     ownerId: v.id('users'),

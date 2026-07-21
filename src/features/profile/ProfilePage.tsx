@@ -4,18 +4,29 @@ import { useMutation, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
-import { BarbellIcon, FlameIcon, HeartOutlineIcon, PeopleIcon } from '../../components/icons'
+import {
+  BarbellIcon,
+  ClipboardIcon,
+  FlameIcon,
+  HeartOutlineIcon,
+  PeopleIcon,
+} from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
   const updateDisplayName = useMutation(api.profiles.updateDisplayName)
   const setWorkoutsPublic = useMutation(api.profiles.setWorkoutsPublic)
+  const submitFeatureRequest = useMutation(api.featureRequests.submit)
   const { signOut } = useAuthActions()
 
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  const [featureText, setFeatureText] = useState('')
+  const [featureError, setFeatureError] = useState<string | null>(null)
+  const [featureSent, setFeatureSent] = useState(false)
 
   if (profile === undefined) {
     return <p className="mt-8 text-center text-muted">Loading…</p>
@@ -29,6 +40,19 @@ export function ProfilePage() {
       setEditing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.')
+    }
+  }
+
+  async function handleSubmitFeatureRequest(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setFeatureError(null)
+    setFeatureSent(false)
+    try {
+      await submitFeatureRequest({ text: featureText })
+      setFeatureText('')
+      setFeatureSent(true)
+    } catch (err) {
+      setFeatureError(err instanceof Error ? err.message : 'Could not send.')
     }
   }
 
@@ -123,6 +147,31 @@ export function ProfilePage() {
           className="h-5 w-5 shrink-0 accent-accent"
         />
       </label>
+
+      <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+        <p className="flex items-center gap-2 font-semibold">
+          <ClipboardIcon className="h-4 w-4" /> Suggest a feature
+        </p>
+        <p className="text-sm text-muted">Got an idea? It goes straight to the developer.</p>
+        <form onSubmit={handleSubmitFeatureRequest} className="mt-3 flex flex-col gap-2">
+          <textarea
+            value={featureText}
+            onChange={(e) => setFeatureText(e.target.value)}
+            placeholder="I'd love to see…"
+            rows={3}
+            className="w-full resize-none rounded-lg border border-border bg-surface-2 px-3 py-2 outline-none focus:border-accent"
+          />
+          {featureError && <p className="text-sm text-red-400">{featureError}</p>}
+          {featureSent && <p className="text-sm text-success">Sent — thanks!</p>}
+          <button
+            type="submit"
+            disabled={!featureText.trim()}
+            className="rounded-lg bg-accent py-2 font-semibold text-accent-fg disabled:opacity-50"
+          >
+            Submit
+          </button>
+        </form>
+      </div>
 
       <Link
         to="/friends"

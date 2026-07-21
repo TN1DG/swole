@@ -35,7 +35,17 @@ export const LIMITS = {
   usernameMaxLength: 20,
   friendsPerUser: 200,
   friendRequestsPerUser: 50, // pending outgoing requests
+  featureRequestTextMaxLength: 1000,
+  featureRequestsPerUser: 20,
 } as const
+
+// Trimmed, non-empty, length-capped free text (feature request body, etc.).
+export function cleanText(raw: string, max: number, label = 'Text'): string {
+  const text = raw.trim()
+  if (!text) throw new Error(`${label} is required`)
+  if (text.length > max) throw new Error(`${label} too long (max ${max} characters)`)
+  return text
+}
 
 const USERNAME_PATTERN = /^[a-z0-9_]+$/
 
