@@ -4,6 +4,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { ChecklistIcon, PlateIcon, StopwatchIcon } from '../../components/icons'
+import { StatTile } from '../../components/StatTile'
 import { ActiveWorkout, type FinishSummary } from './ActiveWorkout'
 
 export function WorkoutsPage() {
@@ -35,22 +36,22 @@ export function WorkoutsPage() {
             <>
               <p className="text-lg font-bold">Workout saved! 💪</p>
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <Stat
+                <StatTile
                   icon={<StopwatchIcon />}
                   label="Duration"
                   value={formatDuration(summary.durationMs)}
                 />
-                <Stat
+                <StatTile
                   icon={<PlateIcon />}
                   label="Volume"
                   value={`${formatKg(summary.totalVolumeKg)} kg`}
                 />
-                <Stat
+                <StatTile
                   icon={<ChecklistIcon />}
                   label="Sets"
                   value={String(summary.completedSetCount)}
                 />
-                <Stat
+                <StatTile
                   label="New PRs"
                   value={summary.prCount > 0 ? `🏆 ${summary.prCount}` : '—'}
                 />
@@ -109,26 +110,6 @@ export function WorkoutsPage() {
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon?: React.ReactNode
-}) {
-  return (
-    <div className="rounded-xl bg-surface-2 p-3">
-      <p className="flex items-center gap-1 text-xs text-muted uppercase">
-        {icon}
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-bold">{value}</p>
     </div>
   )
 }

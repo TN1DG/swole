@@ -34,17 +34,17 @@ export const getMine = query({
     const userId = await getAuthUserId(ctx)
     if (userId === null) return null
 
-    const user = await ctx.db.get(userId)
-    const profile = await ctx.db
-      .query('profiles')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique()
-
-    const workouts = await ctx.db
-      .query('workouts')
-      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
-      .collect()
-    const [prs, favorites] = await Promise.all([
+    // Five independent reads — run them together instead of one at a time.
+    const [user, profile, workouts, prs, favorites] = await Promise.all([
+      ctx.db.get(userId),
+      ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique(),
+      ctx.db
+        .query('workouts')
+        .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+        .collect(),
       ctx.db
         .query('personalRecords')
         .withIndex('by_owner', (q) => q.eq('ownerId', userId))

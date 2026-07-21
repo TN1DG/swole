@@ -5,6 +5,7 @@ import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
 import { BarbellIcon, FlameIcon, HeartOutlineIcon } from '../../components/icons'
+import { StatTile } from '../../components/StatTile'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
@@ -87,9 +88,15 @@ export function ProfilePage() {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat icon={<BarbellIcon />} label="Workouts" value={String(profile!.workoutCount)} />
-        <Stat label="PRs" value={`🏆 ${profile!.prCount}`} />
-        <Stat
+        <StatTile
+          centered
+          icon={<BarbellIcon />}
+          label="Workouts"
+          value={String(profile!.workoutCount)}
+        />
+        <StatTile centered label="PRs" value={`🏆 ${profile!.prCount}`} />
+        <StatTile
+          centered
           icon={<HeartOutlineIcon />}
           label="Favorites"
           value={String(profile!.favoriteCount)}
@@ -110,26 +117,6 @@ export function ProfilePage() {
       >
         Sign out
       </button>
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon?: React.ReactNode
-}) {
-  return (
-    <div className="rounded-xl bg-surface-2 p-3 text-center">
-      <p className="flex items-center justify-center gap-1 text-xs text-muted uppercase">
-        {icon}
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-bold">{value}</p>
     </div>
   )
 }
