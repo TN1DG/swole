@@ -23,7 +23,7 @@ export function ExercisePicker({ onPick, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="flex h-[75svh] w-full max-w-lg flex-col rounded-t-2xl border-t border-border bg-surface p-4"
+        className="flex h-[75svh] w-full max-w-lg flex-col rounded-t-2xl glass-card border-b-0 p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">Add Exercise</h2>
@@ -34,7 +34,7 @@ export function ExercisePicker({ onPick, onClose }: Props) {
           autoFocus
           className="mt-3 rounded-xl border border-border bg-surface-2 px-4 py-3 outline-none focus:border-accent"
         />
-        <ul className="mt-3 flex-1 overflow-y-auto">
+        <ul className="no-scrollbar mt-3 flex-1 overflow-y-auto">
           {filtered.map((ex) => (
             <li key={ex._id}>
               <button

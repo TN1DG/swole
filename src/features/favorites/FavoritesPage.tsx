@@ -33,11 +33,11 @@ export function FavoritesPage() {
                 type="button"
                 // Same detail sheet as the Exercises tab: one place for stats.
                 onClick={() => setSelected(fav)}
-                className="flex w-full items-center justify-between rounded-xl border border-border bg-surface py-3 pr-12 pl-4 text-left"
+                className="flex w-full items-center justify-between rounded-xl glass-tile py-3 pr-12 pl-4 text-left"
               >
                 <div>
                   <p className="font-medium">{fav.exercise.name}</p>
-                  <p className="text-sm text-muted">
+                  <p className="text-sm text-muted tabular-nums">
                     {fav.exercise.equipment ?? fav.exercise.muscleGroup}
                     {fav.record &&
                       ` · 🏆 ${formatKg(fav.record.bestWeightKg)} kg × ${fav.record.bestWeightReps}`}

@@ -16,7 +16,7 @@ export function HistoryPage() {
       <FirstVisitTip tabKey="history" />
 
       {/* Segmented control */}
-      <div className="mt-4 grid grid-cols-2 rounded-xl border border-border bg-surface p-1">
+      <div className="mt-4 grid grid-cols-2 rounded-xl glass-tile p-1">
         {(['workouts', 'records'] as const).map((t) => (
           <button
             key={t}
@@ -60,13 +60,13 @@ function WorkoutList() {
         <Link
           key={w._id}
           to={`/history/${w._id}`}
-          className="rounded-2xl border border-border bg-surface p-4"
+          className="rounded-2xl glass-tile block p-4"
         >
           <div className="flex items-baseline justify-between gap-2">
             <p className="min-w-0 truncate font-semibold">{w.name}</p>
             <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
           </div>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted tabular-nums">
             {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg ·{' '}
             {w.setCount} sets
           </p>
@@ -116,11 +116,11 @@ function RecordList() {
       {sorted.map((r) => (
         <div
           key={r._id}
-          className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+          className="flex items-center justify-between rounded-xl glass-tile px-4 py-3"
         >
           <div>
             <p className="font-medium">{r.exercise?.name ?? '?'}</p>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted tabular-nums">
               🏆 {formatKg(r.bestWeightKg)} kg × {r.bestWeightReps} · est. 1RM{' '}
               {formatKg(r.bestEst1rm)} kg
             </p>

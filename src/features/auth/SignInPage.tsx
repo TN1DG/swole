@@ -161,7 +161,7 @@ export function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
             >
               {submitting ? 'One sec…' : step === 'signIn' ? 'Sign In' : 'Sign Up'}
             </button>
@@ -215,7 +215,7 @@ export function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
             >
               {submitting ? 'One sec…' : 'Verify'}
             </button>
@@ -258,7 +258,7 @@ export function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
             >
               {submitting ? 'One sec…' : 'Send reset code'}
             </button>
@@ -306,7 +306,7 @@ export function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
             >
               {submitting ? 'One sec…' : 'Reset password'}
             </button>

@@ -36,7 +36,7 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85svh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        className="no-scrollbar flex max-h-[85svh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl glass-card border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
@@ -70,37 +70,35 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
         {/* PR stats */}
         {record && (
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-surface-2 p-3">
-              <p className="text-xs text-muted uppercase">Best weight</p>
-              <p className="mt-1 font-bold">
+            <div className="rounded-xl glass-tile p-3">
+              <p className="label-micro">Best weight</p>
+              <p className="mt-1 font-bold tabular-nums">
                 🏆 {formatKg(record.bestWeightKg)} kg × {record.bestWeightReps}
               </p>
             </div>
-            <div className="rounded-xl bg-surface-2 p-3">
-              <p className="flex items-center gap-1 text-xs text-muted uppercase">
+            <div className="rounded-xl glass-tile p-3">
+              <p className="label-micro flex items-center gap-1">
                 <BarbellIcon className="h-3.5 w-3.5" /> Est. 1RM
               </p>
-              <p className="mt-1 font-bold">{formatKg(record.bestEst1rm)} kg</p>
+              <p className="mt-1 font-bold tabular-nums">{formatKg(record.bestEst1rm)} kg</p>
             </div>
           </div>
         )}
         {lifetimeVolumeKg > 0 && (
-          <div className="mt-3 rounded-xl bg-surface-2 p-3">
-            <p className="flex items-center gap-1 text-xs text-muted uppercase">
+          <div className="mt-3 rounded-xl glass-tile p-3">
+            <p className="label-micro flex items-center gap-1">
               <PlateIcon className="h-3.5 w-3.5" /> Lifetime volume
             </p>
-            <p className="mt-1 font-bold">{formatKg(lifetimeVolumeKg)} kg</p>
+            <p className="mt-1 font-bold tabular-nums">{formatKg(lifetimeVolumeKg)} kg</p>
           </div>
         )}
 
         {/* Progress chart */}
-        <h3 className="mt-5 text-sm font-semibold tracking-wide text-muted uppercase">
-          Top set per session
-        </h3>
+        <h3 className="label-micro mt-5">Top set per session</h3>
         {history === undefined ? (
           <p className="mt-3 text-center text-muted">Loading…</p>
         ) : points.length >= 2 ? (
-          <div className="mt-2 rounded-xl bg-surface-2 p-2">
+          <div className="mt-2 rounded-xl glass-tile p-2">
             <ProgressChart points={points} />
           </div>
         ) : (
@@ -112,9 +110,7 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
         {/* Recent sessions */}
         {history && history.length > 0 && (
           <>
-            <h3 className="mt-5 text-sm font-semibold tracking-wide text-muted uppercase">
-              Recent sessions
-            </h3>
+            <h3 className="label-micro mt-5">Recent sessions</h3>
             <ul className="mt-2 flex flex-col gap-2">
               {[...history]
                 .reverse()
@@ -122,7 +118,7 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
                 .map((s) => (
                   <li
                     key={s.workoutId}
-                    className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm"
+                    className="flex items-center justify-between rounded-xl glass-tile px-3 py-2 text-sm tabular-nums"
                   >
                     <span className="text-muted">{formatShortDate(s.startedAt)}</span>
                     <span className="font-medium">

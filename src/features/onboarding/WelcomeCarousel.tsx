@@ -96,7 +96,7 @@ function StorySlide({
       <button
         type="button"
         onClick={onNext}
-        className="mt-8 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+        className="btn-glow mt-8 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
       >
         {index === STORY_SLIDES.length - 1 ? "Let's set you up" : 'Next'}
       </button>
@@ -172,7 +172,7 @@ function IdentitySlide({ onNext }: { onNext: () => void }) {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+          className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
         >
           {submitting ? 'One sec…' : 'Continue'}
         </button>
@@ -252,7 +252,7 @@ function StatsSlide({
           placeholder="Age"
           className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
         />
-        <div className="grid grid-cols-2 rounded-xl border border-border bg-surface p-1">
+        <div className="grid grid-cols-2 rounded-xl glass-tile p-1">
           {(['male', 'female'] as const).map((s) => (
             <button
               key={s}
@@ -283,7 +283,7 @@ function StatsSlide({
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+          className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
         >
           {submitting ? 'One sec…' : 'See my numbers'}
         </button>
@@ -328,7 +328,7 @@ function RewardSlide({
         type="button"
         onClick={() => void handleFinish()}
         disabled={submitting}
-        className="mt-6 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+        className="btn-glow mt-6 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
       >
         {submitting ? 'One sec…' : "Let's Lift 💪"}
       </button>

@@ -87,7 +87,7 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">{workout.name}</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted tabular-nums">
             <ElapsedTimer since={workout.startedAt} /> ·{' '}
             {formatKg(volume)} kg · {doneSets.length} sets
           </p>
@@ -119,7 +119,7 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
       <button
         type="button"
         onClick={() => setPickerOpen(true)}
-        className="mt-5 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+        className="btn-glow mt-5 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
       >
         + Add Exercise
       </button>
@@ -176,7 +176,7 @@ function ExerciseCard({
   const [detailOpen, setDetailOpen] = useState(false)
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-3">
+    <section className="rounded-2xl glass-tile p-3">
       <div className="flex items-center gap-2">
         {/* reorder */}
         <div className="flex flex-col">
@@ -332,7 +332,7 @@ function SetRow({
         onFocus={(e) => e.target.select()}
         inputMode="decimal"
         placeholder="0"
-        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center outline-none focus:border-accent"
+        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:border-accent"
       />
       <input
         value={reps}
@@ -341,7 +341,7 @@ function SetRow({
         onFocus={(e) => e.target.select()}
         inputMode="numeric"
         placeholder="0"
-        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center outline-none focus:border-accent"
+        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:border-accent"
       />
 
       {/* Done toggle — also commits current weight/reps */}

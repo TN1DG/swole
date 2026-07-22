@@ -55,7 +55,7 @@ export function WorkoutDetailPage() {
       </Link>
 
       <h1 className="mt-2 text-2xl font-bold">{detail.name}</h1>
-      <p className="mt-1 text-sm text-muted">
+      <p className="mt-1 text-sm text-muted tabular-nums">
         {formatWorkoutDate(detail.startedAt)} ·{' '}
         {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} ·{' '}
         {formatKg(totalVolume)} kg · {setCount} sets
@@ -65,7 +65,7 @@ export function WorkoutDetailPage() {
         {detail.exercises.map((entry) => (
           <section
             key={entry.workoutExerciseId}
-            className="rounded-2xl border border-border bg-surface p-3"
+            className="rounded-2xl glass-tile p-3"
           >
             <button
               type="button"
@@ -89,8 +89,8 @@ export function WorkoutDetailPage() {
                     <td className={`py-1 ${set.isWarmup ? 'text-pr' : 'text-muted'}`}>
                       {set.isWarmup ? 'W' : set.setNumber}
                     </td>
-                    <td className="py-1">{formatKg(set.weightKg)}</td>
-                    <td className="py-1">{set.reps}</td>
+                    <td className="py-1 tabular-nums">{formatKg(set.weightKg)}</td>
+                    <td className="py-1 tabular-nums">{set.reps}</td>
                   </tr>
                 ))}
               </tbody>
@@ -101,7 +101,7 @@ export function WorkoutDetailPage() {
 
       <Link
         to={`/share/${detail._id}`}
-        className="mt-6 block w-full rounded-xl bg-accent py-3 text-center font-semibold text-accent-fg"
+        className="btn-glow mt-6 block w-full rounded-xl bg-accent py-3 text-center font-semibold text-accent-fg"
       >
         Share as Photo
       </Link>

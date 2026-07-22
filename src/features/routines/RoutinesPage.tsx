@@ -58,7 +58,7 @@ export function RoutinesPage() {
           {routines.map((routine) => (
             <div
               key={routine._id}
-              className="rounded-2xl border border-border bg-surface p-4"
+              className="rounded-2xl glass-tile p-4"
             >
               <p className="font-semibold">{routine.name}</p>
               <p className="mt-1 text-sm text-muted">
@@ -70,7 +70,7 @@ export function RoutinesPage() {
                 <button
                   type="button"
                   onClick={() => void handleStart(routine._id)}
-                  className="flex-1 rounded-xl bg-accent py-2 font-semibold text-accent-fg"
+                  className="btn-glow flex-1 rounded-xl bg-accent py-2 font-semibold text-accent-fg"
                 >
                   Start
                 </button>

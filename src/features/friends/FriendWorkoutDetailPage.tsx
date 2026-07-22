@@ -49,7 +49,7 @@ export function FriendWorkoutDetailPage() {
         <h1 className="truncate text-2xl font-bold">{detail.name}</h1>
         {tierLabel && <p className="shrink-0 text-sm font-semibold text-accent">{tierLabel}</p>}
       </div>
-      <p className="mt-1 text-sm text-muted">
+      <p className="mt-1 text-sm text-muted tabular-nums">
         {formatWorkoutDate(detail.startedAt)} ·{' '}
         {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} ·{' '}
         {formatKg(totalVolume)} kg · {setCount} sets
@@ -59,7 +59,7 @@ export function FriendWorkoutDetailPage() {
         {detail.exercises.map((entry) => (
           <section
             key={entry.workoutExerciseId}
-            className="rounded-2xl border border-border bg-surface p-3"
+            className="rounded-2xl glass-tile p-3"
           >
             <p className="font-semibold">
               {entry.exercise.name}
@@ -79,8 +79,8 @@ export function FriendWorkoutDetailPage() {
                     <td className={`py-1 ${set.isWarmup ? 'text-pr' : 'text-muted'}`}>
                       {set.isWarmup ? 'W' : set.setNumber}
                     </td>
-                    <td className="py-1">{formatKg(set.weightKg)}</td>
-                    <td className="py-1">{set.reps}</td>
+                    <td className="py-1 tabular-nums">{formatKg(set.weightKg)}</td>
+                    <td className="py-1 tabular-nums">{set.reps}</td>
                   </tr>
                 ))}
               </tbody>
@@ -91,7 +91,7 @@ export function FriendWorkoutDetailPage() {
 
       <Link
         to={`/friends/${userId}/${detail._id}/trophy`}
-        className="mt-6 block w-full rounded-xl bg-accent py-3 text-center font-semibold text-accent-fg"
+        className="btn-glow mt-6 block w-full rounded-xl bg-accent py-3 text-center font-semibold text-accent-fg"
       >
         Download Trophy
       </Link>

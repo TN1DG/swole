@@ -12,16 +12,14 @@ export function StatTile({
   centered?: boolean
 }) {
   return (
-    <div className={`rounded-xl bg-surface-2 p-3 ${centered ? 'text-center' : ''}`}>
+    <div className={`rounded-xl glass-tile p-3 ${centered ? 'text-center' : ''}`}>
       <p
-        className={`flex items-center gap-1 text-xs text-muted uppercase ${
-          centered ? 'justify-center' : ''
-        }`}
+        className={`label-micro flex items-center gap-1 ${centered ? 'justify-center' : ''}`}
       >
         {icon}
         {label}
       </p>
-      <p className="mt-1 text-lg font-bold">{value}</p>
+      <p className="mt-1 text-lg font-bold tabular-nums">{value}</p>
     </div>
   )
 }

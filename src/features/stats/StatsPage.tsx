@@ -114,7 +114,7 @@ export function StatsPage() {
 
         <div>
           <p className="text-sm text-muted">Sex (used for the calorie formula)</p>
-          <div className="mt-1 grid grid-cols-2 rounded-xl border border-border bg-surface p-1">
+          <div className="mt-1 grid grid-cols-2 rounded-xl glass-tile p-1">
             {(['male', 'female'] as const).map((s) => (
               <button
                 key={s}
@@ -150,7 +150,7 @@ export function StatsPage() {
 
         <button
           type="submit"
-          className="mt-1 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+          className="btn-glow mt-1 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
         >
           Save
         </button>

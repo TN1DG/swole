@@ -62,7 +62,7 @@ export function ExercisesPage() {
       />
 
       {/* Muscle group filter chips */}
-      <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
         <FilterChip
           label="All"
           active={groupFilter === null}
@@ -89,9 +89,7 @@ export function ExercisesPage() {
       ) : (
         sections.map(({ group, items }) => (
           <section key={group} className="mt-5">
-            <h2 className="text-sm font-semibold tracking-wide text-muted uppercase">
-              {group}
-            </h2>
+            <h2 className="label-micro">{group}</h2>
             <ul className="mt-2 flex flex-col gap-2">
               {items.map((ex) => (
                 <li key={ex._id} className="relative">
@@ -99,11 +97,11 @@ export function ExercisesPage() {
                     type="button"
                     // Opens the detail sheet: chart, PRs, recent sessions.
                     onClick={() => setSelected(ex)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface py-3 pr-12 pl-4 text-left"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl glass-tile py-3 pr-12 pl-4 text-left"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium">{ex.name}</p>
-                      <p className="truncate text-sm text-muted">
+                      <p className="truncate text-sm text-muted tabular-nums">
                         {ex.equipment}
                         {recordByExercise.has(ex._id) &&
                           ` · 🏆 ${recordByExercise.get(ex._id)!.bestWeightKg} kg`}
@@ -159,9 +157,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
-        active
-          ? 'bg-accent text-accent-fg'
-          : 'border border-border bg-surface text-muted'
+        active ? 'bg-accent text-accent-fg' : 'glass-tile text-muted'
       }`}
     >
       {label}

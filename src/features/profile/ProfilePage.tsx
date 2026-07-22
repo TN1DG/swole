@@ -79,7 +79,7 @@ export function ProfilePage() {
       <h1 className="text-2xl font-bold">Profile</h1>
       <FirstVisitTip tabKey="profile" />
 
-      <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+      <div className="mt-4 rounded-2xl glass-card p-4">
         {editing ? (
           <form onSubmit={handleSave} className="flex flex-col gap-2">
             <input
@@ -93,7 +93,7 @@ export function ProfilePage() {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 rounded-lg bg-accent py-2 font-semibold text-accent-fg"
+                className="btn-glow flex-1 rounded-lg bg-accent py-2 font-semibold text-accent-fg"
               >
                 Save
               </button>
@@ -152,7 +152,7 @@ export function ProfilePage() {
         />
       </div>
 
-      <label className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-border bg-surface p-4">
+      <label className="mt-4 flex items-center justify-between gap-2 rounded-xl glass-card p-4">
         <div>
           <p className="font-semibold">Public workouts</p>
           <p className="text-sm text-muted">
@@ -167,7 +167,7 @@ export function ProfilePage() {
         />
       </label>
 
-      <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+      <div className="mt-4 rounded-2xl glass-card p-4">
         <p className="flex items-center gap-2 font-semibold">
           <ClipboardIcon className="h-4 w-4" /> Suggest a feature
         </p>
@@ -185,7 +185,7 @@ export function ProfilePage() {
           <button
             type="submit"
             disabled={!featureText.trim()}
-            className="rounded-lg bg-accent py-2 font-semibold text-accent-fg disabled:opacity-50"
+            className="btn-glow rounded-lg bg-accent py-2 font-semibold text-accent-fg disabled:opacity-50"
           >
             Submit
           </button>
@@ -194,14 +194,14 @@ export function ProfilePage() {
 
       <Link
         to="/friends"
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3 font-semibold"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl glass-tile py-3 font-semibold"
       >
         <PeopleIcon /> Friends
       </Link>
 
       <Link
         to="/stats"
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3 font-semibold"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl glass-tile py-3 font-semibold"
       >
         <FlameIcon /> My Stats
       </Link>
@@ -214,7 +214,7 @@ export function ProfilePage() {
         Sign out
       </button>
 
-      <div className="mt-8 rounded-2xl border border-red-400/30 bg-surface p-4">
+      <div className="mt-8 rounded-2xl glass-card border-red-400/30! p-4">
         <p className="font-semibold text-red-400">Danger zone</p>
         {!confirmingDelete ? (
           <>

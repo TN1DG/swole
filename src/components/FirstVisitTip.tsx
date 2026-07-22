@@ -26,7 +26,7 @@ export function FirstVisitTip({ tabKey }: { tabKey: TabKey }) {
   if (!seenTips || dismissed || seenTips.includes(tabKey)) return null
 
   return (
-    <div className="mt-4 flex items-start gap-2 rounded-xl border border-accent/30 bg-surface p-3 text-sm">
+    <div className="mt-4 flex items-start gap-2 rounded-xl glass-card border-accent/30! p-3 text-sm">
       <p className="flex-1 text-muted">{TIP_COPY[tabKey]}</p>
       <button
         type="button"

@@ -122,14 +122,14 @@ export function SharePage() {
         <button
           type="button"
           onClick={() => cameraInputRef.current?.click()}
-          className="flex-1 rounded-xl border border-border bg-surface py-2.5 text-sm font-semibold"
+          className="flex-1 rounded-xl glass-tile py-2.5 text-sm font-semibold"
         >
           📷 Take Photo
         </button>
         <button
           type="button"
           onClick={() => galleryInputRef.current?.click()}
-          className="flex-1 rounded-xl border border-border bg-surface py-2.5 text-sm font-semibold"
+          className="flex-1 rounded-xl glass-tile py-2.5 text-sm font-semibold"
         >
           🖼 Choose Photo
         </button>
@@ -145,7 +145,7 @@ export function SharePage() {
           type="button"
           onClick={handleShare}
           disabled={busy}
-          className="flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+          className="btn-glow flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
         >
           {busy ? 'Rendering…' : 'Share'}
         </button>

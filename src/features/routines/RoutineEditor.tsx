@@ -89,7 +89,7 @@ export function RoutineEditor({ initial, onClose }: Props) {
         {exercises.map((entry, i) => (
           <div
             key={`${entry.exerciseId}-${i}`}
-            className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2"
+            className="flex items-center gap-2 rounded-xl glass-tile px-3 py-2"
           >
             {/* reorder */}
             <div className="flex flex-col">
@@ -108,7 +108,7 @@ export function RoutineEditor({ initial, onClose }: Props) {
               >
                 −
               </button>
-              <span className="w-12 text-center text-sm">
+              <span className="w-12 text-center text-sm tabular-nums">
                 {entry.targetSets} set{entry.targetSets > 1 ? 's' : ''}
               </span>
               <button
@@ -145,7 +145,7 @@ export function RoutineEditor({ initial, onClose }: Props) {
       <button
         type="button"
         onClick={handleSave}
-        className="mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+        className="btn-glow mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
       >
         Save Routine
       </button>

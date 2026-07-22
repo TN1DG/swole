@@ -35,13 +35,13 @@ export function FriendWorkoutsPage() {
                 <Link
                   key={w._id}
                   to={`/friends/${userId}/${w._id}`}
-                  className="block rounded-2xl border border-border bg-surface p-4"
+                  className="block rounded-2xl glass-tile p-4"
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="min-w-0 truncate font-semibold">{w.name}</p>
                     <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
                   </div>
-                  <p className="mt-1 text-sm text-muted">
+                  <p className="mt-1 text-sm text-muted tabular-nums">
                     {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg ·{' '}
                     {w.setCount} sets
                   </p>

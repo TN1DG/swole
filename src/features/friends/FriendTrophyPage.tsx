@@ -93,7 +93,7 @@ export function FriendTrophyPage() {
           type="button"
           onClick={handleShare}
           disabled={busy}
-          className="flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
+          className="btn-glow flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
         >
           {busy ? 'Rendering…' : 'Share'}
         </button>

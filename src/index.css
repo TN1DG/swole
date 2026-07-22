@@ -13,6 +13,60 @@
   --color-accent-fg: #fff7f0;
   --color-success: #7a9a52;
   --color-pr: #d9a441;
+
+  /* Alpha-blended variants for the glass surfaces below. */
+  --color-surface-glass: rgb(30 28 25 / 0.72);
+  --color-surface-2-glass: rgb(41 37 34 / 0.55);
+  --color-border-glass: rgb(69 61 53 / 0.55);
+}
+
+/* Tier A: a floating panel — modals, once-per-screen cards. Blurred, so
+   reserve this for elements that never repeat many times on one screen
+   (backdrop-filter is real compositing cost, stacking it across a dozen
+   list rows is the kind of thing that janks on an older phone mid-workout). */
+@utility glass-card {
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--color-border-glass);
+  box-shadow:
+    0 8px 24px -12px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 0 rgb(255 247 240 / 0.05);
+}
+
+/* Tier B: a repeated list row or nested tile. Tinted like glass but never
+   blurred, so it stays cheap no matter how many stack on one screen. */
+@utility glass-tile {
+  background: var(--color-surface-2-glass);
+  border: 1px solid rgb(69 61 53 / 0.3);
+}
+
+/* A soft rust glow for primary (bg-accent) call-to-action buttons. */
+@utility btn-glow {
+  box-shadow:
+    0 0 0 1px rgb(193 84 31 / 0.4),
+    0 4px 20px -4px rgb(193 84 31 / 0.45);
+}
+
+/* One standard for the small uppercase captions/section labels used
+   everywhere (stat tile labels, section headers) — was two slightly
+   different ad-hoc treatments before. */
+@utility label-micro {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Hides the scrollbar on an intentionally-scrollable strip (e.g. the
+   horizontal filter-chip row) without disabling scrolling itself. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 html,
@@ -30,9 +84,26 @@ body {
   position: relative;
 }
 
-/* Faint oxidized-metal grain over the whole app; subliminal texture, not noise
-   you consciously notice. Sits behind #root so it never blocks interaction. */
+/* "Abyss" depth: soft rust glow blobs behind everything, using only the
+   existing accent/pr tones. Gradients with transparent stops are cheap (no
+   blur() filter needed) — this is what glass-card's backdrop-filter actually
+   has to pick up and blur; without it there's nothing behind the glass to see. */
 body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% -10%, rgb(193 84 31 / 0.16), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 100% 110%, rgb(193 84 31 / 0.1), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 90% 20%, rgb(217 164 65 / 0.06), transparent 65%);
+}
+
+/* Faint oxidized-metal grain on top of the glow; subliminal texture, not
+   noise you consciously notice. Both sit behind #root so neither blocks
+   interaction. */
+body::after {
   content: '';
   position: fixed;
   inset: 0;

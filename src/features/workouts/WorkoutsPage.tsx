@@ -31,7 +31,7 @@ export function WorkoutsPage() {
       <FirstVisitTip tabKey="workout" />
 
       {summary && (
-        <div className="mt-4 rounded-2xl border border-accent/40 bg-surface p-4">
+        <div className="mt-4 rounded-2xl glass-card border-accent/40! p-4">
           {summary.discarded ? (
             <p className="text-muted">Empty workout discarded.</p>
           ) : (
@@ -63,7 +63,7 @@ export function WorkoutsPage() {
           {!summary.discarded && (
             <Link
               to={`/share/${summary.workoutId}`}
-              className="mt-4 block w-full rounded-xl bg-accent py-2 text-center font-semibold text-accent-fg"
+              className="btn-glow mt-4 block w-full rounded-xl bg-accent py-2 text-center font-semibold text-accent-fg"
             >
               Share as Photo 📸
             </Link>
@@ -82,7 +82,7 @@ export function WorkoutsPage() {
       <button
         type="button"
         onClick={() => void start({ localHour: new Date().getHours() })}
-        className="mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+        className="btn-glow mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
       >
         Start Empty Workout
       </button>
@@ -90,16 +90,14 @@ export function WorkoutsPage() {
       {/* Quick start from a routine */}
       {routines && routines.length > 0 && (
         <>
-          <h2 className="mt-8 text-sm font-semibold tracking-wide text-muted uppercase">
-            Routines
-          </h2>
+          <h2 className="label-micro mt-8">Routines</h2>
           <div className="mt-2 flex flex-col gap-2">
             {routines.map((routine) => (
               <button
                 key={routine._id}
                 type="button"
                 onClick={() => void startFromRoutine({ routineId: routine._id })}
-                className="rounded-xl border border-border bg-surface px-4 py-3 text-left"
+                className="rounded-xl glass-tile px-4 py-3 text-left"
               >
                 <p className="font-semibold">{routine.name}</p>
                 <p className="mt-0.5 text-sm text-muted">

@@ -14,8 +14,11 @@ export function AppLayout() {
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col">
       {/* Top bar. iOS status bar is translucent (viewport-fit=cover), so this
-          needs its own safe-area padding or it renders under the notch/clock. */}
-      <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+          needs its own safe-area padding or it renders under the notch/clock.
+          Sticky (not fixed) — the page itself is the scroll container, so this
+          avoids having to hand-sync main's padding to the header's real,
+          safe-area-variable height. */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border-glass bg-surface-glass px-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-md">
         <span className="text-lg font-black uppercase tracking-[0.15em] text-accent">SWOLE</span>
         <NavLink
           to="/profile"
@@ -33,8 +36,9 @@ export function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 backdrop-blur">
+      {/* Bottom tab bar — z-30 like the header, both below ExerciseDetail's
+          z-50 sheet overlay so modals still cover them. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border-glass bg-surface-glass backdrop-blur-md">
         <div className="mx-auto flex max-w-lg">
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink

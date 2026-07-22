@@ -43,7 +43,7 @@ export function ExerciseForm({ initial, onClose }: Props) {
     >
       {/* stopPropagation so clicks inside the sheet don't close it */}
       <div
-        className="w-full max-w-lg rounded-t-2xl border-t border-border bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        className="w-full max-w-lg rounded-t-2xl glass-card border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold">
@@ -101,7 +101,7 @@ export function ExerciseForm({ initial, onClose }: Props) {
             </button>
             <button
               type="submit"
-              className="flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+              className="btn-glow flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg"
             >
               Save
             </button>
