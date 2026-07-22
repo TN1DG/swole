@@ -19,6 +19,7 @@ export function ProfilePage() {
   const updateDisplayName = useMutation(api.profiles.updateDisplayName)
   const setWorkoutsPublic = useMutation(api.profiles.setWorkoutsPublic)
   const submitFeatureRequest = useMutation(api.featureRequests.submit)
+  const deleteAccount = useMutation(api.account.deleteAccount)
   const { signOut } = useAuthActions()
 
   const [editing, setEditing] = useState(false)
@@ -28,6 +29,10 @@ export function ProfilePage() {
   const [featureText, setFeatureText] = useState('')
   const [featureError, setFeatureError] = useState<string | null>(null)
   const [featureSent, setFeatureSent] = useState(false)
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   if (profile === undefined) {
     return <p className="mt-8 text-center text-muted">Loading…</p>
@@ -54,6 +59,18 @@ export function ProfilePage() {
       setFeatureSent(true)
     } catch (err) {
       setFeatureError(err instanceof Error ? err.message : 'Could not send.')
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteError(null)
+    setDeleting(true)
+    try {
+      await deleteAccount({})
+      await signOut()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete account.')
+      setDeleting(false)
     }
   }
 
@@ -196,6 +213,51 @@ export function ProfilePage() {
       >
         Sign out
       </button>
+
+      <div className="mt-8 rounded-2xl border border-red-400/30 bg-surface p-4">
+        <p className="font-semibold text-red-400">Danger zone</p>
+        {!confirmingDelete ? (
+          <>
+            <p className="mt-1 text-sm text-muted">
+              Permanently delete your account and everything in it — workouts, routines,
+              friends, PRs. This can't be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="mt-3 w-full rounded-xl border border-red-400/40 py-3 font-semibold text-red-400"
+            >
+              Delete Account
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-muted">
+              Are you sure? Every workout, routine, PR, and friend connection you have will
+              be gone for good — there's no getting this back.
+            </p>
+            {deleteError && <p className="mt-2 text-sm text-red-400">{deleteError}</p>}
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={deleting}
+                className="flex-1 rounded-xl bg-red-500 py-3 font-semibold text-white disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete everything'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="flex-1 rounded-xl border border-border py-3 font-semibold text-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
