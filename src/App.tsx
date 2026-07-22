@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Authenticated, Unauthenticated, AuthLoading } from 'convex/react'
 import { AppLayout } from './components/AppLayout'
+import { OnboardingGate } from './features/onboarding/OnboardingGate'
 import { SignInPage } from './features/auth/SignInPage'
 import { WorkoutsPage } from './features/workouts/WorkoutsPage'
 import { HistoryPage } from './features/history/HistoryPage'
@@ -29,24 +30,26 @@ export default function App() {
         <SignInPage />
       </Unauthenticated>
 
-      {/* Signed in -> the actual app. */}
+      {/* Signed in -> the welcome carousel first-run, then the actual app. */}
       <Authenticated>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<WorkoutsPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/history/:workoutId" element={<WorkoutDetailPage />} />
-            <Route path="/share/:workoutId" element={<SharePage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/stats" element={<StatsPage />} />
-            <Route path="/friends" element={<FriendsPage />} />
-            <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
-            <Route path="/routines" element={<RoutinesPage />} />
-            <Route path="/exercises" element={<ExercisesPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <OnboardingGate>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<WorkoutsPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/history/:workoutId" element={<WorkoutDetailPage />} />
+              <Route path="/share/:workoutId" element={<SharePage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/stats" element={<StatsPage />} />
+              <Route path="/friends" element={<FriendsPage />} />
+              <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
+              <Route path="/routines" element={<RoutinesPage />} />
+              <Route path="/exercises" element={<ExercisesPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </OnboardingGate>
       </Authenticated>
     </>
   )

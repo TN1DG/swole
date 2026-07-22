@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
-import { PeopleIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 
 const TIER_LABELS: Record<string, string> = {
   none: '',
@@ -13,63 +13,10 @@ const TIER_LABELS: Record<string, string> = {
   iron_will: '🔥 Iron Will',
 }
 
+// A username is always set by the time this page is reachable — OnboardingGate
+// (src/features/onboarding/OnboardingGate.tsx) captures it during the welcome
+// carousel before any route becomes available.
 export function FriendsPage() {
-  const profile = useQuery(api.profiles.getMine)
-
-  if (profile === undefined || profile === null) {
-    return <p className="mt-8 text-center text-muted">Loading…</p>
-  }
-  if (!profile.username) {
-    return <ChooseUsername />
-  }
-  return <FriendsHub />
-}
-
-function ChooseUsername() {
-  const setUsername = useMutation(api.profiles.setUsername)
-  const [value, setValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    try {
-      await setUsername({ username: value })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
-    }
-  }
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold">Friends</h1>
-      <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-6 text-center">
-        <PeopleIcon className="h-8 w-8 text-muted" />
-        <p className="font-semibold">Choose a username first</p>
-        <p className="text-sm text-muted">
-          This is how friends find and add you — lowercase letters, numbers, underscores.
-        </p>
-        <form onSubmit={handleSubmit} className="mt-2 flex w-full gap-2">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="username"
-            className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 outline-none focus:border-accent"
-          />
-          <button
-            type="submit"
-            className="shrink-0 rounded-xl bg-accent px-4 py-3 font-semibold text-accent-fg"
-          >
-            Save
-          </button>
-        </form>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-      </div>
-    </div>
-  )
-}
-
-function FriendsHub() {
   const incoming = useQuery(api.friends.myIncomingRequests)
   const outgoing = useQuery(api.friends.myOutgoingRequests)
   const friends = useQuery(api.friends.myFriends)
@@ -113,6 +60,7 @@ function FriendsHub() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Friends</h1>
+      <FirstVisitTip tabKey="friends" />
 
       <form onSubmit={handleSearch} className="mt-4 flex gap-2">
         <input

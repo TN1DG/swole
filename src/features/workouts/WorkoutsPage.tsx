@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { ChecklistIcon, PlateIcon, StopwatchIcon } from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ActiveWorkout, type FinishSummary } from './ActiveWorkout'
 
 export function WorkoutsPage() {
@@ -27,6 +28,7 @@ export function WorkoutsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Workout</h1>
+      <FirstVisitTip tabKey="workout" />
 
       {summary && (
         <div className="mt-4 rounded-2xl border border-accent/40 bg-surface p-4">

@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
 import { BarbellIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 
 export function HistoryPage() {
   const [tab, setTab] = useState<'workouts' | 'records'>('workouts')
@@ -12,6 +13,7 @@ export function HistoryPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">History</h1>
+      <FirstVisitTip tabKey="history" />
 
       {/* Segmented control */}
       <div className="mt-4 grid grid-cols-2 rounded-xl border border-border bg-surface p-1">

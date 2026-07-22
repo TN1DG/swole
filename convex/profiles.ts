@@ -2,7 +2,11 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { assertRange, cleanUsername } from './validation'
+import { assertRange, cleanName, cleanUsername } from './validation'
+
+// Cap on how many first-visit tips we'll remember dismissing — one per main
+// tab, generous headroom for future tabs without growing unbounded.
+const MAX_SEEN_TIPS = 20
 
 // Plausibility bounds for the body-stats form — not abuse prevention (there's
 // no query-cost concern here), just sane limits for a calorie calculator.
@@ -70,6 +74,7 @@ export const getMine = query({
       activityLevel: profile?.activityLevel ?? null,
       username: profile?.username ?? null,
       workoutsPublic: profile?.workoutsPublic ?? false,
+      onboarded: profile?.onboardedAt != null,
     }
   },
 })
@@ -94,6 +99,72 @@ export const setUsername = mutation({
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { username })
+  },
+})
+
+// The welcome carousel's identity step. Deliberately does NOT mark onboarding
+// done — the carousel still has the stats questionnaire and reward screen
+// to go, and OnboardingGate would otherwise drop straight into the app the
+// moment this call lands. See `finishOnboarding` for that.
+export const saveOnboardingIdentity = mutation({
+  args: { username: v.string(), displayName: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const username = cleanUsername(args.username)
+    const displayName = cleanName(args.displayName, 40)
+
+    const existing = await ctx.db
+      .query('profiles')
+      .withIndex('by_username', (q) => q.eq('username', username))
+      .unique()
+    if (existing && existing.userId !== userId) {
+      throw new Error('That username is taken')
+    }
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { username, displayName })
+  },
+})
+
+// The carousel's very last step (after the reward screen) — this is what
+// actually gates OnboardingGate.
+export const finishOnboarding = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { onboardedAt: Date.now() })
+  },
+})
+
+// Which first-visit tab tips this user has already dismissed.
+export const getSeenTips = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return []
+    const profile = await ctx.db
+      .query('profiles')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique()
+    return profile?.seenTips ?? []
+  },
+})
+
+export const markTipSeen = mutation({
+  args: { tip: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    const seen = profile.seenTips ?? []
+    if (seen.includes(args.tip) || seen.length >= MAX_SEEN_TIPS) return
+    await ctx.db.patch(profile._id, { seenTips: [...seen, args.tip] })
   },
 })
 

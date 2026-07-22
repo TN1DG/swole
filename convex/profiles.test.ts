@@ -128,3 +128,107 @@ describe('updateBodyStats', () => {
     ).rejects.toThrow(/not signed in/i)
   })
 })
+
+describe('saveOnboardingIdentity', () => {
+  it('sets username and display name but does not mark onboarded', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.saveOnboardingIdentity, {
+      username: 'alice_lifts',
+      displayName: 'Alice',
+    })
+
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({
+      username: 'alice_lifts',
+      displayName: 'Alice',
+      onboarded: false,
+    })
+  })
+
+  it('rejects a username already taken by someone else', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.saveOnboardingIdentity, {
+      username: 'sameuser',
+      displayName: 'Alice',
+    })
+    await expect(
+      bob.mutation(api.profiles.saveOnboardingIdentity, {
+        username: 'sameuser',
+        displayName: 'Bob',
+      }),
+    ).rejects.toThrow(/taken/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.saveOnboardingIdentity, {
+        username: 'alice',
+        displayName: 'Alice',
+      }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('finishOnboarding', () => {
+  it('marks the profile onboarded', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    expect((await user.query(api.profiles.getMine, {}))!.onboarded).toBe(false)
+    await user.mutation(api.profiles.finishOnboarding, {})
+    expect((await user.query(api.profiles.getMine, {}))!.onboarded).toBe(true)
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(t.mutation(api.profiles.finishOnboarding, {})).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('seen tips', () => {
+  it('returns no tips seen by default, then records dismissals', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    expect(await user.query(api.profiles.getSeenTips, {})).toEqual([])
+
+    await user.mutation(api.profiles.markTipSeen, { tip: 'workout' })
+    await user.mutation(api.profiles.markTipSeen, { tip: 'friends' })
+    expect(await user.query(api.profiles.getSeenTips, {})).toEqual(['workout', 'friends'])
+  })
+
+  it('is idempotent — marking the same tip twice does not duplicate it', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.markTipSeen, { tip: 'workout' })
+    await user.mutation(api.profiles.markTipSeen, { tip: 'workout' })
+    expect(await user.query(api.profiles.getSeenTips, {})).toEqual(['workout'])
+  })
+
+  it('caps at 20 tips', async () => {
+    const t = createBackend()
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    for (let i = 0; i < 20; i++) {
+      await user.mutation(api.profiles.markTipSeen, { tip: `tip-${i}` })
+    }
+    await user.mutation(api.profiles.markTipSeen, { tip: 'tip-20' })
+    expect((await user.query(api.profiles.getSeenTips, {})).length).toBe(20)
+  })
+
+  it('requires sign-in to mark a tip seen, but getSeenTips just returns empty', async () => {
+    const t: T = createBackend()
+    expect(await t.query(api.profiles.getSeenTips, {})).toEqual([])
+    await expect(t.mutation(api.profiles.markTipSeen, { tip: 'workout' })).rejects.toThrow(
+      /not signed in/i,
+    )
+  })
+})

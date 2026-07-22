@@ -12,6 +12,7 @@ import {
   PeopleIcon,
 } from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
@@ -59,6 +60,7 @@ export function ProfilePage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Profile</h1>
+      <FirstVisitTip tabKey="profile" />
 
       <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
         {editing ? (

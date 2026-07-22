@@ -4,6 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { MUSCLE_GROUPS } from '../../../convex/constants'
 import { BarbellIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from './ExerciseDetail'
 import { ExerciseForm } from './ExerciseForm'
 
@@ -50,6 +51,7 @@ export function ExercisesPage() {
           + New
         </button>
       </div>
+      <FirstVisitTip tabKey="exercises" />
 
       {/* Search */}
       <input

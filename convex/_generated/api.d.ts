@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
+import type * as emailAuth from "../emailAuth.js";
 import type * as exercises from "../exercises.js";
 import type * as favorites from "../favorites.js";
 import type * as featureRequests from "../featureRequests.js";
@@ -17,6 +18,7 @@ import type * as fitness from "../fitness.js";
 import type * as friends from "../friends.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
 import type * as routines from "../routines.js";
@@ -33,6 +35,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   constants: typeof constants;
+  emailAuth: typeof emailAuth;
   exercises: typeof exercises;
   favorites: typeof favorites;
   featureRequests: typeof featureRequests;
@@ -40,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   friends: typeof friends;
   history: typeof history;
   http: typeof http;
+  migrations: typeof migrations;
   profiles: typeof profiles;
   prs: typeof prs;
   routines: typeof routines;

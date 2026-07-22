@@ -31,6 +31,11 @@ export default defineSchema({
     username: v.optional(v.string()),
     // Opt-in: anyone (not just accepted friends) can view your workout history.
     workoutsPublic: v.optional(v.boolean()),
+    // Set once the welcome carousel is completed (or backfilled for pre-existing
+    // accounts) — gates whether OnboardingGate shows the carousel or the app.
+    onboardedAt: v.optional(v.number()),
+    // Which first-visit tab tips have been dismissed, so they show at most once.
+    seenTips: v.optional(v.array(v.string())),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -118,6 +123,15 @@ export default defineSchema({
     userId: v.id('users'),
     text: v.string(),
   }).index('by_user', ['userId']),
+
+  // Throttles how often a verification/reset email can be sent to a given
+  // address — the auth library's own rate limiter guards wrong-code guesses,
+  // not "please resend my code" spam (see convex/emailAuth.ts).
+  emailSendAttempts: defineTable({
+    key: v.string(), // `${kind}:${email.toLowerCase()}`, kind = 'verify' | 'reset'
+    windowStart: v.number(),
+    count: v.number(),
+  }).index('by_key', ['key']),
 
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({

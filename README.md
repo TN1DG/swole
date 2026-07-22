@@ -19,6 +19,8 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 - **PWA** — installable, app-like, with a cached shell.
 - **Gym-themed UI** — a dark gunmetal/rust color palette, a faint metal-grain texture, and a small hand-drawn icon set (barbell, plate, stopwatch, checklist, heart) standing in wherever a stat or empty state had no visual before.
 - **Feature requests** — a "Suggest a feature" box on the Profile page; submissions email the developer instantly via Resend.
+- **Onboarding** — a one-time welcome carousel right after signup (consistency, community, and the app's own story), name + username capture, and a body-stats questionnaire that ends in a reward screen showing your calorie/macro breakdown. First-visit tips (one-liners, dismissible) then introduce each main tab the first time you open it.
+- **Account security** — email verification and password reset, both via 6-digit codes typed in-app (not magic links, so an installed PWA never has to bounce to a system browser); failed sign-in/code attempts and repeated code-send requests are both rate-limited.
 
 ## Tech Stack
 
@@ -27,7 +29,7 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 | Frontend | [React](https://react.dev) + [Vite](https://vite.dev) + TypeScript | Fast dev loop; types flow end-to-end from the DB schema into components |
 | Styling | [Tailwind CSS v4](https://tailwindcss.com) | Mobile-first utilities, design tokens in one `@theme` block |
 | Backend | [Convex](https://convex.dev) | Reactive database + serverless functions; `useQuery` results update live across devices with zero refetch code |
-| Auth | [Convex Auth](https://labs.convex.dev/auth) | Email/password, JWTs signed server-side, no third-party service |
+| Auth | [Convex Auth](https://labs.convex.dev/auth) | Email/password, JWTs signed server-side; email verification + password reset via Resend-sent 6-digit codes, no third-party auth service |
 | Image export | [modern-screenshot](https://github.com/qq15725/modern-screenshot) | Renders the share-card DOM node to a high-res PNG (what you preview is exactly what exports) |
 | Email | [Resend](https://resend.com) | One `fetch` call from a Convex action, no SDK — used to email the developer on feature-request submissions |
 | Testing | [Vitest](https://vitest.dev) + [convex-test](https://github.com/get-convex/convex-test) | Runs the real backend functions against an in-memory Convex |
@@ -37,8 +39,15 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 
 ```
 convex/                 # Backend: schema + all queries/mutations
-  schema.ts             #   12 tables: exercises, workouts, sets, routines, PRs,
-                        #   favorites, friendRequests, friendships, featureRequests…
+  schema.ts             #   13 tables: exercises, workouts, sets, routines, PRs,
+                        #   favorites, friendRequests, friendships, featureRequests,
+                        #   emailSendAttempts…
+  auth.ts               #   Convex Auth config: Password provider + verify/reset
+  emailAuth.ts          #   6-digit-code email providers for verify/reset, Resend
+                        #   send + its own throttle (auth's own rate limiter only
+                        #   covers wrong-password/wrong-code guesses, not resends)
+  migrations.ts         #   one-off backfills (emailVerified, onboardedAt) — run
+                        #   once via `npx convex run`, safe to delete after
   workouts.ts           #   active-workout lifecycle (start → log → finish), reordering
   history.ts            #   past workouts, progress data, PR recomputation;
                         #   summarizeWorkout is shared with friends.ts
@@ -48,14 +57,15 @@ convex/                 # Backend: schema + all queries/mutations
   friends.ts            #   requests/accept, leaderboard, permission-gated
                         #   friend-workouts read (first cross-user data access)
   featureRequests.ts    #   saves a suggestion, schedules a Resend email to the owner
-  profiles.ts           #   display name, username, body stats for TDEE
+  profiles.ts           #   display name, username, body stats for TDEE, onboarding
   prs.ts, fitness.ts    #   PRs (Epley 1RM), TDEE/BMR/macros, leaderboard scoring
   validation.ts         #   server-side input sanitization used by all mutations
   *.test.ts             #   test suite (never deployed — see Testing)
 src/
   features/<feature>/   # UI grouped by feature: workouts, history, routines,
-                        #   exercises, favorites, friends, profile, stats, share, auth
-  components/           # AppLayout (nav), ErrorBoundary, shared icons.tsx
+                        #   exercises, favorites, friends, profile, stats, share,
+                        #   auth, onboarding
+  components/           # AppLayout (nav), ErrorBoundary, FirstVisitTip, icons.tsx
   lib/
 scripts/                # one-time setup: auth keys, PWA icon generation
 ```
@@ -106,7 +116,8 @@ The suite runs the **actual backend functions** against an in-memory Convex (`co
 - `favorites.test.ts` — toggle on/off, joined PR data, rejects favoriting an exercise you can't see, cross-user isolation.
 - `friends.test.ts` — request/accept/decline, two-way friendship on accept, leaderboard scoring, and the security matrix for the one query that intentionally crosses users: a stranger can't view your workouts, a friend can, a public opt-in overrides for anyone.
 - `featureRequests.test.ts` — validation, per-user cap, and the scheduled Resend email path with `fetch` mocked (never hits the real network in tests).
-- `profiles.test.ts` — defaults before a profile row exists, set/clear display name and body stats, validation, cross-user isolation.
+- `profiles.test.ts` — defaults before a profile row exists, set/clear display name and body stats, validation, cross-user isolation, onboarding identity save + finish, first-visit tip tracking.
+- `emailAuth.test.ts` — runs the *actual* `auth:signIn` action end to end (not just mutations): sign-up sends a code, wrong code is rejected, an already-verified account skips straight to sign-in, repeated code-sends are throttled, and password reset invalidates the previous session — all with `fetch` mocked.
 - `fitness.test.ts` — the pure math: Epley 1RM/PR checks, TDEE/BMR/macro calculations, and the consistency-streak/leaderboard scoring.
 
 Test files live in `convex/` next to the code they test; the Convex CLI skips any file whose basename has more than one dot (`*.test.ts`, `test.helpers.ts`), so they are never deployed.
@@ -125,7 +136,6 @@ One command: pushes functions to the production Convex deployment, rebuilds the 
 - kg/lb display toggle (weights are stored canonically in kg; the profile's `unitPreference` field exists but isn't wired into any display yet)
 - Bodyweight / rep-only PR tracking
 - Workout notes UI (schema field already exists)
-- Password reset + email verification (Resend is already wired up for feature-request emails — reusing it here is mostly template work now)
 - Offline logging with sync
 - Native iOS/Android wrap via Capacitor
 

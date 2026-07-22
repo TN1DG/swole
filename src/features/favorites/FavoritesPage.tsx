@@ -3,6 +3,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { HeartOutlineIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 
 export function FavoritesPage() {
@@ -15,6 +16,7 @@ export function FavoritesPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Favorites</h1>
+      <FirstVisitTip tabKey="favorites" />
 
       {favorites === undefined ? (
         <p className="mt-8 text-center text-muted">Loading…</p>

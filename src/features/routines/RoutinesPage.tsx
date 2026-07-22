@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { ClipboardIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { RoutineEditor, type RoutineDraft } from './RoutineEditor'
 
 export function RoutinesPage() {
@@ -43,6 +44,7 @@ export function RoutinesPage() {
           + New
         </button>
       </div>
+      <FirstVisitTip tabKey="routines" />
 
       {routines === undefined ? (
         <p className="mt-8 text-center text-muted">Loading…</p>
