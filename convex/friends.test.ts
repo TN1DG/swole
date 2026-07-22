@@ -223,6 +223,56 @@ describe('friendWorkouts', () => {
   })
 })
 
+describe('getFriendWorkoutDetail', () => {
+  it('a friend sees full set-by-set detail, owner identity, and consistency', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice, bob } = await twoFriends(t)
+
+    const workoutId = await logWorkout(t, alice.user, exerciseId, 0, 120)
+
+    const detail = await bob.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
+    expect(detail).not.toBeNull()
+    expect(detail!.owner.displayName).toBe('alice@test.local')
+    expect(detail!.exercises).toHaveLength(1)
+    expect(detail!.exercises[0].sets[0]).toMatchObject({ weightKg: 120, reps: 5 })
+    expect(detail!.consistency).toMatchObject({ streakWeeks: 1, tier: 'none' })
+  })
+
+  it('a stranger cannot see it; a public opt-in makes it visible to anyone', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const eve = await userWithUsername(t, 'eve')
+
+    const workoutId = await logWorkout(t, alice.user, exerciseId, 0)
+    expect(await eve.user.query(api.friends.getFriendWorkoutDetail, { workoutId })).toBeNull()
+
+    await alice.user.mutation(api.profiles.setWorkoutsPublic, { workoutsPublic: true })
+    const detail = await eve.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
+    expect(detail).not.toBeNull()
+    expect(detail!.owner.displayName).toBe('alice@test.local')
+  })
+
+  it('returns null for an in-progress (unfinished) workout', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const workoutId = await alice.user.mutation(api.workouts.start, {})
+
+    expect(await bob.user.query(api.friends.getFriendWorkoutDetail, { workoutId })).toBeNull()
+  })
+
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const exerciseId = await createBuiltInExercise(t)
+    const workoutId = await logWorkout(t, alice.user, exerciseId, 0)
+
+    const anon: T = t
+    expect(await anon.query(api.friends.getFriendWorkoutDetail, { workoutId })).toBeNull()
+  })
+})
+
 describe('leaderboard', () => {
   it('includes you and your friends, ranked by this-week score', async () => {
     const t = createBackend()

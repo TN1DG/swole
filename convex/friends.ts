@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { summarizeWorkout } from './history'
+import { getWorkoutExercises, summarizeWorkout } from './history'
 import { consistencyStreakWeeks, consistencyTier, leaderboardScore, weeksAgo } from './fitness'
 import { cleanUsername, LIMITS } from './validation'
 
@@ -33,6 +33,23 @@ async function areFriends(ctx: QueryCtx, userId: Id<'users'>, otherId: Id<'users
     .withIndex('by_user_friend', (q) => q.eq('userId', userId).eq('friendId', otherId))
     .unique()
   return row !== null
+}
+
+// Streak/tier for one specific owner — leaderboard computes this inline for
+// a whole friends-batch (and needs the same workouts for volume too, so it
+// isn't worth sharing this fetch there); this is for a single arbitrary
+// owner, e.g. showing "whose workout is this" on a friend's workout detail.
+async function ownerConsistency(ctx: QueryCtx, ownerId: Id<'users'>, now: number) {
+  const workouts = await ctx.db
+    .query('workouts')
+    .withIndex('by_owner', (q) => q.eq('ownerId', ownerId))
+    .filter((q) => q.neq(q.field('endedAt'), undefined))
+    .collect()
+  const streakWeeks = consistencyStreakWeeks(
+    workouts.map((w) => w.startedAt),
+    now,
+  )
+  return { streakWeeks, tier: consistencyTier(streakWeeks) }
 }
 
 // ---------- queries ----------
@@ -188,6 +205,50 @@ export const friendWorkouts = query({
     // Bounded, not paginated — this is a read-only peek, not infinite scroll.
     const recent = workouts.slice(0, 30)
     return { ...info, workouts: await Promise.all(recent.map((w) => summarizeWorkout(ctx, w))) }
+  },
+})
+
+// Full detail (every exercise, every set) for one of a friend's — or a
+// public opt-in user's — workouts. Same permission gate as friendWorkouts
+// above; also bundles the owner's identity and consistency tier since the
+// friend-facing detail page and trophy card both need to say whose it is.
+export const getFriendWorkoutDetail = query({
+  args: { workoutId: v.id('workouts') },
+  handler: async (ctx, args) => {
+    const callerId = await getAuthUserId(ctx)
+    if (callerId === null) return null
+
+    const workout = await ctx.db.get(args.workoutId)
+    if (!workout || workout.endedAt === undefined) return null
+    const ownerId = workout.ownerId
+
+    if (ownerId !== callerId) {
+      const [isFriend, ownerProfile] = await Promise.all([
+        areFriends(ctx, callerId, ownerId),
+        ctx.db
+          .query('profiles')
+          .withIndex('by_user', (q) => q.eq('userId', ownerId))
+          .unique(),
+      ])
+      if (!isFriend && !ownerProfile?.workoutsPublic) return null
+    }
+
+    const exercises = await getWorkoutExercises(ctx, workout._id)
+
+    const records = await ctx.db
+      .query('personalRecords')
+      .withIndex('by_owner', (q) => q.eq('ownerId', ownerId))
+      .collect()
+    const prExerciseIds = records
+      .filter((r) => r.workoutId === workout._id)
+      .map((r) => r.exerciseId)
+
+    const [owner, consistency] = await Promise.all([
+      profileFor(ctx, ownerId),
+      ownerConsistency(ctx, ownerId, Date.now()),
+    ])
+
+    return { ...workout, exercises, prExerciseIds, owner, consistency }
   },
 })
 

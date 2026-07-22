@@ -6,7 +6,8 @@ import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 
 // Read-only: a friend's (or a public opt-in user's) workout history. Same
-// card shape as your own History tab, no drill-down to per-workout detail.
+// card shape as your own History tab; tapping one opens a read-only detail
+// view (FriendWorkoutDetailPage).
 export function FriendWorkoutsPage() {
   const { userId } = useParams()
   const data = useQuery(api.friends.friendWorkouts, { userId: userId as Id<'users'> })
@@ -31,7 +32,11 @@ export function FriendWorkoutsPage() {
           ) : (
             <div className="mt-4 flex flex-col gap-3">
               {data.workouts.map((w) => (
-                <div key={w._id} className="rounded-2xl border border-border bg-surface p-4">
+                <Link
+                  key={w._id}
+                  to={`/friends/${userId}/${w._id}`}
+                  className="block rounded-2xl border border-border bg-surface p-4"
+                >
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="min-w-0 truncate font-semibold">{w.name}</p>
                     <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
@@ -50,7 +55,7 @@ export function FriendWorkoutsPage() {
                       <li className="text-xs">+ {w.exercises.length - 4} more</li>
                     )}
                   </ul>
-                </div>
+                </Link>
               ))}
             </div>
           )}

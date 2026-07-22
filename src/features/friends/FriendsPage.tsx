@@ -4,14 +4,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
-
-const TIER_LABELS: Record<string, string> = {
-  none: '',
-  consistent: '🔥 Consistent',
-  dedicated: '🔥 Dedicated',
-  relentless: '🔥 Relentless',
-  iron_will: '🔥 Iron Will',
-}
+import { TIER_LABELS } from '../../lib/tierLabels'
 
 // A username is always set by the time this page is reachable — OnboardingGate
 // (src/features/onboarding/OnboardingGate.tsx) captures it during the welcome

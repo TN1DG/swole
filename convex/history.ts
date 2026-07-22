@@ -75,6 +75,32 @@ export const listCompleted = query({
   },
 })
 
+// Every exercise + its sets for a workout, ordered — shared by getDetail
+// (owner-only) and friends.getFriendWorkoutDetail (friend/public read-only),
+// which differ only in who's allowed to call and whose PR list gets checked.
+export async function getWorkoutExercises(ctx: QueryCtx | MutationCtx, workoutId: Id<'workouts'>) {
+  const workoutExercises = await ctx.db
+    .query('workoutExercises')
+    .withIndex('by_workout', (q) => q.eq('workoutId', workoutId))
+    .collect()
+
+  return Promise.all(
+    workoutExercises
+      .sort((a, b) => a.position - b.position)
+      .map(async (we) => {
+        const sets = await ctx.db
+          .query('sets')
+          .withIndex('by_workoutExercise', (q) => q.eq('workoutExerciseId', we._id))
+          .collect()
+        return {
+          workoutExerciseId: we._id,
+          exercise: (await ctx.db.get(we.exerciseId))!,
+          sets: sets.sort((a, b) => a.setNumber - b.setNumber),
+        }
+      }),
+  )
+}
+
 // Full workout detail: every exercise with every set, plus which exercises
 // earned a PR in this workout (records still pointing at it).
 export const getDetail = query({
@@ -86,26 +112,7 @@ export const getDetail = query({
     const workout = await ctx.db.get(args.workoutId)
     if (!workout || workout.ownerId !== userId) return null
 
-    const workoutExercises = await ctx.db
-      .query('workoutExercises')
-      .withIndex('by_workout', (q) => q.eq('workoutId', workout._id))
-      .collect()
-
-    const exercises = await Promise.all(
-      workoutExercises
-        .sort((a, b) => a.position - b.position)
-        .map(async (we) => {
-          const sets = await ctx.db
-            .query('sets')
-            .withIndex('by_workoutExercise', (q) => q.eq('workoutExerciseId', we._id))
-            .collect()
-          return {
-            workoutExerciseId: we._id,
-            exercise: (await ctx.db.get(we.exerciseId))!,
-            sets: sets.sort((a, b) => a.setNumber - b.setNumber),
-          }
-        }),
-    )
+    const exercises = await getWorkoutExercises(ctx, workout._id)
 
     const records = await ctx.db
       .query('personalRecords')
