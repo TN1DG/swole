@@ -74,7 +74,8 @@ export const getMine = query({
       activityLevel: profile?.activityLevel ?? null,
       username: profile?.username ?? null,
       workoutsPublic: profile?.workoutsPublic ?? false,
-      onboarded: profile?.onboardedAt != null,
+      onboarded: profile?.onboardedAt != null || (!!profile?.username && !!profile?.displayName),
+      onboardedAtSet: profile?.onboardedAt != null,
     }
   },
 })
