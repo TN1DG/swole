@@ -1,15 +1,14 @@
 import { Password } from '@convex-dev/auth/providers/Password'
 import { convexAuth } from '@convex-dev/auth/server'
-import { ResendOTPPasswordReset, ResendOTPVerification } from './emailAuth'
+import { ResendOTPPasswordReset } from './emailAuth'
 
-// Sets up email+password login, gated behind a 6-digit email code for both
-// new-account verification and password reset (see convex/emailAuth.ts).
-// `signIn`/`signOut` become callable from the frontend; `auth` is used by
-// http.ts to expose the auth HTTP endpoints.
+// Email+password login with no signup verification — users are signed in
+// immediately after creating an account. Password reset still uses an OTP
+// (see convex/emailAuth.ts). `signIn`/`signOut` become callable from the
+// frontend; `auth` is used by http.ts to expose the auth HTTP endpoints.
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
-      verify: ResendOTPVerification,
       reset: ResendOTPPasswordReset,
     }),
   ],
