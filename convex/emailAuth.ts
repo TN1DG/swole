@@ -67,11 +67,11 @@ async function sendOtpEmail(
 
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    // Lets the owner test signup/reset locally without paying for Resend.
     console.warn(`RESEND_API_KEY not set — ${args.kind} code for ${args.email}: ${args.token}`)
     return
   }
 
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -79,7 +79,7 @@ async function sendOtpEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Swole <onboarding@resend.dev>',
+      from: `Swole <${fromEmail}>`,
       to: args.email,
       subject: args.subject,
       text: args.body,
