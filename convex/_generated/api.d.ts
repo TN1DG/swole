@@ -20,6 +20,7 @@ import type * as friends from "../friends.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
+import type * as pings from "../pings.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
 import type * as routines from "../routines.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   history: typeof history;
   http: typeof http;
   migrations: typeof migrations;
+  pings: typeof pings;
   profiles: typeof profiles;
   prs: typeof prs;
   routines: typeof routines;

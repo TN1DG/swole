@@ -13,6 +13,8 @@ import {
 } from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
+import { ConsistencyRing } from '../../components/ConsistencyRing'
+import { TIER_LABELS } from '../../lib/tierLabels'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
@@ -134,6 +136,16 @@ export function ProfilePage() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="mt-4 flex items-center gap-4 rounded-2xl glass-card p-4">
+        <ConsistencyRing streakWeeks={profile!.streakWeeks} size={52} />
+        <div>
+          <p className="font-semibold">
+            {TIER_LABELS[profile!.tier] || 'Building streak…'}
+          </p>
+          <p className="text-sm text-muted">{profile!.streakWeeks} week streak</p>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">

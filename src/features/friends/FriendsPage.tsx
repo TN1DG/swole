@@ -6,6 +6,7 @@ import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { TIER_LABELS } from '../../lib/tierLabels'
+import { ConsistencyRing } from '../../components/ConsistencyRing'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -165,6 +166,7 @@ function LeaderboardTab() {
               <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">
                 {i + 1}
               </span>
+              <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">
                   {entry.displayName}
@@ -280,6 +282,12 @@ function FriendsTab({
             >
               <Link to={`/friends/${f.userId}`} className="min-w-0 flex-1 truncate font-medium">
                 {f.displayName}
+              </Link>
+              <Link
+                to={`/friends/${f.userId}/chat`}
+                className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+              >
+                Ping 💬
               </Link>
               <button
                 type="button"

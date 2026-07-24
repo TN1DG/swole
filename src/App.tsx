@@ -16,6 +16,7 @@ import { FriendsPage } from './features/friends/FriendsPage'
 import { FriendWorkoutsPage } from './features/friends/FriendWorkoutsPage'
 import { FriendWorkoutDetailPage } from './features/friends/FriendWorkoutDetailPage'
 import { FriendTrophyPage } from './features/friends/FriendTrophyPage'
+import { FriendChatPage } from './features/friends/FriendChatPage'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/friends" element={<FriendsPage />} />
+              <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
               <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
               <Route path="/friends/:userId/:workoutId" element={<FriendWorkoutDetailPage />} />
               <Route

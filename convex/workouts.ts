@@ -369,6 +369,22 @@ export const finish = mutation({
     }
 
     await ctx.db.patch(args.workoutId, { endedAt: now })
+
+    try {
+      const SIX_HOURS = 6 * 60 * 60 * 1000
+      const recentPings = await ctx.db
+        .query('gymPings')
+        .withIndex('by_from', (q) => q.eq('fromUserId', userId))
+        .order('desc')
+        .collect()
+      const target = recentPings.find(
+        (p) => p.linkedWorkoutId === undefined && now - p.sentAt <= SIX_HOURS,
+      )
+      if (target) await ctx.db.patch(target._id, { linkedWorkoutId: args.workoutId })
+    } catch {
+      // best-effort — never block workout completion
+    }
+
     return {
       discarded: false as const,
       workoutId: args.workoutId,

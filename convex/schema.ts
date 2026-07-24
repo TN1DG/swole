@@ -58,6 +58,18 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_user_friend', ['userId', 'friendId']),
 
+  // Snapchat-style accountability pings between friends.
+  gymPings: defineTable({
+    fromUserId: v.id('users'),
+    toUserId: v.id('users'),
+    sentAt: v.number(),
+    acknowledgedAt: v.optional(v.number()),
+    linkedWorkoutId: v.optional(v.id('workouts')),
+  })
+    .index('by_from_to', ['fromUserId', 'toUserId'])
+    .index('by_to', ['toUserId'])
+    .index('by_from', ['fromUserId']),
+
   // Built-in exercises have no ownerId; custom ones belong to a user.
   exercises: defineTable({
     ownerId: v.optional(v.id('users')),

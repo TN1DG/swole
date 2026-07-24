@@ -3,6 +3,7 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { assertRange, cleanName, cleanUsername } from './validation'
+import { consistencyStreakWeeks, consistencyTier } from './fitness'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
 // tab, generous headroom for future tabs without growing unbounded.
@@ -59,12 +60,19 @@ export const getMine = query({
         .collect(),
     ])
 
+    const completedWorkouts = workouts.filter((w) => w.endedAt !== undefined)
+    const streakWeeks = consistencyStreakWeeks(
+      completedWorkouts.map((w) => w.startedAt),
+      Date.now(),
+    )
+    const tier = consistencyTier(streakWeeks)
+
     return {
       email: user?.email ?? null,
       displayName: profile?.displayName ?? null,
       unitPreference: profile?.unitPreference ?? 'kg',
       memberSince: user?._creationTime ?? Date.now(),
-      workoutCount: workouts.filter((w) => w.endedAt !== undefined).length,
+      workoutCount: completedWorkouts.length,
       prCount: prs.length,
       favoriteCount: favorites.length,
       heightCm: profile?.heightCm ?? null,
@@ -76,6 +84,8 @@ export const getMine = query({
       workoutsPublic: profile?.workoutsPublic ?? false,
       onboarded: profile?.onboardedAt != null || (!!profile?.username && !!profile?.displayName),
       onboardedAtSet: profile?.onboardedAt != null,
+      streakWeeks,
+      tier,
     }
   },
 })
