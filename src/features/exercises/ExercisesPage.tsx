@@ -4,7 +4,7 @@ import { Box, Button, Chip, IconButton, TextField, Typography } from '@mui/mater
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { MUSCLE_GROUPS } from '../../../convex/constants'
-import { BarbellIcon } from '../../components/icons'
+import { BarbellIcon, HeartOutlineIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from './ExerciseDetail'
 import { ExerciseForm } from './ExerciseForm'
@@ -27,13 +27,15 @@ export function ExercisesPage() {
 
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [selected, setSelected] = useState<Doc<'exercises'> | null>(null)
 
   const filtered = (exercises ?? []).filter((ex) => {
     const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase())
     const matchesGroup = groupFilter === null || ex.muscleGroup === groupFilter
-    return matchesSearch && matchesGroup
+    const matchesFavorite = !favoritesOnly || favoriteIdSet.has(ex._id)
+    return matchesSearch && matchesGroup && matchesFavorite
   })
 
   // Group into sections, in our fixed muscle-group order.
@@ -52,7 +54,7 @@ export function ExercisesPage() {
           + New
         </Button>
       </Box>
-      <FirstVisitTip tabKey="exercises" />
+      <FirstVisitTip tabKey={favoritesOnly ? 'favorites' : 'exercises'} />
 
       {/* Search */}
       <TextField
@@ -63,7 +65,7 @@ export function ExercisesPage() {
         sx={{ mt: 2 }}
       />
 
-      {/* Muscle group filter chips */}
+      {/* Muscle group + favorites filter chips */}
       <Box
         sx={{ mt: 1.5, mx: -2, px: 2, display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, ...noScrollbarSx }}
       >
@@ -73,6 +75,13 @@ export function ExercisesPage() {
           onClick={() => setGroupFilter(null)}
           color={groupFilter === null ? 'primary' : undefined}
           sx={groupFilter === null ? undefined : { bgcolor: 'surface2.main', color: 'text.secondary' }}
+        />
+        <Chip
+          label={favoritesOnly ? '❤️ Favorites' : '🤍 Favorites'}
+          clickable
+          onClick={() => setFavoritesOnly((v) => !v)}
+          color={favoritesOnly ? 'primary' : undefined}
+          sx={favoritesOnly ? undefined : { bgcolor: 'surface2.main', color: 'text.secondary' }}
         />
         {MUSCLE_GROUPS.map((g) => (
           <Chip
@@ -93,8 +102,19 @@ export function ExercisesPage() {
         </Typography>
       ) : sections.length === 0 ? (
         <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center' }}>
-          <BarbellIcon size={32} />
-          <Typography color="text.secondary">No exercises found.</Typography>
+          {favoritesOnly ? (
+            <>
+              <HeartOutlineIcon size={32} />
+              <Typography color="text.secondary">
+                No favorites yet — tap the heart on an exercise to pin it here.
+              </Typography>
+            </>
+          ) : (
+            <>
+              <BarbellIcon size={32} />
+              <Typography color="text.secondary">No exercises found.</Typography>
+            </>
+          )}
         </Box>
       ) : (
         sections.map(({ group, items }) => (
