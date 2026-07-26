@@ -36,6 +36,10 @@ export default defineSchema({
     onboardedAt: v.optional(v.number()),
     // Which first-visit tab tips have been dismissed, so they show at most once.
     seenTips: v.optional(v.array(v.string())),
+    // Single global target for the History calendar's daily rings.
+    dailyVolumeGoalKg: v.optional(v.number()),
+    // Earned by finishing workouts, spent/won via challenges (convex/challenges.ts).
+    pointsBalance: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -65,6 +69,8 @@ export default defineSchema({
     sentAt: v.number(),
     acknowledgedAt: v.optional(v.number()),
     linkedWorkoutId: v.optional(v.id('workouts')),
+    // Sender dismissed the "start your workout?" banner for this ack.
+    senderPromptDismissedAt: v.optional(v.number()),
   })
     .index('by_from_to', ['fromUserId', 'toUserId'])
     .index('by_to', ['toUserId'])
@@ -144,6 +150,33 @@ export default defineSchema({
     windowStart: v.number(),
     count: v.number(),
   }).index('by_key', ['key']),
+
+  // A friend-vs-friend consistency-streak wager, started from the ping
+  // thread. Points are escrowed off both balances as soon as each side
+  // commits (propose/accept), not just at resolution — see convex/challenges.ts.
+  challenges: defineTable({
+    challengerId: v.id('users'),
+    opponentId: v.id('users'),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('active'),
+      v.literal('resolved'),
+      v.literal('declined'),
+      v.literal('cancelled'),
+    ),
+    weeks: v.number(),
+    wagerPoints: v.number(),
+    createdAt: v.number(),
+    startedAt: v.optional(v.number()), // set on accept
+    endsAt: v.optional(v.number()), // startedAt + weeks * WEEK_MS
+    resolvedAt: v.optional(v.number()),
+    winnerId: v.optional(v.id('users')), // absent + resolved = tie
+    challengerStreakWeeks: v.optional(v.number()),
+    opponentStreakWeeks: v.optional(v.number()),
+  })
+    .index('by_challenger', ['challengerId'])
+    .index('by_opponent', ['opponentId'])
+    .index('by_status_endsAt', ['status', 'endsAt']),
 
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({

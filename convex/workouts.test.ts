@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { epley1rm } from './fitness'
+import { epley1rm, POINTS_PER_FINISHED_WORKOUT } from './fitness'
 import {
   asUser,
   createBackend,
@@ -78,6 +78,20 @@ describe('finish', () => {
     const summary = await user.mutation(api.workouts.finish, { workoutId })
     expect(summary.discarded).toBe(true)
     expect(await user.query(api.history.getDetail, { workoutId })).toBeNull()
+  })
+
+  it('awards points for a completed workout, none for a discarded one', async () => {
+    const { user, exerciseId } = await oneUser()
+
+    const discarded = await logWorkout(user, exerciseId, [[100, 5, false]])
+    await user.mutation(api.workouts.finish, { workoutId: discarded.workoutId })
+    expect((await user.query(api.profiles.getMine, {}))!.pointsBalance).toBe(0)
+
+    const completed = await logWorkout(user, exerciseId, [[100, 5, true]])
+    await user.mutation(api.workouts.finish, { workoutId: completed.workoutId })
+    expect((await user.query(api.profiles.getMine, {}))!.pointsBalance).toBe(
+      POINTS_PER_FINISHED_WORKOUT,
+    )
   })
 
   it('cannot finish twice or edit a finished workout', async () => {

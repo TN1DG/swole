@@ -148,6 +148,11 @@ export function ProfilePage() {
         </div>
       </div>
 
+      <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-4">
+        <p className="font-semibold">Points</p>
+        <p className="text-lg font-bold tabular-nums">🪙 {profile!.pointsBalance}</p>
+      </div>
+
       <div className="mt-4 grid grid-cols-3 gap-3">
         <StatTile
           centered

@@ -6,9 +6,10 @@ import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
 import { BarbellIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
+import { CalendarView } from './CalendarView'
 
 export function HistoryPage() {
-  const [tab, setTab] = useState<'workouts' | 'records'>('workouts')
+  const [tab, setTab] = useState<'workouts' | 'records' | 'calendar'>('workouts')
 
   return (
     <div>
@@ -16,8 +17,8 @@ export function HistoryPage() {
       <FirstVisitTip tabKey="history" />
 
       {/* Segmented control */}
-      <div className="mt-4 grid grid-cols-2 rounded-xl glass-tile p-1">
-        {(['workouts', 'records'] as const).map((t) => (
+      <div className="mt-4 grid grid-cols-3 rounded-xl glass-tile p-1">
+        {(['workouts', 'records', 'calendar'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -31,7 +32,13 @@ export function HistoryPage() {
         ))}
       </div>
 
-      {tab === 'workouts' ? <WorkoutList /> : <RecordList />}
+      {tab === 'workouts' ? (
+        <WorkoutList />
+      ) : tab === 'records' ? (
+        <RecordList />
+      ) : (
+        <CalendarView />
+      )}
     </div>
   )
 }

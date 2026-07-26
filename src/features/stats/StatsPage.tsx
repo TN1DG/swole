@@ -14,6 +14,7 @@ import { CalorieBreakdown } from './CalorieBreakdown'
 export function StatsPage() {
   const profile = useQuery(api.profiles.getMine)
   const updateBodyStats = useMutation(api.profiles.updateBodyStats)
+  const setDailyVolumeGoal = useMutation(api.profiles.setDailyVolumeGoal)
 
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
@@ -22,6 +23,10 @@ export function StatsPage() {
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [dailyGoal, setDailyGoal] = useState('')
+  const [goalSaved, setGoalSaved] = useState(false)
+  const [goalError, setGoalError] = useState<string | null>(null)
 
   // Pull saved values into the form exactly once, the first time they load —
   // otherwise a later reactive refetch (e.g. after saving) would clobber
@@ -34,6 +39,7 @@ export function StatsPage() {
     if (profile?.age) setAge(String(profile.age))
     if (profile?.sex) setSex(profile.sex)
     if (profile?.activityLevel) setActivityLevel(profile.activityLevel)
+    if (profile?.dailyVolumeGoalKg) setDailyGoal(String(profile.dailyVolumeGoalKg))
     setHydrated(true)
   }, [profile, hydrated])
 
@@ -64,6 +70,18 @@ export function StatsPage() {
       setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.')
+    }
+  }
+
+  async function handleSaveGoal(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setGoalError(null)
+    setGoalSaved(false)
+    try {
+      await setDailyVolumeGoal({ dailyVolumeGoalKg: parseFloat(dailyGoal) })
+      setGoalSaved(true)
+    } catch (err) {
+      setGoalError(err instanceof Error ? err.message : 'Could not save.')
     }
   }
 
@@ -165,6 +183,33 @@ export function StatsPage() {
           Fill in height, weight, and age above to see your calorie and macro goals.
         </p>
       )}
+
+      <h2 className="mt-8 text-lg font-bold">Daily Lifting Goal</h2>
+      <p className="mt-1 text-sm text-muted">
+        Powers the rings on History → Calendar — one target, every day.
+      </p>
+      <form onSubmit={handleSaveGoal} className="mt-4 flex flex-col gap-3">
+        <label className="text-sm text-muted">
+          Daily lifting goal (kg)
+          <input
+            value={dailyGoal}
+            onChange={(e) => setDailyGoal(e.target.value)}
+            inputMode="decimal"
+            placeholder="2000"
+            className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+          />
+        </label>
+
+        {goalError && <p className="text-sm text-red-400">{goalError}</p>}
+        {goalSaved && <p className="text-sm text-success">Saved.</p>}
+
+        <button
+          type="submit"
+          className="btn-glow mt-1 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
+        >
+          Save Goal
+        </button>
+      </form>
     </div>
   )
 }

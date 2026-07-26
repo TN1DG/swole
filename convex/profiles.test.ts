@@ -232,3 +232,38 @@ describe('seen tips', () => {
     )
   })
 })
+
+describe('setDailyVolumeGoal', () => {
+  it('defaults to null and pointsBalance defaults to 0', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({ dailyVolumeGoalKg: null, pointsBalance: 0 })
+  })
+
+  it('saves and returns the goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setDailyVolumeGoal, { dailyVolumeGoalKg: 2000 })
+    expect((await user.query(api.profiles.getMine, {}))!.dailyVolumeGoalKg).toBe(2000)
+  })
+
+  it('rejects an out-of-range goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await expect(
+      user.mutation(api.profiles.setDailyVolumeGoal, { dailyVolumeGoalKg: 0 }),
+    ).rejects.toThrow(/between/i)
+    await expect(
+      user.mutation(api.profiles.setDailyVolumeGoal, { dailyVolumeGoalKg: 1_000_000 }),
+    ).rejects.toThrow(/between/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.setDailyVolumeGoal, { dailyVolumeGoalKg: 2000 }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})

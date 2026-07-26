@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { PingAckBanner } from './PingAckBanner'
 
 // Each tab: route path, label, and a simple inline SVG icon.
 const tabs = [
@@ -33,6 +34,7 @@ export function AppLayout() {
 
       {/* Page content. Bottom padding leaves room for the fixed tab bar. */}
       <main className="flex-1 px-4 pt-4 pb-24">
+        <PingAckBanner />
         <Outlet />
       </main>
 

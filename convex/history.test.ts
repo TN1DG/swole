@@ -127,3 +127,55 @@ describe('exerciseHistory', () => {
     )
   })
 })
+
+describe('listForCalendar', () => {
+  it('returns only completed workouts within [startMs, endMs)', async () => {
+    const { t, user, exerciseId } = await oneUser()
+    const inRange = await finishedWorkout(user, exerciseId, 100, 5)
+    const outOfRange = await finishedWorkout(user, exerciseId, 100, 5)
+
+    const now = Date.now()
+    await t.run(async (ctx) => {
+      await ctx.db.patch(inRange, { startedAt: now, endedAt: now })
+      // Well before the range being queried below.
+      await ctx.db.patch(outOfRange, { startedAt: now - 30 * 24 * 60 * 60 * 1000 })
+    })
+
+    const results = await user.query(api.history.listForCalendar, {
+      startMs: now - 1000,
+      endMs: now + 1000,
+    })
+    expect(results.map((w) => w._id)).toEqual([inRange])
+  })
+
+  it('excludes the active (unfinished) workout', async () => {
+    const { user } = await oneUser()
+    const now = Date.now()
+    await user.mutation(api.workouts.start, {}) // never finished
+
+    const results = await user.query(api.history.listForCalendar, {
+      startMs: now - 1000,
+      endMs: now + 1000,
+    })
+    expect(results).toEqual([])
+  })
+
+  it('rejects an oversized range', async () => {
+    const { user } = await oneUser()
+    const now = Date.now()
+    await expect(
+      user.query(api.history.listForCalendar, {
+        startMs: now,
+        endMs: now + 60 * 24 * 60 * 60 * 1000, // 60 days, over the ~40-day cap
+      }),
+    ).rejects.toThrow(/invalid range/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    const now = Date.now()
+    expect(
+      await t.query(api.history.listForCalendar, { startMs: now, endMs: now + 1000 }),
+    ).toEqual([])
+  })
+})

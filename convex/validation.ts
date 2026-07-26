@@ -37,6 +37,10 @@ export const LIMITS = {
   friendRequestsPerUser: 50, // pending outgoing requests
   featureRequestTextMaxLength: 1000,
   featureRequestsPerUser: 20,
+  dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
+  challengeMinWeeks: 1,
+  challengeMaxWeeks: 8,
+  maxWagerPoints: 1000,
 } as const
 
 // Trimmed, non-empty, length-capped free text (feature request body, etc.).

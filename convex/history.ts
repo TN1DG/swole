@@ -75,6 +75,39 @@ export const listCompleted = query({
   },
 })
 
+// A calendar view never needs more than a month(+padding) at a time — bounded
+// range instead of paginated, since that's realistically a few dozen rows.
+const MAX_CALENDAR_RANGE_MS = 40 * 24 * 60 * 60 * 1000
+
+// Completed workouts whose startedAt falls in [startMs, endMs) — the
+// CalendarView groups these into local calendar days client-side (see
+// src/features/history/CalendarView.tsx for why that grouping lives there
+// and not here: the app has no server-side timezone concept).
+export const listForCalendar = query({
+  args: { startMs: v.number(), endMs: v.number() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return []
+    if (args.endMs <= args.startMs || args.endMs - args.startMs > MAX_CALENDAR_RANGE_MS) {
+      throw new Error('Invalid range')
+    }
+
+    const workouts = await ctx.db
+      .query('workouts')
+      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .filter((q) =>
+        q.and(
+          q.neq(q.field('endedAt'), undefined),
+          q.gte(q.field('startedAt'), args.startMs),
+          q.lt(q.field('startedAt'), args.endMs),
+        ),
+      )
+      .collect()
+
+    return Promise.all(workouts.map((w) => summarizeWorkout(ctx, w)))
+  },
+})
+
 // Every exercise + its sets for a workout, ordered — shared by getDetail
 // (owner-only) and friends.getFriendWorkoutDetail (friend/public read-only),
 // which differ only in who's allowed to call and whose PR list gets checked.

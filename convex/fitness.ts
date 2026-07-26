@@ -173,3 +173,38 @@ export function consistencyTier(streakWeeks: number): ConsistencyTier {
   }
   return 'none'
 }
+
+// ---------- Consistency points (earned) & challenges (wagered) ----------
+
+// Flat award per finished workout. A named constant (not folded into
+// workouts.ts) so it's easy to find/retune later without touching finish()'s
+// control flow.
+export const POINTS_PER_FINISHED_WORKOUT = 10
+
+// The forward-window twin of consistencyStreakWeeks: that one counts
+// *backward* from "now" (week 0 = this week), which is the wrong direction
+// for a challenge with a fixed start/end date. This counts consecutive weeks
+// starting at windowStart with >=1 workout, capped at windowEnd (so a
+// fully-elapsed challenge can't over-score) and at `now` (so an in-progress
+// challenge shows a legitimate partial score, never future weeks).
+export function forwardStreakWeeks(
+  startedAts: number[],
+  windowStart: number,
+  windowEnd: number,
+  now: number,
+): number {
+  const totalWeeks = Math.max(0, Math.floor((windowEnd - windowStart) / WEEK_MS))
+  const cappedNow = Math.min(now, windowEnd)
+  const weeksElapsed = Math.min(
+    totalWeeks,
+    Math.max(0, Math.ceil((cappedNow - windowStart) / WEEK_MS)),
+  )
+  const weeksWithWorkout = new Set(
+    startedAts
+      .filter((t) => t >= windowStart && t < windowEnd)
+      .map((t) => Math.floor((t - windowStart) / WEEK_MS)),
+  )
+  let streak = 0
+  while (streak < weeksElapsed && weeksWithWorkout.has(streak)) streak++
+  return streak
+}

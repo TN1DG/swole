@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { assertRange, cleanName, cleanUsername } from './validation'
+import { assertRange, cleanName, cleanUsername, LIMITS } from './validation'
 import { consistencyStreakWeeks, consistencyTier } from './fitness'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
@@ -19,7 +19,9 @@ const STATS_BOUNDS = {
 
 // No profile row exists until the user first sets something (display name or
 // unit preference) — create one on demand instead of on every sign-up.
-async function getOrCreateProfile(ctx: MutationCtx, userId: Id<'users'>) {
+// Exported: workouts.ts (points-on-finish) and challenges.ts (escrow) both
+// need to read-or-create a profile the same way this file's own mutations do.
+export async function getOrCreateProfile(ctx: MutationCtx, userId: Id<'users'>) {
   const existing = await ctx.db
     .query('profiles')
     .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -28,6 +30,24 @@ async function getOrCreateProfile(ctx: MutationCtx, userId: Id<'users'>) {
 
   const id = await ctx.db.insert('profiles', { userId, unitPreference: 'kg' })
   return (await ctx.db.get(id))!
+}
+
+// Credits a user's consistency-points balance — workouts.ts (finish) and
+// challenges.ts (refunds, payouts) both call this rather than patching
+// profiles directly, so the balance math stays in one place.
+export async function awardPoints(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
+  const profile = await getOrCreateProfile(ctx, userId)
+  await ctx.db.patch(profile._id, { pointsBalance: (profile.pointsBalance ?? 0) + amount })
+}
+
+// Debits a balance, throwing if it can't cover the amount — challenges.ts
+// calls this at propose/accept time to escrow a wager up front, so a
+// balance always reflects what's actually still spendable right now.
+export async function escrowPoints(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
+  const profile = await getOrCreateProfile(ctx, userId)
+  const balance = profile.pointsBalance ?? 0
+  if (balance < amount) throw new Error('Not enough points')
+  await ctx.db.patch(profile._id, { pointsBalance: balance - amount })
 }
 
 // Everything the profile screen shows: identity, and a few cheap lifetime
@@ -80,6 +100,8 @@ export const getMine = query({
       age: profile?.age ?? null,
       sex: profile?.sex ?? null,
       activityLevel: profile?.activityLevel ?? null,
+      dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
+      pointsBalance: profile?.pointsBalance ?? 0,
       username: profile?.username ?? null,
       workoutsPublic: profile?.workoutsPublic ?? false,
       onboarded: profile?.onboardedAt != null,
@@ -222,6 +244,19 @@ export const updateBodyStats = mutation({
       sex: args.sex,
       activityLevel: args.activityLevel,
     })
+  },
+})
+
+// Single global target for the History calendar's daily rings.
+export const setDailyVolumeGoal = mutation({
+  args: { dailyVolumeGoalKg: v.number() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const goal = assertRange(args.dailyVolumeGoalKg, 1, LIMITS.dailyVolumeGoalKg, 'Daily goal')
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { dailyVolumeGoalKg: goal })
   },
 })
 

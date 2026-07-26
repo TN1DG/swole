@@ -1,5 +1,6 @@
 import { consistencyTier } from '../../convex/fitness'
 import type { ConsistencyTier } from '../../convex/fitness'
+import { ProgressRing } from './ProgressRing'
 
 const TIER_BOUNDS: Record<ConsistencyTier, [number, number]> = {
   none: [0, 2],
@@ -34,46 +35,14 @@ export function ConsistencyRing({
   className?: string
 }) {
   const tier = consistencyTier(streakWeeks)
-  const progress = ringProgress(streakWeeks)
-  const strokeWidth = size * 0.1
-  const radius = size / 2 - strokeWidth / 2
-  const circumference = 2 * Math.PI * radius
-  const cx = size / 2
-  const cy = size / 2
 
   return (
-    <svg width={size} height={size} className={className} aria-hidden>
-      <circle
-        cx={cx}
-        cy={cy}
-        r={radius}
-        fill="none"
-        stroke="#374151"
-        strokeWidth={strokeWidth}
-      />
-      <circle
-        cx={cx}
-        cy={cy}
-        r={radius}
-        fill="none"
-        stroke={RING_COLORS[tier]}
-        strokeWidth={strokeWidth}
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - progress)}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cy})`}
-      />
-      <text
-        x={cx}
-        y={cy}
-        dominantBaseline="central"
-        textAnchor="middle"
-        fontSize={size * 0.28}
-        fontWeight="700"
-        fill="currentColor"
-      >
-        {streakWeeks}
-      </text>
-    </svg>
+    <ProgressRing
+      progress={ringProgress(streakWeeks)}
+      color={RING_COLORS[tier]}
+      size={size}
+      label={String(streakWeeks)}
+      className={className}
+    />
   )
 }

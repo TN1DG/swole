@@ -2,8 +2,9 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import { beatsRecord, epley1rm } from './fitness'
+import { beatsRecord, epley1rm, POINTS_PER_FINISHED_WORKOUT } from './fitness'
 import { assertRange, cleanName, LIMITS } from './validation'
+import { awardPoints } from './profiles'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -369,6 +370,7 @@ export const finish = mutation({
     }
 
     await ctx.db.patch(args.workoutId, { endedAt: now })
+    await awardPoints(ctx, userId, POINTS_PER_FINISHED_WORKOUT)
 
     try {
       const SIX_HOURS = 6 * 60 * 60 * 1000

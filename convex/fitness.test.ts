@@ -4,6 +4,7 @@ import {
   consistencyStreakWeeks,
   consistencyTier,
   epley1rm,
+  forwardStreakWeeks,
   formatDuration,
   goalCalories,
   leaderboardScore,
@@ -156,6 +157,66 @@ describe('consistencyTier', () => {
     expect(consistencyTier(8)).toBe('relentless')
     expect(consistencyTier(12)).toBe('iron_will')
     expect(consistencyTier(100)).toBe('iron_will')
+  })
+})
+
+describe('forwardStreakWeeks', () => {
+  it('is 0 with no workouts', () => {
+    const start = 0
+    const end = 4 * WEEK_MS
+    expect(forwardStreakWeeks([], start, end, end)).toBe(0)
+  })
+
+  it('counts one workout in the first week as a streak of 1', () => {
+    const start = 0
+    const end = 4 * WEEK_MS
+    expect(forwardStreakWeeks([start + 2 * DAY_MS], start, end, end)).toBe(1)
+  })
+
+  it('stops at the first gap week', () => {
+    const start = 0
+    const end = 4 * WEEK_MS
+    const startedAts = [
+      start + 1 * DAY_MS, // week 0
+      start + WEEK_MS + 1 * DAY_MS, // week 1
+      start + 3 * WEEK_MS + 1 * DAY_MS, // week 3 — gap at week 2 stops it at 2
+    ]
+    expect(forwardStreakWeeks(startedAts, start, end, end)).toBe(2)
+  })
+
+  it('excludes a workout logged exactly at windowEnd', () => {
+    const start = 0
+    const end = 2 * WEEK_MS
+    expect(forwardStreakWeeks([end], start, end, end)).toBe(0)
+  })
+
+  it('excludes a workout logged before windowStart', () => {
+    const start = WEEK_MS
+    const end = 3 * WEEK_MS
+    expect(forwardStreakWeeks([start - 1], start, end, end)).toBe(0)
+  })
+
+  it('is 0 when now is before windowStart', () => {
+    const start = WEEK_MS
+    const end = 3 * WEEK_MS
+    expect(forwardStreakWeeks([start], start, end, start - 1)).toBe(0)
+  })
+
+  it('caps at the total weeks in the window even if now is past windowEnd', () => {
+    const start = 0
+    const end = 2 * WEEK_MS // only 2 weeks fit
+    const startedAts = [start + 1 * DAY_MS, start + WEEK_MS + 1 * DAY_MS]
+    // "now" far beyond the window shouldn't let the streak exceed 2.
+    expect(forwardStreakWeeks(startedAts, start, end, end + 10 * WEEK_MS)).toBe(2)
+  })
+
+  it('a still-active window only credits weeks that have actually elapsed', () => {
+    const start = 0
+    const end = 4 * WEEK_MS
+    const startedAts = [start + 1 * DAY_MS] // only week 0 logged so far
+    // "now" is mid-way through week 1 — week 1 has started but no workout in
+    // it yet, so the streak should stay at 1, not assume future weeks.
+    expect(forwardStreakWeeks(startedAts, start, end, start + WEEK_MS + 1 * DAY_MS)).toBe(1)
   })
 })
 
