@@ -22,10 +22,10 @@ function mockFetchOk() {
   return fetchMock
 }
 
-// The email body is plain text: "Your verification code is 123456. ..." or
-// "Your password reset code is 123456. ...". Codes are stored hashed at rest
-// (convex/emailAuth.ts never persists them in the clear), so tests recover
-// the code the same way a real inbox would: from the sent message body.
+// The email body is plain text: "Your password reset code is 123456. ...".
+// Codes are stored hashed at rest (convex/emailAuth.ts never persists them in
+// the clear), so tests recover the code the same way a real inbox would:
+// from the sent message body.
 function extractCode(fetchMock: ReturnType<typeof mockFetchOk>): string {
   const call = fetchMock.mock.calls.at(-1)!
   const body = JSON.parse(call[1].body)
@@ -56,112 +56,19 @@ afterEach(() => {
   delete process.env.JWKS
 })
 
-describe('sign up + email verification', () => {
-  it('sends a code on sign-up, then verifies and signs in', async () => {
+describe('sign up', () => {
+  it('signs in immediately, no verification email sent', async () => {
     const fetchMock = mockFetchOk()
     const t = createBackend()
 
-    // Password wraps verify/reset internally (signInViaProvider), so the
-    // library's "started" signal never reaches this top-level action for the
-    // password provider — a pending code shows up as `tokens: null` instead,
-    // same shape a client sees for `signingIn: false`.
-    const started = await t.action(api.auth.signIn, {
+    // Password() is only configured with `reset` (see convex/auth.ts) — no
+    // `verify` — so signUp returns real tokens straight away.
+    const result = await t.action(api.auth.signIn, {
       provider: 'password',
       params: { flow: 'signUp', email: 'alice@test.local', password: 'longenough123' },
     })
-    expect(started.tokens ?? null).toBeNull()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://api.resend.com/emails')
-    const body = JSON.parse(init.body)
-    expect(body.to).toBe('alice@test.local')
-    expect(body.subject).toMatch(/verify/i)
-
-    const code = extractCode(fetchMock)
-    const result = await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'email-verification', email: 'alice@test.local', code },
-    })
-    expect(result.tokens).toBeTruthy()
-
-    await t.run(async (ctx) => {
-      const account = await ctx.db
-        .query('authAccounts')
-        .withIndex('providerAndAccountId', (q) =>
-          q.eq('provider', 'password').eq('providerAccountId', 'alice@test.local'),
-        )
-        .unique()
-      expect(account?.emailVerified).toBeTruthy()
-    })
-  })
-
-  it('rejects a wrong code', async () => {
-    mockFetchOk()
-    const t = createBackend()
-
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signUp', email: 'bob@test.local', password: 'longenough123' },
-    })
-
-    await expect(
-      t.action(api.auth.signIn, {
-        provider: 'password',
-        params: { flow: 'email-verification', email: 'bob@test.local', code: '000000' },
-      }),
-    ).rejects.toThrow(/could not verify code/i)
-  })
-
-  it('an already-verified account signs in directly, without a new code', async () => {
-    const fetchMock = mockFetchOk()
-    const t = createBackend()
-
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signUp', email: 'carol@test.local', password: 'longenough123' },
-    })
-    const code = extractCode(fetchMock)
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'email-verification', email: 'carol@test.local', code },
-    })
-
-    fetchMock.mockClear()
-    const result = await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signIn', email: 'carol@test.local', password: 'longenough123' },
-    })
     expect(result.tokens).toBeTruthy()
     expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('throttles repeated verification-code requests for the same email', async () => {
-    const fetchMock = mockFetchOk()
-    const t = createBackend()
-
-    // Sign-up itself sends the 1st code; each of these re-triggers one more.
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signUp', email: 'dave@test.local', password: 'longenough123' },
-    })
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signIn', email: 'dave@test.local', password: 'longenough123' },
-    })
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: { flow: 'signIn', email: 'dave@test.local', password: 'longenough123' },
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-
-    // 4th send within the 15-minute window is throttled.
-    await expect(
-      t.action(api.auth.signIn, {
-        provider: 'password',
-        params: { flow: 'signIn', email: 'dave@test.local', password: 'longenough123' },
-      }),
-    ).rejects.toThrow(/too many/i)
-    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })
 
@@ -173,14 +80,6 @@ describe('password reset', () => {
     await t.action(api.auth.signIn, {
       provider: 'password',
       params: { flow: 'signUp', email: 'erin@test.local', password: 'originalpass1' },
-    })
-    await t.action(api.auth.signIn, {
-      provider: 'password',
-      params: {
-        flow: 'email-verification',
-        email: 'erin@test.local',
-        code: extractCode(fetchMock),
-      },
     })
 
     // Capture the pre-reset session so we can confirm it gets invalidated.
@@ -198,7 +97,6 @@ describe('password reset', () => {
     })
     expect(sessionsBefore.length).toBe(1)
 
-    fetchMock.mockClear()
     const started = await t.action(api.auth.signIn, {
       provider: 'password',
       params: { flow: 'reset', email: 'erin@test.local' },
@@ -257,14 +155,6 @@ describe('password reset', () => {
     })
     await t.action(api.auth.signIn, {
       provider: 'password',
-      params: {
-        flow: 'email-verification',
-        email: 'frank@test.local',
-        code: extractCode(fetchMock),
-      },
-    })
-    await t.action(api.auth.signIn, {
-      provider: 'password',
       params: { flow: 'reset', email: 'frank@test.local' },
     })
 
@@ -279,5 +169,39 @@ describe('password reset', () => {
         },
       }),
     ).rejects.toThrow(/could not verify code/i)
+  })
+
+  it('throttles repeated reset requests for the same email', async () => {
+    const fetchMock = mockFetchOk()
+    const t = createBackend()
+
+    await t.action(api.auth.signIn, {
+      provider: 'password',
+      params: { flow: 'signUp', email: 'dave@test.local', password: 'longenough123' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await t.action(api.auth.signIn, {
+      provider: 'password',
+      params: { flow: 'reset', email: 'dave@test.local' },
+    })
+    await t.action(api.auth.signIn, {
+      provider: 'password',
+      params: { flow: 'reset', email: 'dave@test.local' },
+    })
+    await t.action(api.auth.signIn, {
+      provider: 'password',
+      params: { flow: 'reset', email: 'dave@test.local' },
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    // 4th send within the 15-minute window is throttled.
+    await expect(
+      t.action(api.auth.signIn, {
+        provider: 'password',
+        params: { flow: 'reset', email: 'dave@test.local' },
+      }),
+    ).rejects.toThrow(/too many/i)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })
