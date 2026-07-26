@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from 'convex/react'
+import { Box, ButtonBase, IconButton, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { ProgressRing } from '../../components/ProgressRing'
+import { GlassTile } from '../../components/GlassTile'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -39,7 +41,11 @@ export function CalendarView() {
   }, [workouts])
 
   if (profile === undefined || workouts === undefined) {
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   }
 
   const goal = profile?.dailyVolumeGoalKg ?? null
@@ -54,57 +60,53 @@ export function CalendarView() {
   }
 
   return (
-    <div className="mt-4">
+    <Box sx={{ mt: 2 }}>
       {goal === null && (
-        <p className="mb-3 text-sm text-muted">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           Set a daily lifting goal on{' '}
-          <Link to="/stats" className="text-accent underline">
+          <Typography component={Link} to="/stats" color="primary.main" sx={{ textDecoration: 'underline' }}>
             My Stats
-          </Link>{' '}
+          </Typography>{' '}
           to see progress rings here.
-        </p>
+        </Typography>
       )}
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => changeMonth(-1)}
-          aria-label="Previous month"
-          className="rounded-lg px-3 py-1.5 text-muted"
-        >
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <IconButton aria-label="Previous month" sx={{ color: 'text.secondary' }} onClick={() => changeMonth(-1)}>
           ←
-        </button>
-        <p className="font-semibold">{monthLabel}</p>
-        <button
-          type="button"
-          onClick={() => changeMonth(1)}
-          aria-label="Next month"
-          className="rounded-lg px-3 py-1.5 text-muted"
-        >
+        </IconButton>
+        <Typography sx={{ fontWeight: 600 }}>{monthLabel}</Typography>
+        <IconButton aria-label="Next month" sx={{ color: 'text.secondary' }} onClick={() => changeMonth(1)}>
           →
-        </button>
-      </div>
+        </IconButton>
+      </Box>
 
-      <div className="mt-3 grid grid-cols-7 gap-y-2 text-center">
+      <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 1, textAlign: 'center' }}>
         {WEEKDAY_LABELS.map((w, i) => (
-          <p key={i} className="text-xs text-muted">
+          <Typography key={i} variant="caption" color="text.secondary">
             {w}
-          </p>
+          </Typography>
         ))}
 
         {Array.from({ length: leadingBlanks }).map((_, i) => (
-          <div key={`blank-${i}`} />
+          <Box key={`blank-${i}`} />
         ))}
 
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
           const info = byDay.get(day)
           const progress = info && goal ? info.totalVolumeKg / goal : 0
           return (
-            <button
+            <ButtonBase
               key={day}
-              type="button"
               onClick={() => info && setSelectedDay(day === selectedDay ? null : day)}
-              className={`mx-auto flex flex-col items-center gap-0.5 ${info ? '' : 'opacity-40'}`}
+              sx={{
+                mx: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 0.5,
+                opacity: info ? 1 : 0.4,
+              }}
             >
               {info && goal ? (
                 <ProgressRing
@@ -113,32 +115,36 @@ export function CalendarView() {
                   size={28}
                 />
               ) : (
-                <div className="flex h-[28px] w-[28px] items-center justify-center">
-                  {info && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                </div>
+                <Box sx={{ display: 'flex', height: '28px', width: '28px', alignItems: 'center', justifyContent: 'center' }}>
+                  {info && <Box sx={{ height: 6, width: 6, borderRadius: '50%', bgcolor: 'primary.main' }} />}
+                </Box>
               )}
-              <span className="text-[10px] text-muted">{day}</span>
-            </button>
+              <Typography sx={{ fontSize: '10px' }} color="text.secondary">
+                {day}
+              </Typography>
+            </ButtonBase>
           )
         })}
-      </div>
+      </Box>
 
       {selected && (
-        <div className="mt-4 flex flex-col gap-3">
-          <p className="text-sm font-semibold">
-            {selectedDay} {monthCursor.toLocaleDateString([], { month: 'short' })} —{' '}
-            {formatKg(selected.totalVolumeKg)} kg total
-          </p>
+        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {selectedDay} {monthCursor.toLocaleDateString([], { month: 'short' })} — {formatKg(selected.totalVolumeKg)} kg
+            total
+          </Typography>
           {selected.workouts.map((w) => (
-            <Link key={w._id} to={`/history/${w._id}`} className="rounded-2xl glass-tile block p-4">
-              <p className="font-semibold">{w.name}</p>
-              <p className="mt-1 text-sm text-muted tabular-nums">
-                {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
-              </p>
+            <Link key={w._id} to={`/history/${w._id}`} style={{ textDecoration: 'none', display: 'block' }}>
+              <GlassTile sx={{ borderRadius: '16px', p: 2, color: 'text.primary' }}>
+                <Typography sx={{ fontWeight: 600 }}>{w.name}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+                </Typography>
+              </GlassTile>
             </Link>
           ))}
-        </div>
+        </Box>
       )}
-    </div>
+    </Box>
   )
 }

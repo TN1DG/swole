@@ -1,3 +1,6 @@
+import { Box, Typography } from '@mui/material'
+import { GlassTile } from './GlassTile'
+
 // A labeled number tile with an optional leading icon — used for the small
 // stat grids on the post-workout summary and the profile page.
 export function StatTile({
@@ -12,14 +15,23 @@ export function StatTile({
   centered?: boolean
 }) {
   return (
-    <div className={`rounded-xl glass-tile p-3 ${centered ? 'text-center' : ''}`}>
-      <p
-        className={`label-micro flex items-center gap-1 ${centered ? 'justify-center' : ''}`}
+    <GlassTile sx={{ p: 1.5, textAlign: centered ? 'center' : 'left' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: centered ? 'center' : 'flex-start',
+          gap: 0.5,
+        }}
       >
         {icon}
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-bold tabular-nums">{value}</p>
-    </div>
+        <Typography variant="overline" color="text.secondary" component="span">
+          {label}
+        </Typography>
+      </Box>
+      <Typography sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums', fontWeight: 'bold' }} variant="h6">
+        {value}
+      </Typography>
+    </GlassTile>
   )
 }

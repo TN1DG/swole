@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, Chip, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { MUSCLE_GROUPS } from '../../../convex/constants'
@@ -7,6 +8,8 @@ import { BarbellIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from './ExerciseDetail'
 import { ExerciseForm } from './ExerciseForm'
+import { GlassTile } from '../../components/GlassTile'
+import { noScrollbarSx } from '../../theme/noScrollbar'
 
 export function ExercisesPage() {
   // Reactive: re-renders automatically whenever exercises change on the server.
@@ -40,93 +43,119 @@ export function ExercisesPage() {
   })).filter((s) => s.items.length > 0)
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Exercises</h1>
-        <button
-          type="button"
-          onClick={() => setFormOpen(true)}
-          className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-fg"
-        >
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          Exercises
+        </Typography>
+        <Button variant="contained" size="small" onClick={() => setFormOpen(true)}>
           + New
-        </button>
-      </div>
+        </Button>
+      </Box>
       <FirstVisitTip tabKey="exercises" />
 
       {/* Search */}
-      <input
+      <TextField
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search exercises…"
-        className="mt-4 w-full rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+        fullWidth
+        sx={{ mt: 2 }}
       />
 
       {/* Muscle group filter chips */}
-      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
-        <FilterChip
+      <Box
+        sx={{ mt: 1.5, mx: -2, px: 2, display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, ...noScrollbarSx }}
+      >
+        <Chip
           label="All"
-          active={groupFilter === null}
+          clickable
           onClick={() => setGroupFilter(null)}
+          color={groupFilter === null ? 'primary' : undefined}
+          sx={groupFilter === null ? undefined : { bgcolor: 'surface2.main', color: 'text.secondary' }}
         />
         {MUSCLE_GROUPS.map((g) => (
-          <FilterChip
+          <Chip
             key={g}
             label={g}
-            active={groupFilter === g}
+            clickable
             onClick={() => setGroupFilter(groupFilter === g ? null : g)}
+            color={groupFilter === g ? 'primary' : undefined}
+            sx={groupFilter === g ? undefined : { bgcolor: 'surface2.main', color: 'text.secondary' }}
           />
         ))}
-      </div>
+      </Box>
 
       {/* List */}
       {exercises === undefined ? (
-        <p className="mt-8 text-center text-muted">Loading…</p>
+        <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
       ) : sections.length === 0 ? (
-        <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
-          <BarbellIcon className="h-8 w-8" />
-          <p>No exercises found.</p>
-        </div>
+        <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center' }}>
+          <BarbellIcon size={32} />
+          <Typography color="text.secondary">No exercises found.</Typography>
+        </Box>
       ) : (
         sections.map(({ group, items }) => (
-          <section key={group} className="mt-5">
-            <h2 className="label-micro">{group}</h2>
-            <ul className="mt-2 flex flex-col gap-2">
+          <Box component="section" key={group} sx={{ mt: 2.5 }}>
+            <Typography variant="overline" color="text.secondary" component="h2">
+              {group}
+            </Typography>
+            <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
               {items.map((ex) => (
-                <li key={ex._id} className="relative">
-                  <button
+                <GlassTile key={ex._id} sx={{ position: 'relative' }}>
+                  <Box
+                    component="button"
                     type="button"
                     // Opens the detail sheet: chart, PRs, recent sessions.
                     onClick={() => setSelected(ex)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl glass-tile py-3 pr-12 pl-4 text-left"
+                    sx={{
+                      display: 'flex',
+                      width: '100%',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                      py: 1.5,
+                      pr: 6,
+                      pl: 2,
+                      textAlign: 'left',
+                      border: 'none',
+                      bgcolor: 'transparent',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      color: 'inherit',
+                    }}
                   >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{ex.name}</p>
-                      <p className="truncate text-sm text-muted tabular-nums">
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap sx={{ fontWeight: 500 }}>
+                        {ex.name}
+                      </Typography>
+                      <Typography noWrap variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {ex.equipment}
                         {recordByExercise.has(ex._id) &&
                           ` · 🏆 ${recordByExercise.get(ex._id)!.bestWeightKg} kg`}
-                      </p>
-                    </div>
+                      </Typography>
+                    </Box>
                     {ex.isCustom && (
-                      <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent">
-                        Custom
-                      </span>
+                      <Chip
+                        label="Custom"
+                        size="small"
+                        sx={{ flexShrink: 0, bgcolor: 'rgb(193 84 31 / 0.2)', color: 'primary.main' }}
+                      />
                     )}
-                  </button>
-                  <button
-                    type="button"
+                  </Box>
+                  <IconButton
+                    aria-label={favoriteIdSet.has(ex._id) ? 'Remove from favorites' : 'Add to favorites'}
                     onClick={() => void toggleFavorite({ exerciseId: ex._id })}
-                    aria-label={
-                      favoriteIdSet.has(ex._id) ? 'Remove from favorites' : 'Add to favorites'
-                    }
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-lg leading-none"
+                    sx={{ position: 'absolute', top: '50%', right: 12, transform: 'translateY(-50%)', fontSize: '1.125rem' }}
                   >
                     {favoriteIdSet.has(ex._id) ? '❤️' : '🤍'}
-                  </button>
-                </li>
+                  </IconButton>
+                </GlassTile>
               ))}
-            </ul>
-          </section>
+            </Box>
+          </Box>
         ))
       )}
 
@@ -139,28 +168,6 @@ export function ExercisesPage() {
           onClose={() => setSelected(null)}
         />
       )}
-    </div>
-  )
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
-        active ? 'bg-accent text-accent-fg' : 'glass-tile text-muted'
-      }`}
-    >
-      {label}
-    </button>
+    </Box>
   )
 }

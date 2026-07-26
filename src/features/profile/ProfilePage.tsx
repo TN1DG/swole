@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { Box, Button, Checkbox, Stack, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
+import { errorMessage } from '../../lib/errors'
 import {
   BarbellIcon,
   ClipboardIcon,
@@ -14,6 +16,9 @@ import {
 import { StatTile } from '../../components/StatTile'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ConsistencyRing } from '../../components/ConsistencyRing'
+import { GlassCard } from '../../components/GlassCard'
+import { GlassTile } from '../../components/GlassTile'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { TIER_LABELS } from '../../lib/tierLabels'
 
 export function ProfilePage() {
@@ -32,12 +37,16 @@ export function ProfilePage() {
   const [featureError, setFeatureError] = useState<string | null>(null)
   const [featureSent, setFeatureSent] = useState(false)
 
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   if (profile === undefined) {
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 8, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   }
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
@@ -47,7 +56,7 @@ export function ProfilePage() {
       await updateDisplayName({ displayName: name })
       setEditing(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
+      setError(errorMessage(err, 'Could not save.'))
     }
   }
 
@@ -60,7 +69,7 @@ export function ProfilePage() {
       setFeatureText('')
       setFeatureSent(true)
     } catch (err) {
-      setFeatureError(err instanceof Error ? err.message : 'Could not send.')
+      setFeatureError(errorMessage(err, 'Could not send.'))
     }
   }
 
@@ -71,210 +80,241 @@ export function ProfilePage() {
       await deleteAccount({})
       await signOut()
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete account.')
+      setDeleteError(errorMessage(err, 'Could not delete account.'))
       setDeleting(false)
     }
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Profile</h1>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        Profile
+      </Typography>
       <FirstVisitTip tabKey="profile" />
 
-      <div className="mt-4 rounded-2xl glass-card p-4">
+      <GlassCard sx={{ mt: 2 }}>
         {editing ? (
-          <form onSubmit={handleSave} className="flex flex-col gap-2">
-            <input
+          <Box component="form" onSubmit={handleSave} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <TextField
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Display name"
-              className="rounded-lg border border-border bg-surface-2 px-3 py-2 outline-none focus:border-accent"
+              size="small"
+              fullWidth
             />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="btn-glow flex-1 rounded-lg bg-accent py-2 font-semibold text-accent-fg"
-              >
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={1}>
+              <Button type="submit" variant="contained" fullWidth>
                 Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="flex-1 rounded-lg border border-border py-2 font-semibold text-muted"
-              >
+              </Button>
+              <Button type="button" variant="outlined" color="inherit" fullWidth onClick={() => setEditing(false)}>
                 Cancel
-              </button>
-            </div>
-          </form>
+              </Button>
+            </Stack>
+          </Box>
         ) : (
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-lg font-bold">
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography noWrap variant="h6" sx={{ fontWeight: 'bold' }}>
                 {profile?.displayName ?? profile?.email}
-              </p>
+              </Typography>
               {profile?.displayName && (
-                <p className="truncate text-sm text-muted">{profile.email}</p>
+                <Typography noWrap variant="body2" color="text.secondary">
+                  {profile.email}
+                </Typography>
               )}
               {profile?.username && (
-                <p className="truncate text-sm text-accent">@{profile.username}</p>
+                <Typography noWrap variant="body2" color="primary.main">
+                  @{profile.username}
+                </Typography>
               )}
-              <p className="mt-1 text-xs text-muted">
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                 Member since {formatShortDate(profile!.memberSince)}
-              </p>
-            </div>
-            <button
-              type="button"
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              sx={{ flexShrink: 0 }}
               onClick={() => {
                 setName(profile?.displayName ?? '')
                 setEditing(true)
               }}
-              className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
             >
               Edit
-            </button>
-          </div>
+            </Button>
+          </Stack>
         )}
-      </div>
+      </GlassCard>
 
-      <div className="mt-4 flex items-center gap-4 rounded-2xl glass-card p-4">
+      <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <ConsistencyRing streakWeeks={profile!.streakWeeks} size={52} />
-        <div>
-          <p className="font-semibold">
-            {TIER_LABELS[profile!.tier] || 'Building streak…'}
-          </p>
-          <p className="text-sm text-muted">{profile!.streakWeeks} week streak</p>
-        </div>
-      </div>
+        <Box>
+          <Typography sx={{ fontWeight: 600 }}>{TIER_LABELS[profile!.tier] || 'Building streak…'}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {profile!.streakWeeks} week streak
+          </Typography>
+        </Box>
+      </GlassCard>
 
-      <div className="mt-4 flex items-center justify-between rounded-2xl glass-card p-4">
-        <p className="font-semibold">Points</p>
-        <p className="text-lg font-bold tabular-nums">🪙 {profile!.pointsBalance}</p>
-      </div>
+      <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography sx={{ fontWeight: 600 }}>Points</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+          🪙 {profile!.pointsBalance}
+        </Typography>
+      </GlassCard>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <StatTile
-          centered
-          icon={<BarbellIcon />}
-          label="Workouts"
-          value={String(profile!.workoutCount)}
-        />
+      <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5 }}>
+        <StatTile centered icon={<BarbellIcon />} label="Workouts" value={String(profile!.workoutCount)} />
         <StatTile centered label="PRs" value={`🏆 ${profile!.prCount}`} />
-        <StatTile
-          centered
-          icon={<HeartOutlineIcon />}
-          label="Favorites"
-          value={String(profile!.favoriteCount)}
-        />
-      </div>
+        <StatTile centered icon={<HeartOutlineIcon />} label="Favorites" value={String(profile!.favoriteCount)} />
+      </Box>
 
-      <label className="mt-4 flex items-center justify-between gap-2 rounded-xl glass-card p-4">
-        <div>
-          <p className="font-semibold">Public workouts</p>
-          <p className="text-sm text-muted">
+      <GlassCard
+        component="label"
+        sx={{
+          mt: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          borderRadius: '12px',
+          cursor: 'pointer',
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontWeight: 600 }}>Public workouts</Typography>
+          <Typography variant="body2" color="text.secondary">
             Anyone can view your workout history, not just accepted friends.
-          </p>
-        </div>
-        <input
-          type="checkbox"
+          </Typography>
+        </Box>
+        <Checkbox
           checked={profile!.workoutsPublic}
           onChange={(e) => void setWorkoutsPublic({ workoutsPublic: e.target.checked })}
-          className="h-5 w-5 shrink-0 accent-accent"
+          sx={{ flexShrink: 0 }}
         />
-      </label>
+      </GlassCard>
 
-      <div className="mt-4 rounded-2xl glass-card p-4">
-        <p className="flex items-center gap-2 font-semibold">
-          <ClipboardIcon className="h-4 w-4" /> Suggest a feature
-        </p>
-        <p className="text-sm text-muted">Got an idea? It goes straight to the developer.</p>
-        <form onSubmit={handleSubmitFeatureRequest} className="mt-3 flex flex-col gap-2">
-          <textarea
+      <GlassCard sx={{ mt: 2 }}>
+        <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
+          <ClipboardIcon /> Suggest a feature
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Got an idea? It goes straight to the developer.
+        </Typography>
+        <Box component="form" onSubmit={handleSubmitFeatureRequest} sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <TextField
             value={featureText}
             onChange={(e) => setFeatureText(e.target.value)}
             placeholder="I'd love to see…"
+            multiline
             rows={3}
-            className="w-full resize-none rounded-lg border border-border bg-surface-2 px-3 py-2 outline-none focus:border-accent"
+            fullWidth
           />
-          {featureError && <p className="text-sm text-red-400">{featureError}</p>}
-          {featureSent && <p className="text-sm text-success">Sent — thanks!</p>}
-          <button
-            type="submit"
-            disabled={!featureText.trim()}
-            className="btn-glow rounded-lg bg-accent py-2 font-semibold text-accent-fg disabled:opacity-50"
-          >
+          {featureError && (
+            <Typography variant="body2" color="error">
+              {featureError}
+            </Typography>
+          )}
+          {featureSent && (
+            <Typography variant="body2" color="success.main">
+              Sent — thanks!
+            </Typography>
+          )}
+          <Button type="submit" variant="contained" disabled={!featureText.trim()}>
             Submit
-          </button>
-        </form>
-      </div>
+          </Button>
+        </Box>
+      </GlassCard>
 
-      <Link
-        to="/friends"
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl glass-tile py-3 font-semibold"
-      >
-        <PeopleIcon /> Friends
+      <Link to="/friends" style={{ textDecoration: 'none', display: 'block' }}>
+        <GlassTile
+          sx={{
+            mt: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            py: 1.5,
+            fontWeight: 600,
+            color: 'text.primary',
+          }}
+        >
+          <PeopleIcon /> Friends
+        </GlassTile>
       </Link>
 
-      <Link
-        to="/stats"
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl glass-tile py-3 font-semibold"
-      >
-        <FlameIcon /> My Stats
+      <Link to="/stats" style={{ textDecoration: 'none', display: 'block' }}>
+        <GlassTile
+          sx={{
+            mt: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            py: 1.5,
+            fontWeight: 600,
+            color: 'text.primary',
+          }}
+        >
+          <FlameIcon /> My Stats
+        </GlassTile>
       </Link>
 
-      <button
-        type="button"
+      <Button
+        fullWidth
+        variant="outlined"
+        color="inherit"
+        sx={{ mt: 1.5, color: 'error.main' }}
         onClick={() => void signOut()}
-        className="mt-3 w-full rounded-xl border border-border py-3 font-semibold text-red-400"
       >
         Sign out
-      </button>
+      </Button>
 
-      <div className="mt-8 rounded-2xl glass-card border-red-400/30! p-4">
-        <p className="font-semibold text-red-400">Danger zone</p>
-        {!confirmingDelete ? (
-          <>
-            <p className="mt-1 text-sm text-muted">
-              Permanently delete your account and everything in it — workouts, routines,
-              friends, PRs. This can't be undone.
-            </p>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              className="mt-3 w-full rounded-xl border border-red-400/40 py-3 font-semibold text-red-400"
-            >
-              Delete Account
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-sm text-muted">
-              Are you sure? Every workout, routine, PR, and friend connection you have will
-              be gone for good — there's no getting this back.
-            </p>
-            {deleteError && <p className="mt-2 text-sm text-red-400">{deleteError}</p>}
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() => void handleDeleteAccount()}
-                disabled={deleting}
-                className="flex-1 rounded-xl bg-red-500 py-3 font-semibold text-white disabled:opacity-50"
-              >
-                {deleting ? 'Deleting…' : 'Yes, delete everything'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                disabled={deleting}
-                className="flex-1 rounded-xl border border-border py-3 font-semibold text-muted disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </>
+      <GlassCard sx={{ mt: 4, borderColor: 'rgb(248 113 113 / 0.3)' }}>
+        <Typography color="error" sx={{ fontWeight: 600 }}>
+          Danger zone
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Permanently delete your account and everything in it — workouts, routines, friends,
+          PRs. This can't be undone.
+        </Typography>
+        {deleteError && (
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            {deleteError}
+          </Typography>
         )}
-      </div>
-    </div>
+        <Button
+          fullWidth
+          variant="outlined"
+          color="error"
+          disabled={deleting}
+          sx={{ mt: 1.5 }}
+          onClick={() => setConfirmOpen(true)}
+        >
+          {deleting ? 'Deleting…' : 'Delete Account'}
+        </Button>
+      </GlassCard>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Delete your account?"
+        description="Every workout, routine, PR, and friend connection you have will be gone for good — there's no getting this back."
+        confirmLabel="Yes, delete everything"
+        destructive
+        onConfirm={() => void handleDeleteAccount()}
+      />
+    </Box>
   )
 }

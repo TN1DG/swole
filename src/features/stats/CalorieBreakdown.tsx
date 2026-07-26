@@ -1,5 +1,7 @@
+import { Box, Typography } from '@mui/material'
 import { GOALS, goalCalories, macroTargets } from '../../../convex/fitness'
 import { FlameIcon } from '../../components/icons'
+import { GlassTile } from '../../components/GlassTile'
 
 // BMR/TDEE tiles + per-goal calorie & macro cards — shared by the My Stats
 // page (after saving) and the onboarding reward screen (right after the
@@ -16,52 +18,78 @@ export function CalorieBreakdown({
 }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl glass-tile p-3">
-          <p className="label-micro">BMR</p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{Math.round(bmr)} kcal</p>
-        </div>
-        <div className="rounded-xl glass-tile p-3">
-          <p className="label-micro flex items-center gap-1">
-            <FlameIcon className="h-3.5 w-3.5" /> TDEE
-          </p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{Math.round(tdeeValue)} kcal</p>
-        </div>
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+        <GlassTile sx={{ p: 1.5 }}>
+          <Typography variant="overline" color="text.secondary" component="p">
+            BMR
+          </Typography>
+          <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }} variant="h6">
+            {Math.round(bmr)} kcal
+          </Typography>
+        </GlassTile>
+        <GlassTile sx={{ p: 1.5 }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            component="p"
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+          >
+            <FlameIcon size={14} /> TDEE
+          </Typography>
+          <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }} variant="h6">
+            {Math.round(tdeeValue)} kcal
+          </Typography>
+        </GlassTile>
+      </Box>
 
-      <h2 className="label-micro mt-6">Calorie & Macro Goals</h2>
-      <div className="mt-2 flex flex-col gap-3">
+      <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 3 }}>
+        Calorie & Macro Goals
+      </Typography>
+      <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         {GOALS.map((goal) => {
           const calories = goalCalories(tdeeValue, goal.value)
           const macros = macroTargets(calories, weightKg, goal.value)
           return (
-            <div key={goal.value} className="rounded-2xl glass-tile p-4">
-              <div className="flex items-baseline justify-between">
-                <p className="font-semibold">{goal.label}</p>
-                <p className="flex items-center gap-1 font-bold text-accent tabular-nums">
-                  <FlameIcon className="h-4 w-4" /> {macros.calories} kcal
-                </p>
-              </div>
-              <p className="text-sm text-muted">{goal.hint}</p>
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-sm">
+            <GlassTile key={goal.value} sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontWeight: 600 }}>{goal.label}</Typography>
+                <Typography
+                  color="primary.main"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    fontWeight: 'bold',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  <FlameIcon /> {macros.calories} kcal
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                {goal.hint}
+              </Typography>
+              <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, textAlign: 'center' }}>
                 <Macro label="Protein" value={macros.proteinG} />
                 <Macro label="Carbs" value={macros.carbsG} />
                 <Macro label="Fat" value={macros.fatG} />
                 <Macro label="Fiber" value={macros.fiberG} />
-              </div>
-            </div>
+              </Box>
+            </GlassTile>
           )
         })}
-      </div>
+      </Box>
     </>
   )
 }
 
 function Macro({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-surface-2 p-2">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
-      <p className="font-bold tabular-nums">{value}g</p>
-    </div>
+    <Box sx={{ borderRadius: '8px', bgcolor: 'surface2.main', p: 1 }}>
+      <Typography sx={{ fontSize: '10px', textTransform: 'uppercase' }} color="text.secondary">
+        {label}
+      </Typography>
+      <Typography sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>{value}g</Typography>
+    </Box>
   )
 }

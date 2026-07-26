@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, ButtonBase, IconButton, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { HeartOutlineIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
+import { GlassTile } from '../../components/GlassTile'
 
 export function FavoritesPage() {
   const favorites = useQuery(api.favorites.listMine)
@@ -14,47 +16,49 @@ export function FavoritesPage() {
   )
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Favorites</h1>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        Favorites
+      </Typography>
       <FirstVisitTip tabKey="favorites" />
 
       {favorites === undefined ? (
-        <p className="mt-8 text-center text-muted">Loading…</p>
+        <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
       ) : favorites.length === 0 ? (
-        <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
-          <HeartOutlineIcon className="h-8 w-8" />
-          <p>No favorites yet — tap the heart on an exercise to pin it here.</p>
-        </div>
+        <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center' }}>
+          <HeartOutlineIcon size={32} />
+          <Typography color="text.secondary">No favorites yet — tap the heart on an exercise to pin it here.</Typography>
+        </Box>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2">
+        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {favorites.map((fav) => (
-            <li key={fav.exercise._id} className="relative">
-              <button
-                type="button"
+            <GlassTile key={fav.exercise._id} sx={{ position: 'relative' }}>
+              <ButtonBase
                 // Same detail sheet as the Exercises tab: one place for stats.
                 onClick={() => setSelected(fav)}
-                className="flex w-full items-center justify-between rounded-xl glass-tile py-3 pr-12 pl-4 text-left"
+                sx={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left', py: 1.5, pr: 6, pl: 2 }}
               >
-                <div>
-                  <p className="font-medium">{fav.exercise.name}</p>
-                  <p className="text-sm text-muted tabular-nums">
+                <Box>
+                  <Typography sx={{ fontWeight: 500 }}>{fav.exercise.name}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                     {fav.exercise.equipment ?? fav.exercise.muscleGroup}
                     {fav.record &&
                       ` · 🏆 ${formatKg(fav.record.bestWeightKg)} kg × ${fav.record.bestWeightReps}`}
-                  </p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => void toggleFavorite({ exerciseId: fav.exercise._id })}
+                  </Typography>
+                </Box>
+              </ButtonBase>
+              <IconButton
                 aria-label="Remove from favorites"
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-lg leading-none"
+                onClick={() => void toggleFavorite({ exerciseId: fav.exercise._id })}
+                sx={{ position: 'absolute', top: '50%', right: 12, transform: 'translateY(-50%)', fontSize: '1.125rem' }}
               >
                 ❤️
-              </button>
-            </li>
+              </IconButton>
+            </GlassTile>
           ))}
-        </ul>
+        </Box>
       )}
 
       {selected && (
@@ -64,6 +68,6 @@ export function FavoritesPage() {
           onClose={() => setSelected(null)}
         />
       )}
-    </div>
+    </Box>
   )
 }

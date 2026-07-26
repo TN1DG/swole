@@ -1,7 +1,8 @@
 type Point = { label: string; value: number }
 
-// Minimal SVG line chart: top-set weight per session.
-// viewBox coordinates scale to the container width automatically.
+// Minimal SVG line chart: top-set weight per session. Colors come from the
+// plain CSS custom-property bridge (src/theme/globalStyles.ts), not Tailwind
+// classes — this file has no dependency on Tailwind at all.
 export function ProgressChart({ points }: { points: Point[] }) {
   const W = 320
   const H = 140
@@ -24,7 +25,7 @@ export function ProgressChart({ points }: { points: Point[] }) {
   const best = Math.max(...values)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       {/* min/max gridlines + labels */}
       {[min, max].map((v) => (
         <g key={v}>
@@ -33,18 +34,10 @@ export function ProgressChart({ points }: { points: Point[] }) {
             x2={W - PAD.right}
             y1={y(v)}
             y2={y(v)}
-            stroke="currentColor"
-            className="text-border"
+            stroke="var(--color-border)"
             strokeDasharray="3 3"
           />
-          <text
-            x={PAD.left - 6}
-            y={y(v) + 3}
-            textAnchor="end"
-            fontSize="9"
-            fill="currentColor"
-            className="text-muted"
-          >
+          <text x={PAD.left - 6} y={y(v) + 3} textAnchor="end" fontSize="9" fill="var(--color-muted)">
             {v}
           </text>
         </g>
@@ -63,17 +56,10 @@ export function ProgressChart({ points }: { points: Point[] }) {
       ))}
 
       {/* first and last date labels */}
-      <text x={x(0)} y={H - 6} fontSize="9" fill="currentColor" className="text-muted">
+      <text x={x(0)} y={H - 6} fontSize="9" fill="var(--color-muted)">
         {points[0].label}
       </text>
-      <text
-        x={x(points.length - 1)}
-        y={H - 6}
-        textAnchor="end"
-        fontSize="9"
-        fill="currentColor"
-        className="text-muted"
-      >
+      <text x={x(points.length - 1)} y={H - 6} textAnchor="end" fontSize="9" fill="var(--color-muted)">
         {points[points.length - 1].label}
       </text>
     </svg>

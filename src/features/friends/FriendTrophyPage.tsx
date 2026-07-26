@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { domToBlob } from 'modern-screenshot'
+import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { FriendTrophyCard } from './FriendTrophyCard'
@@ -66,46 +67,42 @@ export function FriendTrophyPage() {
   }
 
   if (detail === undefined)
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   if (detail === null)
     return (
-      <div className="mt-8 text-center text-muted">
-        <p>Can't view this workout.</p>
-        <Link to={`/friends/${userId}`} className="text-accent underline">
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">Can't view this workout.</Typography>
+        <Typography component={Link} to={`/friends/${userId}`} color="primary.main" sx={{ textDecoration: 'underline' }}>
           Back
-        </Link>
-      </div>
+        </Typography>
+      </Box>
     )
 
   return (
-    <div>
-      <Link to={`/friends/${userId}/${detail._id}`} className="text-sm text-muted">
+    <Box>
+      <Typography component={Link} to={`/friends/${userId}/${detail._id}`} variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
         ← Workout
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold">Download Trophy</h1>
+      </Typography>
+      <Typography variant="h4" sx={{ mt: 1, fontWeight: 'bold' }}>
+        Download Trophy
+      </Typography>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-border">
+      <Box sx={{ mt: 2, overflow: 'hidden', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
         <FriendTrophyCard ref={frameRef} detail={detail} />
-      </div>
+      </Box>
 
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={busy}
-          className="btn-glow flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-        >
+      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+        <Button variant="contained" fullWidth disabled={busy} onClick={handleShare}>
           {busy ? 'Rendering…' : 'Share'}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={busy}
-          className="flex-1 rounded-xl border border-border py-3 font-semibold disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={handleDownload}>
           Save Image
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   )
 }

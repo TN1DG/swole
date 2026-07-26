@@ -2,20 +2,37 @@
 // Convex's v.number()/v.string() validate the TYPE but not the CONTENT:
 // NaN, Infinity, 1e308, or megabyte strings all pass the wire validators,
 // so every mutation must sanitize what it stores.
+//
+// Every rejection here is an expected, user-caused condition (a name too
+// long, a weight out of range) — the kind of thing a form should show back
+// to the user as-is. That's exactly what ConvexError is for: a plain
+// `throw new Error(...)` reaches the client wrapped in a
+// "[CONVEX ...] Server Error" / stack-trace envelope meant for debugging
+// unexpected failures, not a message meant to be read by an end user.
+// ConvexError's `.message` (and `.data`) arrive at the client exactly as
+// thrown, so the existing `err.message` catch-blocks across the app show
+// the real requirement instead of that envelope.
+import { ConvexError } from 'convex/values'
 
-// Trimmed, non-empty, length-capped user-facing name.
-export function cleanName(raw: string, max = 80): string {
+// Trimmed, non-empty, length-capped user-facing name. `label` is what shows
+// up in the error ("Display name", "Routine name", ...) — defaults to the
+// generic "Name" for call sites that don't need to be more specific.
+export function cleanName(raw: string, max = 80, label = 'Name'): string {
   const name = raw.trim()
-  if (!name) throw new Error('Name is required')
-  if (name.length > max) throw new Error(`Name too long (max ${max} characters)`)
+  if (!name) throw new ConvexError(`${label} is required`)
+  if (name.length > max) {
+    throw new ConvexError(`${label} is too long (max ${max} characters)`)
+  }
   return name
 }
 
 // A finite number within [min, max]. Rejects NaN/Infinity outright rather
 // than clamping them (clamping NaN silently produces NaN again).
 export function assertRange(n: number, min: number, max: number, label: string): number {
-  if (!Number.isFinite(n)) throw new Error(`${label} must be a number`)
-  if (n < min || n > max) throw new Error(`${label} must be between ${min} and ${max}`)
+  if (!Number.isFinite(n)) throw new ConvexError(`${label} must be a number`)
+  if (n < min || n > max) {
+    throw new ConvexError(`${label} must be between ${min} and ${max}`)
+  }
   return n
 }
 
@@ -46,8 +63,8 @@ export const LIMITS = {
 // Trimmed, non-empty, length-capped free text (feature request body, etc.).
 export function cleanText(raw: string, max: number, label = 'Text'): string {
   const text = raw.trim()
-  if (!text) throw new Error(`${label} is required`)
-  if (text.length > max) throw new Error(`${label} too long (max ${max} characters)`)
+  if (!text) throw new ConvexError(`${label} is required`)
+  if (text.length > max) throw new ConvexError(`${label} too long (max ${max} characters)`)
   return text
 }
 
@@ -61,12 +78,12 @@ export function cleanUsername(raw: string): string {
     username.length < LIMITS.usernameMinLength ||
     username.length > LIMITS.usernameMaxLength
   ) {
-    throw new Error(
+    throw new ConvexError(
       `Username must be ${LIMITS.usernameMinLength}-${LIMITS.usernameMaxLength} characters`,
     )
   }
   if (!USERNAME_PATTERN.test(username)) {
-    throw new Error('Username can only contain lowercase letters, numbers, and underscores')
+    throw new ConvexError('Username can only contain lowercase letters, numbers, and underscores')
   }
   return username
 }

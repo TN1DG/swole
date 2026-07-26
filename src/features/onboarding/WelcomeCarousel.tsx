@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import {
   ACTIVITY_LEVELS,
@@ -10,6 +11,8 @@ import {
 } from '../../../convex/fitness'
 import { CalorieBreakdown } from '../stats/CalorieBreakdown'
 import { FlameIcon, PeopleIcon } from '../../components/icons'
+import { errorMessage } from '../../lib/errors'
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 const STORY_SLIDES = [
   {
@@ -46,7 +49,7 @@ export function WelcomeCarousel() {
   } | null>(null)
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col justify-center px-6 py-8">
+    <Box sx={{ mx: 'auto', display: 'flex', minHeight: '100svh', maxWidth: '32rem', flexDirection: 'column', justifyContent: 'center', px: 3, py: 4 }}>
       {step < IDENTITY_STEP && (
         <StorySlide
           index={step}
@@ -66,16 +69,16 @@ export function WelcomeCarousel() {
       {step === REWARD_STEP && bodyStats && <RewardSlide stats={bodyStats} />}
 
       {step < IDENTITY_STEP && (
-        <div className="mt-8 flex justify-center gap-2">
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center', gap: 1 }}>
           {STORY_SLIDES.map((_, i) => (
-            <div
+            <Box
               key={i}
-              className={`h-1.5 w-6 rounded-full ${i === step ? 'bg-accent' : 'bg-surface-2'}`}
+              sx={{ height: 6, width: 24, borderRadius: '9999px', bgcolor: i === step ? 'primary.main' : 'surface2.main' }}
             />
           ))}
-        </div>
+        </Box>
       )}
-    </div>
+    </Box>
   )
 }
 
@@ -90,26 +93,22 @@ function StorySlide({
 }) {
   const slide = STORY_SLIDES[index]
   return (
-    <div className="flex flex-col items-center text-center">
-      <h1 className="text-2xl font-black tracking-tight">{slide.title}</h1>
-      <p className="mt-4 text-muted">{slide.body}</p>
-      <button
-        type="button"
-        onClick={onNext}
-        className="btn-glow mt-8 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
-      >
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+      <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+        {slide.title}
+      </Typography>
+      <Typography color="text.secondary" sx={{ mt: 2 }}>
+        {slide.body}
+      </Typography>
+      <Button variant="contained" fullWidth sx={{ mt: 4 }} onClick={onNext}>
         {index === STORY_SLIDES.length - 1 ? "Let's set you up" : 'Next'}
-      </button>
+      </Button>
       {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-3 text-sm text-muted underline underline-offset-4"
-        >
+        <Button variant="text" color="inherit" sx={{ mt: 1.5, textDecoration: 'underline', color: 'text.secondary' }} onClick={onBack}>
           Back
-        </button>
+        </Button>
       )}
-    </div>
+    </Box>
   )
 }
 
@@ -140,44 +139,58 @@ function IdentitySlide({ onNext }: { onNext: () => void }) {
       await saveIdentity({ username, displayName })
       onNext()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
+      setError(errorMessage(err, 'Could not save.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div>
-      <div className="flex flex-col items-center text-center">
-        <PeopleIcon className="h-8 w-8 text-muted" />
-        <h1 className="mt-2 text-2xl font-black tracking-tight">How should friends find you?</h1>
-        <p className="mt-2 text-muted">Your name and a username — both changeable later.</p>
-      </div>
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
-        <input
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Display name"
-          required
-          className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
-        />
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="username"
-          required
-          className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
-        />
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-        >
+    <Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <PeopleIcon size={32} color="var(--color-muted)" />
+        <Typography variant="h5" sx={{ mt: 1, fontWeight: 900, letterSpacing: '-0.02em' }}>
+          How should friends find you?
+        </Typography>
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
+          Your name and a username — both changeable later.
+        </Typography>
+      </Box>
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box>
+          <TextField
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Display name"
+            required
+            fullWidth
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 0.5 }}>
+            Up to 40 characters.
+          </Typography>
+        </Box>
+        <Box>
+          <TextField
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="username"
+            required
+            fullWidth
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 0.5 }}>
+            3-20 characters — lowercase letters, numbers, and underscores only. Must be unique.
+          </Typography>
+        </Box>
+        {error && (
+          <Typography variant="body2" color="error">
+            {error}
+          </Typography>
+        )}
+        <Button type="submit" variant="contained" fullWidth disabled={submitting} sx={{ mt: 0.5 }}>
           {submitting ? 'One sec…' : 'Continue'}
-        </button>
-      </form>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   )
 }
 
@@ -212,83 +225,82 @@ function StatsSlide({
       await updateBodyStats({ heightCm, weightKg, age: ageYears, sex, activityLevel })
       onNext({ heightCm, weightKg, age: ageYears, sex, activityLevel })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
+      setError(errorMessage(err, 'Could not save.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div>
-      <div className="flex flex-col items-center text-center">
-        <FlameIcon className="h-8 w-8 text-muted" />
-        <h1 className="mt-2 text-2xl font-black tracking-tight">What's your body working with?</h1>
-        <p className="mt-2 text-muted">So we can show you your calorie and macro numbers.</p>
-      </div>
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <input
+    <Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <FlameIcon size={32} color="var(--color-muted)" />
+        <Typography variant="h5" sx={{ mt: 1, fontWeight: 900, letterSpacing: '-0.02em' }}>
+          What's your body working with?
+        </Typography>
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
+          So we can show you your calorie and macro numbers.
+        </Typography>
+      </Box>
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+          <TextField
             value={height}
             onChange={(e) => setHeight(e.target.value)}
-            inputMode="decimal"
             required
             placeholder="Height (cm)"
-            className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+            fullWidth
+            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
           />
-          <input
+          <TextField
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            inputMode="decimal"
             required
             placeholder="Weight (kg)"
-            className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+            fullWidth
+            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
           />
-        </div>
-        <input
+        </Box>
+        <TextField
           value={age}
           onChange={(e) => setAge(e.target.value)}
-          inputMode="numeric"
           required
           placeholder="Age"
-          className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+          fullWidth
+          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
         />
-        <div className="grid grid-cols-2 rounded-xl glass-tile p-1">
-          {(['male', 'female'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSex(s)}
-              className={`rounded-lg py-2 text-sm font-semibold capitalize ${
-                sex === s ? 'bg-accent text-accent-fg' : 'text-muted'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <select
+        <SegmentedControl
+          value={sex}
+          onChange={setSex}
+          options={[
+            { value: 'male', label: 'Male' },
+            { value: 'female', label: 'Female' },
+          ]}
+        />
+        <Select
           value={activityLevel}
           onChange={(e) => setActivityLevel(e.target.value as ActivityLevel)}
-          className="rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+          fullWidth
+          inputProps={{ 'aria-label': 'Activity level' }}
         >
           {ACTIVITY_LEVELS.map((level) => (
-            <option key={level.value} value={level.value}>
+            <MenuItem key={level.value} value={level.value}>
               {level.label} — {level.hint}
-            </option>
+            </MenuItem>
           ))}
-        </select>
+        </Select>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && (
+          <Typography variant="body2" color="error">
+            {error}
+          </Typography>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-        >
+        <Button type="submit" variant="contained" fullWidth disabled={submitting} sx={{ mt: 0.5 }}>
           {submitting ? 'One sec…' : 'See my numbers'}
-        </button>
-      </form>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   )
 }
 
@@ -314,24 +326,21 @@ function RewardSlide({
   }
 
   return (
-    <div>
-      <div className="flex flex-col items-center text-center">
-        <h1 className="text-2xl font-black tracking-tight">Here's what your body needs.</h1>
-        <p className="mt-2 text-muted">
+    <Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
+          Here's what your body needs.
+        </Typography>
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
           Based on what you just entered — revisit anytime from Profile → My Stats.
-        </p>
-      </div>
-      <div className="mt-6">
+        </Typography>
+      </Box>
+      <Box sx={{ mt: 3 }}>
         <CalorieBreakdown bmr={bmr} tdeeValue={tdeeValue} weightKg={stats.weightKg} />
-      </div>
-      <button
-        type="button"
-        onClick={() => void handleFinish()}
-        disabled={submitting}
-        className="btn-glow mt-6 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-      >
+      </Box>
+      <Button variant="contained" fullWidth disabled={submitting} sx={{ mt: 3 }} onClick={() => void handleFinish()}>
         {submitting ? 'One sec…' : "Let's Lift 💪"}
-      </button>
-    </div>
+      </Button>
+    </Box>
   )
 }

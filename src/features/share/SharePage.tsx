@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { domToBlob } from 'modern-screenshot'
+import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ShareCard } from './ShareCard'
+import { GlassTile } from '../../components/GlassTile'
 
 const EXPORT_WIDTH = 1080 // Instagram-story sized PNG (1080x1920)
 
@@ -83,81 +85,72 @@ export function SharePage() {
   }
 
   if (detail === undefined)
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   if (detail === null)
     return (
-      <div className="mt-8 text-center text-muted">
-        <p>Workout not found.</p>
-        <Link to="/history" className="text-accent underline">
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">Workout not found.</Typography>
+        <Typography component={Link} to="/history" color="primary.main" sx={{ textDecoration: 'underline' }}>
           Back to history
-        </Link>
-      </div>
+        </Typography>
+      </Box>
     )
 
   return (
-    <div>
-      <Link to={`/history/${detail._id}`} className="text-sm text-muted">
+    <Box>
+      <Typography component={Link} to={`/history/${detail._id}`} variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
         ← Workout
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold">Share Workout</h1>
+      </Typography>
+      <Typography variant="h4" sx={{ mt: 1, fontWeight: 'bold' }}>
+        Share Workout
+      </Typography>
 
       {/* Hidden inputs: camera vs. gallery */}
-      <input
+      <Box
+        component="input"
         ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         onChange={handleFile}
-        className="hidden"
+        sx={{ display: 'none' }}
       />
-      <input
-        ref={galleryInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        className="hidden"
-      />
+      <Box component="input" ref={galleryInputRef} type="file" accept="image/*" onChange={handleFile} sx={{ display: 'none' }} />
 
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
+      <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
+        <GlassTile
+          component="button"
           onClick={() => cameraInputRef.current?.click()}
-          className="flex-1 rounded-xl glass-tile py-2.5 text-sm font-semibold"
+          sx={{ flex: 1, py: 1.5, fontSize: '0.875rem', fontWeight: 600, border: 'none', cursor: 'pointer', font: 'inherit', color: 'text.primary' }}
         >
           📷 Take Photo
-        </button>
-        <button
-          type="button"
+        </GlassTile>
+        <GlassTile
+          component="button"
           onClick={() => galleryInputRef.current?.click()}
-          className="flex-1 rounded-xl glass-tile py-2.5 text-sm font-semibold"
+          sx={{ flex: 1, py: 1.5, fontSize: '0.875rem', fontWeight: 600, border: 'none', cursor: 'pointer', font: 'inherit', color: 'text.primary' }}
         >
           🖼 Choose Photo
-        </button>
-      </div>
+        </GlassTile>
+      </Box>
 
       {/* The exportable preview */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-border">
+      <Box sx={{ mt: 2, overflow: 'hidden', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
         <ShareCard ref={frameRef} detail={detail} photoUrl={photoUrl} />
-      </div>
+      </Box>
 
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={busy}
-          className="btn-glow flex-1 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-        >
+      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+        <Button variant="contained" fullWidth disabled={busy} onClick={handleShare}>
           {busy ? 'Rendering…' : 'Share'}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={busy}
-          className="flex-1 rounded-xl border border-border py-3 font-semibold disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={handleDownload}>
           Save Image
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   )
 }

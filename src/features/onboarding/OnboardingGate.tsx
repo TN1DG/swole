@@ -1,4 +1,5 @@
 import { useQuery } from 'convex/react'
+import { Box, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { WelcomeCarousel } from './WelcomeCarousel'
 
@@ -14,7 +15,9 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
 
   if (profile === undefined) {
     return (
-      <div className="flex min-h-svh items-center justify-center text-muted">Loading…</div>
+      <Box sx={{ display: 'flex', minHeight: '100svh', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography color="text.secondary">Loading…</Typography>
+      </Box>
     )
   }
   if (profile !== null && !profile.onboarded) {

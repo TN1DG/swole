@@ -1,45 +1,40 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePaginatedQuery, useQuery } from 'convex/react'
+import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
 import { BarbellIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
+import { GlassTile } from '../../components/GlassTile'
+import { SegmentedControl } from '../../components/SegmentedControl'
 import { CalendarView } from './CalendarView'
 
 export function HistoryPage() {
   const [tab, setTab] = useState<'workouts' | 'records' | 'calendar'>('workouts')
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">History</h1>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        History
+      </Typography>
       <FirstVisitTip tabKey="history" />
 
-      {/* Segmented control */}
-      <div className="mt-4 grid grid-cols-3 rounded-xl glass-tile p-1">
-        {(['workouts', 'records', 'calendar'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`rounded-lg py-2 text-sm font-semibold capitalize ${
-              tab === t ? 'bg-accent text-accent-fg' : 'text-muted'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <Box sx={{ mt: 2 }}>
+        <SegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'workouts', label: 'Workouts' },
+            { value: 'records', label: 'Records' },
+            { value: 'calendar', label: 'Calendar' },
+          ]}
+        />
+      </Box>
 
-      {tab === 'workouts' ? (
-        <WorkoutList />
-      ) : tab === 'records' ? (
-        <RecordList />
-      ) : (
-        <CalendarView />
-      )}
-    </div>
+      {tab === 'workouts' ? <WorkoutList /> : tab === 'records' ? <RecordList /> : <CalendarView />}
+    </Box>
   )
 }
 
@@ -52,55 +47,62 @@ function WorkoutList() {
   )
 
   if (status === 'LoadingFirstPage')
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   if (workouts.length === 0)
     return (
-      <div className="mt-8 flex flex-col items-center gap-2 text-center text-muted">
-        <BarbellIcon className="h-8 w-8" />
-        <p>No workouts yet — go lift something!</p>
-      </div>
+      <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, textAlign: 'center' }}>
+        <BarbellIcon size={32} />
+        <Typography color="text.secondary">No workouts yet — go lift something!</Typography>
+      </Box>
     )
 
   return (
-    <div className="mt-4 flex flex-col gap-3">
+    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {workouts.map((w) => (
-        <Link
-          key={w._id}
-          to={`/history/${w._id}`}
-          className="rounded-2xl glass-tile block p-4"
-        >
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="min-w-0 truncate font-semibold">{w.name}</p>
-            <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
-          </div>
-          <p className="mt-1 text-sm text-muted tabular-nums">
-            {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg ·{' '}
-            {w.setCount} sets
-          </p>
-          <ul className="mt-2 text-sm text-muted">
-            {w.exercises.slice(0, 4).map((ex, i) => (
-              <li key={i}>
-                {ex.setCount} × {ex.name}
-              </li>
-            ))}
-            {w.exercises.length > 4 && (
-              <li className="text-xs">+ {w.exercises.length - 4} more</li>
-            )}
-          </ul>
+        <Link key={w._id} to={`/history/${w._id}`} style={{ textDecoration: 'none', display: 'block' }}>
+          <GlassTile sx={{ p: 2, color: 'text.primary' }}>
+            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+              <Typography noWrap sx={{ minWidth: 0, fontWeight: 600 }}>
+                {w.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
+                {formatWorkoutDate(w.startedAt)}
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+              {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+            </Typography>
+            <Box component="ul" sx={{ mt: 1, m: 0, pl: 0, listStyle: 'none' }}>
+              {w.exercises.slice(0, 4).map((ex, i) => (
+                <Typography key={i} component="li" variant="body2" color="text.secondary">
+                  {ex.setCount} × {ex.name}
+                </Typography>
+              ))}
+              {w.exercises.length > 4 && (
+                <Typography component="li" variant="caption" color="text.secondary">
+                  + {w.exercises.length - 4} more
+                </Typography>
+              )}
+            </Box>
+          </GlassTile>
         </Link>
       ))}
 
       {status !== 'Exhausted' && (
-        <button
-          type="button"
-          onClick={() => loadMore(20)}
+        <Button
+          variant="outlined"
+          color="inherit"
           disabled={status === 'LoadingMore'}
-          className="rounded-xl border border-border py-3 font-semibold text-muted disabled:opacity-50"
+          onClick={() => loadMore(20)}
         >
           {status === 'LoadingMore' ? 'Loading…' : 'Load more'}
-        </button>
+        </Button>
       )}
-    </div>
+    </Box>
   )
 }
 
@@ -108,33 +110,38 @@ function RecordList() {
   const records = useQuery(api.prs.listMine)
 
   if (records === undefined)
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   if (records.length === 0)
     return (
-      <p className="mt-8 text-center text-muted">
+      <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
         🏆 Finish a workout to set your first records.
-      </p>
+      </Typography>
     )
 
   const sorted = [...records].sort((a, b) => b.achievedAt - a.achievedAt)
 
   return (
-    <div className="mt-4 flex flex-col gap-2">
+    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
       {sorted.map((r) => (
-        <div
+        <GlassTile
           key={r._id}
-          className="flex items-center justify-between rounded-xl glass-tile px-4 py-3"
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}
         >
-          <div>
-            <p className="font-medium">{r.exercise?.name ?? '?'}</p>
-            <p className="text-sm text-muted tabular-nums">
-              🏆 {formatKg(r.bestWeightKg)} kg × {r.bestWeightReps} · est. 1RM{' '}
-              {formatKg(r.bestEst1rm)} kg
-            </p>
-          </div>
-          <p className="text-xs text-muted">{formatShortDate(r.achievedAt)}</p>
-        </div>
+          <Box>
+            <Typography sx={{ fontWeight: 500 }}>{r.exercise?.name ?? '?'}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              🏆 {formatKg(r.bestWeightKg)} kg × {r.bestWeightReps} · est. 1RM {formatKg(r.bestEst1rm)} kg
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {formatShortDate(r.achievedAt)}
+          </Typography>
+        </GlassTile>
       ))}
-    </div>
+    </Box>
   )
 }

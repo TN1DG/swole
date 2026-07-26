@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
+import { errorMessage } from '../../lib/errors'
 import { ProgressRing } from '../../components/ProgressRing'
+import { GlassTile } from '../../components/GlassTile'
+import { tokens } from '../../theme/tokens'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -28,84 +32,122 @@ export function FriendChatPage() {
   }, [thread?.length])
 
   return (
-    <div>
-      <div className="flex items-center gap-3 -mx-4 -mt-4 px-4 py-3 border-b border-border sticky top-0 z-10 bg-surface/90 backdrop-blur-sm">
-        <Link to="/friends" className="text-muted font-medium">←</Link>
-        <p className="font-semibold">{friend?.displayName ?? '…'}</p>
-      </div>
+    <Box>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mx: -2,
+          mt: -2,
+          px: 2,
+          py: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          bgcolor: 'rgb(30 28 25 / 0.9)',
+          backdropFilter: 'blur(4px)',
+        }}
+      >
+        <Typography component={Link} to="/friends" color="text.secondary" sx={{ fontWeight: 500, textDecoration: 'none' }}>
+          ←
+        </Typography>
+        <Typography sx={{ fontWeight: 600 }}>{friend?.displayName ?? '…'}</Typography>
+      </Box>
 
       <ChallengeSection friendId={friendId} friendName={friend?.displayName ?? 'them'} />
 
-      <div className="flex flex-col gap-4 py-4 min-h-[50vh]">
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 2, minHeight: '50vh' }}>
         {thread === undefined ? (
-          <p className="text-center text-muted">Loading…</p>
+          <Typography sx={{ textAlign: 'center' }} color="text.secondary">
+            Loading…
+          </Typography>
         ) : thread.length === 0 ? (
-          <p className="text-center text-sm text-muted mt-8">
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
             No pings yet — hit "Ping" below to get started!
-          </p>
+          </Typography>
         ) : (
           thread.map((ping) => {
             const expired = now - ping.sentAt > DAY_MS
             return (
-              <div
+              <Box
                 key={ping._id}
-                className={`flex flex-col gap-1 max-w-[80%] ${
-                  ping.isMine ? 'self-end items-end ml-auto' : 'self-start items-start'
-                } ${expired ? 'opacity-40' : ''}`}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                  maxWidth: '80%',
+                  alignSelf: ping.isMine ? 'flex-end' : 'flex-start',
+                  alignItems: ping.isMine ? 'flex-end' : 'flex-start',
+                  opacity: expired ? 0.4 : 1,
+                }}
               >
-                <div
-                  className={`rounded-2xl px-4 py-2.5 ${
-                    ping.isMine ? 'bg-accent text-accent-fg' : 'glass-tile'
-                  }`}
+                <Box
+                  sx={
+                    ping.isMine
+                      ? { borderRadius: '16px', px: 2, py: 1.25, bgcolor: 'primary.main', color: 'primary.contrastText' }
+                      : { borderRadius: '16px', px: 2, py: 1.25, bgcolor: tokens.surface2Glass, border: '1px solid rgb(69 61 53 / 0.3)' }
+                  }
                 >
-                  <p className="text-sm font-medium">I'm heading to the gym! 💪</p>
-                </div>
-                <p className="text-xs text-muted px-1">{formatWorkoutDate(ping.sentAt)}</p>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    I'm heading to the gym! 💪
+                  </Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
+                  {formatWorkoutDate(ping.sentAt)}
+                </Typography>
 
                 {ping.isMine ? (
-                  <p className="text-xs text-muted px-1">
+                  <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
                     {ping.acknowledgedAt !== null ? 'Held accountable ✓' : 'Waiting…'}
-                  </p>
+                  </Typography>
                 ) : !ping.acknowledgedAt && !expired ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="contained"
+                    size="small"
+                    sx={{ mt: 0.5 }}
                     onClick={() => void acknowledge({ pingId: ping._id })}
-                    className="mt-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg btn-glow"
                   >
                     Hold them accountable 💪
-                  </button>
+                  </Button>
                 ) : null}
 
                 {ping.linkedWorkout && (
-                  <Link
+                  <Typography
+                    component={Link}
                     to={`/friends/${ping.fromUserId}/${ping.linkedWorkout._id}`}
-                    className="text-xs text-accent underline px-1"
+                    variant="caption"
+                    color="primary.main"
+                    sx={{ px: 0.5, textDecoration: 'underline' }}
                   >
                     See workout → {ping.linkedWorkout.name}
-                  </Link>
+                  </Typography>
                 )}
 
                 {ping.isMine && !ping.linkedWorkout && !expired && (
-                  <Link to="/" className="text-xs text-accent underline px-1">
+                  <Typography component={Link} to="/" variant="caption" color="primary.main" sx={{ px: 0.5, textDecoration: 'underline' }}>
                     Log workout →
-                  </Link>
+                  </Typography>
                 )}
-              </div>
+              </Box>
             )
           })
         )}
         <div ref={bottomRef} />
-      </div>
+      </Box>
 
-      <button
-        type="button"
+      <Button
+        variant="contained"
+        fullWidth
         disabled={hasPendingOutgoing}
+        sx={{ position: 'sticky', bottom: 0 }}
         onClick={() => void sendPing({ toUserId: friendId })}
-        className="w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg btn-glow disabled:opacity-50 sticky bottom-0"
       >
         Ping 🏋️
-      </button>
-    </div>
+      </Button>
+    </Box>
   )
 }
 
@@ -141,7 +183,7 @@ function ChallengeSection({ friendId, friendName }: { friendId: Id<'users'>; fri
       })
       setComposing(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not propose.')
+      setError(errorMessage(err, 'Could not propose.'))
     } finally {
       setBusy(false)
     }
@@ -155,7 +197,7 @@ function ChallengeSection({ friendId, friendName }: { friendId: Id<'users'>; fri
       else if (action === 'decline') await decline({ challengeId })
       else await cancelChallenge({ challengeId })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setError(errorMessage(err, 'Something went wrong.'))
     } finally {
       setBusy(false)
     }
@@ -163,116 +205,113 @@ function ChallengeSection({ friendId, friendName }: { friendId: Id<'users'>; fri
 
   if (!open) {
     return (
-      <div className="mt-3 rounded-2xl glass-tile p-4">
+      <GlassTile sx={{ mt: 1.5, p: 2 }}>
         {current?.status === 'resolved' && (
-          <p className="mb-2 text-sm text-muted">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             {current.winnerId === undefined
               ? 'Last challenge tied — points returned.'
               : current.isMine === (current.winnerId === current.challengerId)
                 ? `You won the last challenge! +${current.wagerPoints} pts`
                 : `${friendName} won the last challenge.`}
-          </p>
+          </Typography>
         )}
         {composing ? (
-          <form onSubmit={handlePropose} className="flex flex-col gap-2">
-            <p className="font-semibold">Challenge {friendName} ⚔️</p>
-            <p className="text-xs text-muted">Whoever keeps the longer streak wins the pot.</p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-muted">
-                Weeks
-                <input
+          <Box component="form" onSubmit={handlePropose} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography sx={{ fontWeight: 600 }}>Challenge {friendName} ⚔️</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Whoever keeps the longer streak wins the pot.
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Weeks
+                </Typography>
+                <TextField
                   value={weeks}
                   onChange={(e) => setWeeks(e.target.value)}
-                  inputMode="numeric"
-                  className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  size="small"
+                  fullWidth
+                  sx={{ mt: 0.5 }}
+                  slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                 />
-              </label>
-              <label className="text-xs text-muted">
-                Wager (pts)
-                <input
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Wager (pts)
+                </Typography>
+                <TextField
                   value={wager}
                   onChange={(e) => setWager(e.target.value)}
-                  inputMode="numeric"
-                  className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  size="small"
+                  fullWidth
+                  sx={{ mt: 0.5 }}
+                  slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                 />
-              </label>
-            </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={busy}
-                className="btn-glow flex-1 rounded-lg bg-accent py-2 text-sm font-semibold text-accent-fg disabled:opacity-50"
-              >
+              </Box>
+            </Box>
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button type="submit" variant="contained" size="small" fullWidth disabled={busy}>
                 Propose
-              </button>
-              <button
-                type="button"
-                onClick={() => setComposing(false)}
-                className="flex-1 rounded-lg border border-border py-2 text-sm font-semibold text-muted"
-              >
+              </Button>
+              <Button variant="outlined" color="inherit" size="small" fullWidth onClick={() => setComposing(false)}>
                 Cancel
-              </button>
-            </div>
-          </form>
+              </Button>
+            </Box>
+          </Box>
         ) : (
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="w-full rounded-lg border border-border py-2 text-sm font-semibold text-muted"
-          >
+          <Button variant="outlined" color="inherit" fullWidth sx={{ color: 'text.secondary' }} onClick={() => setComposing(true)}>
             Start a Challenge ⚔️
-          </button>
+          </Button>
         )}
-      </div>
+      </GlassTile>
     )
   }
 
   if (current.status === 'pending' && current.isMine) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl glass-tile p-4">
-        <p className="text-sm text-muted">
+      <GlassTile sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, p: 2 }}>
+        <Typography variant="body2" color="text.secondary">
           Waiting for {friendName} to accept… ({current.wagerPoints} pts, {current.weeks}w)
-        </p>
-        <button
-          type="button"
-          onClick={() => void respond('cancel', current._id)}
+        </Typography>
+        <Button
+          variant="outlined"
+          color="inherit"
+          size="small"
           disabled={busy}
-          className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs text-muted disabled:opacity-50"
+          sx={{ flexShrink: 0 }}
+          onClick={() => void respond('cancel', current._id)}
         >
           Cancel
-        </button>
-      </div>
+        </Button>
+      </GlassTile>
     )
   }
 
   if (current.status === 'pending' && !current.isMine) {
     return (
-      <div className="mt-3 rounded-2xl glass-tile p-4">
-        <p className="text-sm">
-          {friendName} challenged you: {current.wagerPoints} pts, {current.weeks} weeks — longer
-          streak wins.
-        </p>
-        {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => void respond('accept', current._id)}
-            disabled={busy}
-            className="btn-glow flex-1 rounded-lg bg-accent py-2 text-sm font-semibold text-accent-fg disabled:opacity-50"
-          >
+      <GlassTile sx={{ mt: 1.5, p: 2 }}>
+        <Typography variant="body2">
+          {friendName} challenged you: {current.wagerPoints} pts, {current.weeks} weeks — longer streak wins.
+        </Typography>
+        {error && (
+          <Typography variant="body2" color="error" sx={{ mt: 0.5 }}>
+            {error}
+          </Typography>
+        )}
+        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+          <Button variant="contained" size="small" fullWidth disabled={busy} onClick={() => void respond('accept', current._id)}>
             Accept
-          </button>
-          <button
-            type="button"
-            onClick={() => void respond('decline', current._id)}
-            disabled={busy}
-            className="flex-1 rounded-lg border border-border py-2 text-sm font-semibold text-muted disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="outlined" color="inherit" size="small" fullWidth disabled={busy} onClick={() => void respond('decline', current._id)}>
             Decline
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Box>
+      </GlassTile>
     )
   }
 
@@ -284,32 +323,26 @@ function ChallengeSection({ friendId, friendName }: { friendId: Id<'users'>; fri
   const opponentStreak = current.liveOpponentStreak ?? 0
 
   return (
-    <div className="mt-3 rounded-2xl glass-tile p-4">
-      <p className="text-sm font-semibold">
+    <GlassTile sx={{ mt: 1.5, p: 2 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
         Challenge in progress — {current.wagerPoints} pts · ends{' '}
         {current.endsAt !== undefined ? formatShortDate(current.endsAt) : '…'}
-      </p>
-      <div className="mt-3 flex items-center justify-around">
-        <div className="flex flex-col items-center gap-1">
-          <ProgressRing
-            progress={challengerStreak / current.weeks}
-            color="var(--color-accent)"
-            size={48}
-            label={String(challengerStreak)}
-          />
-          <p className="text-xs text-muted">{challengerName}</p>
-        </div>
-        <p className="text-muted">vs</p>
-        <div className="flex flex-col items-center gap-1">
-          <ProgressRing
-            progress={opponentStreak / current.weeks}
-            color="var(--color-accent)"
-            size={48}
-            label={String(opponentStreak)}
-          />
-          <p className="text-xs text-muted">{opponentName}</p>
-        </div>
-      </div>
-    </div>
+      </Typography>
+      <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+          <ProgressRing progress={challengerStreak / current.weeks} color="var(--color-accent)" size={48} label={String(challengerStreak)} />
+          <Typography variant="caption" color="text.secondary">
+            {challengerName}
+          </Typography>
+        </Box>
+        <Typography color="text.secondary">vs</Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+          <ProgressRing progress={opponentStreak / current.weeks} color="var(--color-accent)" size={48} label={String(opponentStreak)} />
+          <Typography variant="caption" color="text.secondary">
+            {opponentName}
+          </Typography>
+        </Box>
+      </Box>
+    </GlassTile>
   )
 }

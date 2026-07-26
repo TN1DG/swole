@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import {
   mutation,
@@ -67,7 +67,7 @@ export const propose = mutation({
       throw new Error('You can only challenge friends')
     }
     if (await openChallengeBetween(ctx, userId, args.opponentId)) {
-      throw new Error('Already have an open challenge with this friend')
+      throw new ConvexError('Already have an open challenge with this friend')
     }
 
     const weeks = Math.round(

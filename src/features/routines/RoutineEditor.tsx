@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ExercisePicker } from '../workouts/ExercisePicker'
+import { GlassTile } from '../../components/GlassTile'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 export type RoutineDraft = {
   _id?: Id<'routines'>
@@ -24,6 +27,7 @@ export function RoutineEditor({ initial, onClose }: Props) {
   const [exercises, setExercises] = useState(initial?.exercises ?? [])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   function move(index: number, delta: -1 | 1) {
     const target = index + delta
@@ -63,101 +67,113 @@ export function RoutineEditor({ initial, onClose }: Props) {
 
   async function handleDelete() {
     if (!initial?._id) return
-    if (!window.confirm(`Delete routine "${initial.name}"?`)) return
     await remove({ routineId: initial._id })
     onClose()
   }
 
   return (
-    <div>
-      <button type="button" onClick={onClose} className="text-sm text-muted">
+    <Box>
+      <Typography
+        component="button"
+        type="button"
+        onClick={onClose}
+        variant="body2"
+        color="text.secondary"
+        sx={{ border: 'none', bgcolor: 'transparent', p: 0, cursor: 'pointer', font: 'inherit' }}
+      >
         ← Routines
-      </button>
+      </Typography>
 
-      <h1 className="mt-2 text-2xl font-bold">
+      <Typography variant="h4" sx={{ mt: 1, fontWeight: 'bold' }}>
         {initial?._id ? 'Edit Routine' : 'New Routine'}
-      </h1>
+      </Typography>
 
-      <input
+      <TextField
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Routine name (e.g. Push Day)"
-        className="mt-4 w-full rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+        fullWidth
+        sx={{ mt: 2 }}
       />
 
-      <div className="mt-4 flex flex-col gap-2">
+      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {exercises.map((entry, i) => (
-          <div
-            key={`${entry.exerciseId}-${i}`}
-            className="flex items-center gap-2 rounded-xl glass-tile px-3 py-2"
-          >
+          <GlassTile key={`${entry.exerciseId}-${i}`} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
             {/* reorder */}
-            <div className="flex flex-col">
-              <button type="button" onClick={() => move(i, -1)} className="px-1 text-muted" aria-label="Move up">▲</button>
-              <button type="button" onClick={() => move(i, 1)} className="px-1 text-muted" aria-label="Move down">▼</button>
-            </div>
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <IconButton size="small" onClick={() => move(i, -1)} aria-label="Move up" sx={{ color: 'text.secondary', py: 0.25 }}>
+                ▲
+              </IconButton>
+              <IconButton size="small" onClick={() => move(i, 1)} aria-label="Move down" sx={{ color: 'text.secondary', py: 0.25 }}>
+                ▼
+              </IconButton>
+            </Box>
 
-            <p className="flex-1 font-medium">{entry.name}</p>
+            <Typography sx={{ flex: 1, fontWeight: 500 }}>{entry.name}</Typography>
 
             {/* target sets stepper */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
                 onClick={() => setTargetSets(i, -1)}
-                className="h-8 w-8 rounded-lg border border-border text-muted"
+                sx={{ height: 32, width: 32, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.secondary' }}
               >
                 −
-              </button>
-              <span className="w-12 text-center text-sm tabular-nums">
+              </IconButton>
+              <Typography variant="body2" sx={{ width: 48, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                 {entry.targetSets} set{entry.targetSets > 1 ? 's' : ''}
-              </span>
-              <button
-                type="button"
+              </Typography>
+              <IconButton
+                size="small"
                 onClick={() => setTargetSets(i, 1)}
-                className="h-8 w-8 rounded-lg border border-border text-muted"
+                sx={{ height: 32, width: 32, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.secondary' }}
               >
                 +
-              </button>
-            </div>
+              </IconButton>
+            </Box>
 
-            <button
-              type="button"
-              onClick={() => setExercises((list) => list.filter((_, j) => j !== i))}
-              className="px-1 text-muted"
+            <IconButton
+              size="small"
               aria-label="Remove"
+              sx={{ color: 'text.secondary' }}
+              onClick={() => setExercises((list) => list.filter((_, j) => j !== i))}
             >
               ✕
-            </button>
-          </div>
+            </IconButton>
+          </GlassTile>
         ))}
-      </div>
+      </Box>
 
-      <button
-        type="button"
+      <Button
+        variant="outlined"
+        color="inherit"
+        fullWidth
+        sx={{ mt: 1.5, borderStyle: 'dashed', color: 'text.secondary' }}
         onClick={() => setPickerOpen(true)}
-        className="mt-3 w-full rounded-xl border border-dashed border-border py-3 font-medium text-muted"
       >
         + Add Exercise
-      </button>
+      </Button>
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {error && (
+        <Typography variant="body2" color="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Typography>
+      )}
 
-      <button
-        type="button"
-        onClick={handleSave}
-        className="btn-glow mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
-      >
+      <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={() => void handleSave()}>
         Save Routine
-      </button>
+      </Button>
 
       {initial?._id && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="mt-3 w-full rounded-xl border border-border py-3 font-semibold text-red-400"
+        <Button
+          variant="outlined"
+          color="inherit"
+          fullWidth
+          sx={{ mt: 1.5, color: 'error.main' }}
+          onClick={() => setConfirmDeleteOpen(true)}
         >
           Delete Routine
-        </button>
+        </Button>
       )}
 
       {pickerOpen && (
@@ -172,13 +188,21 @@ export function RoutineEditor({ initial, onClose }: Props) {
           }}
         />
       )}
-    </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title={`Delete routine "${initial?.name}"?`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => void handleDelete()}
+      />
+    </Box>
   )
 }
 
 // Thin wrapper: the shared picker returns an id; the editor also needs the
 // name for display before anything is saved.
-import { useQuery } from 'convex/react'
 
 function ExercisePickerWithNames({
   onPickNamed,

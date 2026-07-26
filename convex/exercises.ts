@@ -11,7 +11,7 @@ function validateExerciseFields(args: {
   muscleGroup: string
   equipment?: string
 }) {
-  const name = cleanName(args.name)
+  const name = cleanName(args.name, 80, 'Exercise name')
   if (!(MUSCLE_GROUPS as readonly string[]).includes(args.muscleGroup)) {
     throw new Error('Unknown muscle group')
   }

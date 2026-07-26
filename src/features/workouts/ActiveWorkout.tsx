@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
+import { Box, Button, ButtonBase, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { beatsRecord, formatDuration, formatKg } from '../../../convex/fitness'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { ExercisePicker } from './ExercisePicker'
+import { GlassTile } from '../../components/GlassTile'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 // The exact shape getActive returns, minus null — TypeScript derives it
 // from the backend function, so the two can never drift apart.
@@ -19,10 +22,18 @@ type Props = {
   onFinished: (summary: FinishSummary) => void
 }
 
+// What (if anything) ConfirmDialog is currently asking about — replaces the
+// three window.confirm() calls this component used to make.
+type PendingConfirm =
+  | { kind: 'discardEmpty' }
+  | { kind: 'finishWithPending'; count: number }
+  | { kind: 'discardWorkout' }
+  | null
+
 export function ActiveWorkout({ workout, onFinished }: Props) {
-  const addExercise = useMutation(api.workouts.addExercise)
   const finish = useMutation(api.workouts.finish)
   const cancel = useMutation(api.workouts.cancel)
+  const addExercise = useMutation(api.workouts.addExercise)
 
   const prs = useQuery(api.prs.listMine)
   // exerciseId -> record, for O(1) lookups in set rows.
@@ -33,6 +44,7 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null)
   // Set whenever any save fails (bad connection, etc.) so nothing is lost silently.
   const [saveError, setSaveError] = useState(false)
   const reportSaveError = () => setSaveError(true)
@@ -44,13 +56,7 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
     .filter((s) => !s.isWarmup)
     .reduce((sum, s) => sum + s.weightKg * s.reps, 0)
 
-  async function handleFinish() {
-    const pending = allSets.length - doneSets.length
-    if (doneSets.length === 0) {
-      if (!window.confirm('No sets are marked done — discard this workout?')) return
-    } else if (pending > 0) {
-      if (!window.confirm(`${pending} unfinished set${pending > 1 ? 's' : ''} will be discarded. Finish anyway?`)) return
-    }
+  async function doFinish() {
     setFinishing(true)
     try {
       onFinished(await finish({ workoutId: workout._id }))
@@ -61,49 +67,69 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
     }
   }
 
-  async function handleCancel() {
-    if (window.confirm('Discard this entire workout?')) {
-      await cancel({ workoutId: workout._id }).catch(reportSaveError)
+  function handleFinish() {
+    const pending = allSets.length - doneSets.length
+    if (doneSets.length === 0) {
+      setPendingConfirm({ kind: 'discardEmpty' })
+    } else if (pending > 0) {
+      setPendingConfirm({ kind: 'finishWithPending', count: pending })
+    } else {
+      void doFinish()
     }
   }
 
+  async function doCancel() {
+    await cancel({ workoutId: workout._id }).catch(reportSaveError)
+  }
+
   return (
-    <div>
+    <Box>
       {/* Connection problem banner */}
       {saveError && (
-        <div className="mb-3 flex items-center justify-between rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-300">
+        <Box
+          sx={{
+            mb: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderRadius: '12px',
+            border: '1px solid rgb(248 113 113 / 0.4)',
+            bgcolor: 'rgb(248 113 113 / 0.1)',
+            color: 'rgb(252 165 165)',
+            px: 1.5,
+            py: 1,
+            fontSize: '0.875rem',
+          }}
+        >
           <span>Couldn't save — check your connection and retry.</span>
-          <button
-            type="button"
-            onClick={() => setSaveError(false)}
-            className="px-2 font-bold"
-            aria-label="Dismiss"
-          >
+          <IconButton size="small" onClick={() => setSaveError(false)} aria-label="Dismiss" sx={{ color: 'inherit' }}>
             ✕
-          </button>
-        </div>
+          </IconButton>
+        </Box>
       )}
+
       {/* Header: name + live stats, finish/cancel */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">{workout.name}</h1>
-          <p className="mt-1 text-sm text-muted tabular-nums">
-            <ElapsedTimer since={workout.startedAt} /> ·{' '}
-            {formatKg(volume)} kg · {doneSets.length} sets
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleFinish}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+            {workout.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+            <ElapsedTimer since={workout.startedAt} /> · {formatKg(volume)} kg · {doneSets.length} sets
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
           disabled={finishing}
-          className="rounded-xl bg-success px-4 py-2 font-semibold text-black disabled:opacity-50"
+          onClick={handleFinish}
+          sx={{ bgcolor: 'success.main', color: '#000', '&:hover': { bgcolor: 'success.main' } }}
         >
           Finish
-        </button>
-      </div>
+        </Button>
+      </Box>
 
       {/* Exercise cards */}
-      <div className="mt-5 flex flex-col gap-4">
+      <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
         {workout.exercises.map((entry, i) => (
           <ExerciseCard
             key={entry.workoutExerciseId}
@@ -114,35 +140,54 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
             isLast={i === workout.exercises.length - 1}
           />
         ))}
-      </div>
+      </Box>
 
-      <button
-        type="button"
-        onClick={() => setPickerOpen(true)}
-        className="btn-glow mt-5 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
-      >
+      <Button variant="contained" fullWidth sx={{ mt: 2.5 }} onClick={() => setPickerOpen(true)}>
         + Add Exercise
-      </button>
-      <button
-        type="button"
-        onClick={handleCancel}
-        className="mt-3 w-full rounded-xl border border-border py-3 font-semibold text-red-400"
+      </Button>
+      <Button
+        variant="outlined"
+        color="inherit"
+        fullWidth
+        sx={{ mt: 1.5, color: 'error.main' }}
+        onClick={() => setPendingConfirm({ kind: 'discardWorkout' })}
       >
         Discard Workout
-      </button>
+      </Button>
 
       {pickerOpen && (
         <ExercisePicker
           onClose={() => setPickerOpen(false)}
           onPick={async (exerciseId) => {
             setPickerOpen(false)
-            await addExercise({ workoutId: workout._id, exerciseId }).catch(
-              reportSaveError,
-            )
+            await addExercise({ workoutId: workout._id, exerciseId }).catch(reportSaveError)
           }}
         />
       )}
-    </div>
+
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        title={
+          pendingConfirm?.kind === 'finishWithPending'
+            ? 'Finish workout?'
+            : 'Discard this workout?'
+        }
+        description={
+          pendingConfirm?.kind === 'discardEmpty'
+            ? 'No sets are marked done — this workout will be discarded.'
+            : pendingConfirm?.kind === 'finishWithPending'
+              ? `${pendingConfirm.count} unfinished set${pendingConfirm.count > 1 ? 's' : ''} will be discarded. Finish anyway?`
+              : undefined
+        }
+        confirmLabel={pendingConfirm?.kind === 'finishWithPending' ? 'Finish' : 'Discard'}
+        destructive={pendingConfirm?.kind !== 'finishWithPending'}
+        onConfirm={() => {
+          if (pendingConfirm?.kind === 'discardWorkout') void doCancel()
+          else void doFinish()
+        }}
+      />
+    </Box>
   )
 }
 
@@ -156,6 +201,8 @@ function ElapsedTimer({ since }: { since: number }) {
 }
 
 // ---------- one exercise with its set rows ----------
+
+const SET_ROW_COLUMNS = '2.5rem 1fr 1fr 2.75rem 2rem'
 
 function ExerciseCard({
   entry,
@@ -174,98 +221,104 @@ function ExerciseCard({
   const removeExercise = useMutation(api.workouts.removeExercise)
   const moveExercise = useMutation(api.workouts.moveExercise)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
 
   return (
-    <section className="rounded-2xl glass-tile p-3">
-      <div className="flex items-center gap-2">
+    <GlassTile component="section" sx={{ p: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         {/* reorder */}
-        <div className="flex flex-col">
-          <button
-            type="button"
-            onClick={() =>
-              moveExercise({
-                workoutExerciseId: entry.workoutExerciseId,
-                direction: 'up',
-              }).catch(onSaveError)
-            }
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <IconButton
+            size="small"
             disabled={isFirst}
-            className="px-2 py-1.5 text-muted disabled:opacity-30"
             aria-label="Move up"
+            sx={{ color: 'text.secondary', py: 0.5 }}
+            onClick={() =>
+              moveExercise({ workoutExerciseId: entry.workoutExerciseId, direction: 'up' }).catch(onSaveError)
+            }
           >
             ▲
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              moveExercise({
-                workoutExerciseId: entry.workoutExerciseId,
-                direction: 'down',
-              }).catch(onSaveError)
-            }
+          </IconButton>
+          <IconButton
+            size="small"
             disabled={isLast}
-            className="px-2 py-1.5 text-muted disabled:opacity-30"
             aria-label="Move down"
+            sx={{ color: 'text.secondary', py: 0.5 }}
+            onClick={() =>
+              moveExercise({ workoutExerciseId: entry.workoutExerciseId, direction: 'down' }).catch(onSaveError)
+            }
           >
             ▼
-          </button>
-        </div>
+          </IconButton>
+        </Box>
 
-        <button
-          type="button"
+        <ButtonBase
           onClick={() => setDetailOpen(true)}
-          className="flex-1 text-left font-semibold text-accent underline-offset-4 hover:underline"
+          sx={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left', fontWeight: 600, color: 'primary.main' }}
         >
           {entry.exercise.name}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm(`Remove ${entry.exercise.name}?`)) {
-              removeExercise({
-                workoutExerciseId: entry.workoutExerciseId,
-              }).catch(onSaveError)
-            }
-          }}
-          className="px-2 py-2 text-muted"
+        </ButtonBase>
+        <IconButton
+          size="small"
           aria-label="Remove exercise"
+          sx={{ color: 'text.secondary' }}
+          onClick={() => setConfirmRemoveOpen(true)}
         >
           ✕
-        </button>
-      </div>
+        </IconButton>
+      </Box>
 
       {/* Column headers */}
-      <div className="mt-2 grid grid-cols-[2.5rem_1fr_1fr_2.75rem_2rem] items-center gap-2 text-xs font-semibold tracking-wide text-muted uppercase">
-        <span className="text-center">Set</span>
-        <span className="text-center">kg</span>
-        <span className="text-center">Reps</span>
-        <span className="text-center">✓</span>
-        <span />
-      </div>
+      <Box
+        sx={{
+          mt: 1,
+          display: 'grid',
+          gridTemplateColumns: SET_ROW_COLUMNS,
+          alignItems: 'center',
+          gap: 1,
+        }}
+      >
+        {['Set', 'kg', 'Reps', '✓', ''].map((label, i) => (
+          <Typography
+            key={i}
+            variant="caption"
+            color="text.secondary"
+            sx={{ textAlign: 'center', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em' }}
+          >
+            {label}
+          </Typography>
+        ))}
+      </Box>
 
-      <div className="mt-1 flex flex-col gap-1">
+      <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
         {entry.sets.map((set) => (
           <SetRow key={set._id} set={set} record={record} onSaveError={onSaveError} />
         ))}
-      </div>
+      </Box>
 
-      <button
-        type="button"
-        onClick={() =>
-          addSet({ workoutExerciseId: entry.workoutExerciseId }).catch(onSaveError)
-        }
-        className="mt-2 w-full rounded-lg bg-surface-2 py-2 text-sm font-medium text-muted"
+      <Button
+        fullWidth
+        sx={{ mt: 1, bgcolor: 'surface2.main', color: 'text.secondary', fontWeight: 500, fontSize: '0.875rem' }}
+        onClick={() => addSet({ workoutExerciseId: entry.workoutExerciseId }).catch(onSaveError)}
       >
         + Add Set
-      </button>
+      </Button>
 
       {detailOpen && (
-        <ExerciseDetail
-          exercise={entry.exercise}
-          record={record}
-          onClose={() => setDetailOpen(false)}
-        />
+        <ExerciseDetail exercise={entry.exercise} record={record} onClose={() => setDetailOpen(false)} />
       )}
-    </section>
+
+      <ConfirmDialog
+        open={confirmRemoveOpen}
+        onClose={() => setConfirmRemoveOpen(false)}
+        title={`Remove ${entry.exercise.name}?`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() =>
+          removeExercise({ workoutExerciseId: entry.workoutExerciseId }).catch(onSaveError)
+        }
+      />
+    </GlassTile>
   )
 }
 
@@ -292,8 +345,7 @@ function SetRow({
   const parsedReps = parseInt(reps, 10) || 0
 
   // A completed working set that beats (or sets) the record gets a trophy.
-  const isPr =
-    set.completed && !set.isWarmup && beatsRecord(set.weightKg, set.reps, record)
+  const isPr = set.completed && !set.isWarmup && beatsRecord(set.weightKg, set.reps, record)
 
   function commit(extra?: { completed?: boolean }) {
     updateSet({
@@ -305,67 +357,93 @@ function SetRow({
   }
 
   return (
-    <div
-      className={`grid grid-cols-[2.5rem_1fr_1fr_2.75rem_2rem] items-center gap-2 rounded-lg px-0 py-0.5 ${
-        set.completed ? 'bg-success/10' : ''
-      }`}
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: SET_ROW_COLUMNS,
+        alignItems: 'center',
+        gap: 1,
+        borderRadius: '8px',
+        py: 0.25,
+        bgcolor: set.completed ? 'rgb(122 154 82 / 0.1)' : 'transparent',
+      }}
     >
       {/* Set number badge; tap to toggle warm-up */}
-      <button
-        type="button"
-        onClick={() =>
-          updateSet({ setId: set._id, isWarmup: !set.isWarmup }).catch(onSaveError)
-        }
-        className={`justify-self-center rounded-md px-2 py-1 text-sm font-semibold ${
-          set.isWarmup ? 'text-pr' : 'text-muted'
-        }`}
+      <ButtonBase
         title="Tap to toggle warm-up"
+        sx={{
+          justifySelf: 'center',
+          borderRadius: '6px',
+          px: 1,
+          py: 0.5,
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+        }}
+        onClick={() => updateSet({ setId: set._id, isWarmup: !set.isWarmup }).catch(onSaveError)}
       >
         {set.isWarmup ? 'W' : set.setNumber}
         {isPr && ' 🏆'}
-      </button>
+      </ButtonBase>
 
-      <input
+      <TextField
         value={weight}
         onChange={(e) => setWeight(e.target.value)}
         onBlur={() => commit()}
-        onFocus={(e) => e.target.select()}
-        inputMode="decimal"
         placeholder="0"
-        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:border-accent"
+        size="small"
+        slotProps={{
+          htmlInput: {
+            inputMode: 'decimal',
+            style: { textAlign: 'center' },
+            onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+          },
+        }}
+        sx={{ '& .MuiInputBase-input': { fontVariantNumeric: 'tabular-nums' } }}
       />
-      <input
+      <TextField
         value={reps}
         onChange={(e) => setReps(e.target.value)}
         onBlur={() => commit()}
-        onFocus={(e) => e.target.select()}
-        inputMode="numeric"
         placeholder="0"
-        className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:border-accent"
+        size="small"
+        slotProps={{
+          htmlInput: {
+            inputMode: 'numeric',
+            style: { textAlign: 'center' },
+            onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+          },
+        }}
+        sx={{ '& .MuiInputBase-input': { fontVariantNumeric: 'tabular-nums' } }}
       />
 
       {/* Done toggle — also commits current weight/reps */}
-      <button
-        type="button"
-        onClick={() => commit({ completed: !set.completed })}
-        className={`justify-self-center rounded-lg px-3 py-1.5 font-bold ${
-          set.completed
-            ? 'bg-success text-black'
-            : 'border border-border text-muted'
-        }`}
+      <ButtonBase
         aria-label={set.completed ? 'Mark not done' : 'Mark done'}
+        sx={{
+          justifySelf: 'center',
+          borderRadius: '8px',
+          px: 1.5,
+          py: 0.75,
+          fontWeight: 'bold',
+          bgcolor: set.completed ? 'success.main' : 'transparent',
+          color: set.completed ? '#000' : 'text.secondary',
+          border: set.completed ? 'none' : '1px solid',
+          borderColor: 'divider',
+        }}
+        onClick={() => commit({ completed: !set.completed })}
       >
         ✓
-      </button>
+      </ButtonBase>
 
-      <button
-        type="button"
-        onClick={() => removeSet({ setId: set._id }).catch(onSaveError)}
-        className="justify-self-center rounded-md p-2 text-muted"
+      <IconButton
+        size="small"
         aria-label="Remove set"
+        sx={{ justifySelf: 'center', color: 'text.secondary' }}
+        onClick={() => removeSet({ setId: set._id }).catch(onSaveError)}
       >
         ✕
-      </button>
-    </div>
+      </IconButton>
+    </Box>
   )
 }

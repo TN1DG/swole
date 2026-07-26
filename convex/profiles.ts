@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
@@ -46,7 +46,7 @@ export async function awardPoints(ctx: MutationCtx, userId: Id<'users'>, amount:
 export async function escrowPoints(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
   const profile = await getOrCreateProfile(ctx, userId)
   const balance = profile.pointsBalance ?? 0
-  if (balance < amount) throw new Error('Not enough points')
+  if (balance < amount) throw new ConvexError('Not enough points')
   await ctx.db.patch(profile._id, { pointsBalance: balance - amount })
 }
 
@@ -126,7 +126,7 @@ export const setUsername = mutation({
       .withIndex('by_username', (q) => q.eq('username', username))
       .unique()
     if (existing && existing.userId !== userId) {
-      throw new Error('That username is taken')
+      throw new ConvexError('That username is taken — try another one')
     }
 
     const profile = await getOrCreateProfile(ctx, userId)
@@ -145,14 +145,14 @@ export const saveOnboardingIdentity = mutation({
     if (userId === null) throw new Error('Not signed in')
 
     const username = cleanUsername(args.username)
-    const displayName = cleanName(args.displayName, 40)
+    const displayName = cleanName(args.displayName, 40, 'Display name')
 
     const existing = await ctx.db
       .query('profiles')
       .withIndex('by_username', (q) => q.eq('username', username))
       .unique()
     if (existing && existing.userId !== userId) {
-      throw new Error('That username is taken')
+      throw new ConvexError('That username is taken — try another one')
     }
 
     const profile = await getOrCreateProfile(ctx, userId)
@@ -268,7 +268,9 @@ export const updateDisplayName = mutation({
     if (userId === null) throw new Error('Not signed in')
 
     const trimmed = args.displayName.trim()
-    if (trimmed.length > 40) throw new Error('Name too long (max 40 characters)')
+    if (trimmed.length > 40) {
+      throw new ConvexError('Display name is too long (max 40 characters)')
+    }
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { displayName: trimmed || undefined })

@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { Box, Button, Typography } from '@mui/material'
 
 // Catches render-time crashes anywhere in the tree so users get a reload
 // button instead of a blank white screen. (Class component because React
@@ -21,21 +22,35 @@ export class ErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center px-6 text-center">
-          <p className="text-3xl">😵</p>
-          <h1 className="mt-3 text-xl font-bold">Something went wrong</h1>
-          <p className="mt-2 text-sm text-muted">
+        <Box
+          sx={{
+            mx: 'auto',
+            display: 'flex',
+            minHeight: '100svh',
+            maxWidth: '32rem',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 3,
+            textAlign: 'center',
+          }}
+        >
+          <Typography sx={{ fontSize: '1.875rem' }}>😵</Typography>
+          <Typography variant="h6" sx={{ mt: 1.5, fontWeight: 'bold' }}>
+            Something went wrong
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Your workout data is safe on the server — this is just a display
             crash.
-          </p>
-          <button
-            type="button"
+          </Typography>
+          <Button
+            variant="contained"
             onClick={() => window.location.reload()}
-            className="mt-6 rounded-xl bg-accent px-6 py-3 font-semibold text-accent-fg"
+            sx={{ mt: 3 }}
           >
             Reload App
-          </button>
-        </div>
+          </Button>
+        </Box>
       )
     }
     return this.props.children

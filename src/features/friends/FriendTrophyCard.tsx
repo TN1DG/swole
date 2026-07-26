@@ -1,18 +1,22 @@
 import { forwardRef } from 'react'
 import type { FunctionReturnType } from 'convex/server'
+import { Box, Typography } from '@mui/material'
 import type { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
 import { BarbellIcon } from '../../components/icons'
 import { TIER_LABELS } from '../../lib/tierLabels'
 import { computeShareStats } from '../share/shareStats'
 import { WorkoutBreakdown } from '../share/WorkoutBreakdown'
+import { tokens } from '../../theme/tokens'
 
 type Detail = NonNullable<FunctionReturnType<typeof api.friends.getFriendWorkoutDetail>>
 
 // A friend's stats-only export of someone else's workout — never has a
 // photo (the friend wasn't there), so unlike ShareCard this has only one
 // layout: owner identity + consistency tier up top, then the same set ×
-// weight × rep breakdown the owner's own card shows.
+// weight × rep breakdown the owner's own card shows. Captured to a PNG via
+// modern-screenshot (see FriendTrophyPage.tsx) — colors hardcoded, same
+// reasoning as ShareCard.tsx.
 export const FriendTrophyCard = forwardRef<HTMLDivElement, { detail: Detail }>(
   function FriendTrophyCard({ detail }, ref) {
     const durationMs = (detail.endedAt ?? detail.startedAt) - detail.startedAt
@@ -20,22 +24,34 @@ export const FriendTrophyCard = forwardRef<HTMLDivElement, { detail: Detail }>(
     const tierLabel = TIER_LABELS[detail.consistency.tier]
 
     return (
-      <div ref={ref} className="w-full rounded-2xl bg-surface p-4 text-white">
-        <div className="mb-3 flex items-center justify-center gap-2 text-accent">
-          <BarbellIcon className="h-5 w-5" />
-          <span className="text-xs font-black tracking-[0.2em] uppercase">Swole</span>
-        </div>
+      <Box ref={ref} sx={{ width: '100%', borderRadius: '16px', bgcolor: tokens.surface, color: '#fff', p: 2 }}>
+        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: tokens.accent }}>
+          <BarbellIcon size={20} />
+          <Typography component="span" sx={{ fontSize: '0.75rem', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            Swole
+          </Typography>
+        </Box>
 
-        <div className="flex items-baseline justify-between">
-          <p className="truncate text-lg font-black">{detail.owner.displayName}</p>
-          {tierLabel && <p className="shrink-0 text-xs font-semibold text-accent">{tierLabel}</p>}
-        </div>
-        <div className="flex items-baseline justify-between text-white/80">
-          <p className="truncate text-sm">{detail.name}</p>
-          <p className="shrink-0 text-xs text-white/70">{formatShortDate(detail.startedAt)}</p>
-        </div>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <Typography noWrap sx={{ fontSize: '1.125rem', fontWeight: 900, color: '#fff' }}>
+            {detail.owner.displayName}
+          </Typography>
+          {tierLabel && (
+            <Typography sx={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 600, color: tokens.accent }}>
+              {tierLabel}
+            </Typography>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', color: 'rgb(255 255 255 / 0.8)' }}>
+          <Typography noWrap sx={{ fontSize: '0.875rem', color: 'inherit' }}>
+            {detail.name}
+          </Typography>
+          <Typography sx={{ flexShrink: 0, fontSize: '0.75rem', color: 'rgb(255 255 255 / 0.7)' }}>
+            {formatShortDate(detail.startedAt)}
+          </Typography>
+        </Box>
 
-        <div className="mt-2">
+        <Box sx={{ mt: 1 }}>
           <WorkoutBreakdown
             durationMs={durationMs}
             volumeKg={volumeKg}
@@ -43,8 +59,8 @@ export const FriendTrophyCard = forwardRef<HTMLDivElement, { detail: Detail }>(
             prCount={detail.prExerciseIds.length}
             lines={lines}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
     )
   },
 )

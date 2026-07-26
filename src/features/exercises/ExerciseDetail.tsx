@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, IconButton, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { formatKg } from '../../../convex/fitness'
@@ -7,6 +8,9 @@ import { formatShortDate } from '../../lib/dates'
 import { BarbellIcon, PlateIcon } from '../../components/icons'
 import { ExerciseForm } from './ExerciseForm'
 import { ProgressChart } from './ProgressChart'
+import { BottomSheet } from '../../components/BottomSheet'
+import { GlassTile } from '../../components/GlassTile'
+import { noScrollbarSx } from '../../theme/noScrollbar'
 
 type Props = {
   exercise: Doc<'exercises'>
@@ -31,112 +35,141 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
   const lifetimeVolumeKg = (history ?? []).reduce((sum, s) => sum + s.volumeKg, 0)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
-      onClick={onClose}
+    <BottomSheet
+      open
+      onClose={() => onClose()}
+      paperSx={{ maxHeight: '85svh', display: 'flex', flexDirection: 'column', p: 2, overflowY: 'auto', ...noScrollbarSx }}
     >
-      <div
-        className="no-scrollbar flex max-h-[85svh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl glass-card border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-bold">{exercise.name}</h2>
-            <p className="text-sm text-muted">
-              {exercise.muscleGroup} · {exercise.equipment}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void toggleFavorite({ exerciseId: exercise._id })}
-              aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-              className="rounded-lg border border-border px-3 py-1.5 text-lg leading-none"
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            {exercise.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {exercise.muscleGroup} · {exercise.equipment}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <IconButton
+            aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            onClick={() => void toggleFavorite({ exerciseId: exercise._id })}
+            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', fontSize: '1.125rem' }}
+          >
+            {isFavorited ? '❤️' : '🤍'}
+          </IconButton>
+          {exercise.isCustom && (
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              onClick={() => setEditOpen(true)}
+              sx={{ color: 'text.secondary' }}
             >
-              {isFavorited ? '❤️' : '🤍'}
-            </button>
-            {exercise.isCustom && (
-              <button
-                type="button"
-                onClick={() => setEditOpen(true)}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-        </div>
+              Edit
+            </Button>
+          )}
+        </Box>
+      </Box>
 
-        {/* PR stats */}
-        {record && (
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl glass-tile p-3">
-              <p className="label-micro">Best weight</p>
-              <p className="mt-1 font-bold tabular-nums">
-                🏆 {formatKg(record.bestWeightKg)} kg × {record.bestWeightReps}
-              </p>
-            </div>
-            <div className="rounded-xl glass-tile p-3">
-              <p className="label-micro flex items-center gap-1">
-                <BarbellIcon className="h-3.5 w-3.5" /> Est. 1RM
-              </p>
-              <p className="mt-1 font-bold tabular-nums">{formatKg(record.bestEst1rm)} kg</p>
-            </div>
-          </div>
-        )}
-        {lifetimeVolumeKg > 0 && (
-          <div className="mt-3 rounded-xl glass-tile p-3">
-            <p className="label-micro flex items-center gap-1">
-              <PlateIcon className="h-3.5 w-3.5" /> Lifetime volume
-            </p>
-            <p className="mt-1 font-bold tabular-nums">{formatKg(lifetimeVolumeKg)} kg</p>
-          </div>
-        )}
+      {/* PR stats */}
+      {record && (
+        <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+          <GlassTile sx={{ p: 1.5 }}>
+            <Typography variant="overline" color="text.secondary" component="p">
+              Best weight
+            </Typography>
+            <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+              🏆 {formatKg(record.bestWeightKg)} kg × {record.bestWeightReps}
+            </Typography>
+          </GlassTile>
+          <GlassTile sx={{ p: 1.5 }}>
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              component="p"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <BarbellIcon size={14} /> Est. 1RM
+            </Typography>
+            <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+              {formatKg(record.bestEst1rm)} kg
+            </Typography>
+          </GlassTile>
+        </Box>
+      )}
+      {lifetimeVolumeKg > 0 && (
+        <GlassTile sx={{ mt: 1.5, p: 1.5 }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            component="p"
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+          >
+            <PlateIcon size={14} /> Lifetime volume
+          </Typography>
+          <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+            {formatKg(lifetimeVolumeKg)} kg
+          </Typography>
+        </GlassTile>
+      )}
 
-        {/* Progress chart */}
-        <h3 className="label-micro mt-5">Top set per session</h3>
-        {history === undefined ? (
-          <p className="mt-3 text-center text-muted">Loading…</p>
-        ) : points.length >= 2 ? (
-          <div className="mt-2 rounded-xl glass-tile p-2">
-            <ProgressChart points={points} />
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">
-            Log this exercise in at least two workouts to see a progress chart.
-          </p>
-        )}
+      {/* Progress chart */}
+      <Typography variant="overline" color="text.secondary" component="h3" sx={{ display: 'block', mt: 3 }}>
+        Top set per session
+      </Typography>
+      {history === undefined ? (
+        <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
+      ) : points.length >= 2 ? (
+        <GlassTile sx={{ mt: 1, p: 1 }}>
+          <ProgressChart points={points} />
+        </GlassTile>
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+          Log this exercise in at least two workouts to see a progress chart.
+        </Typography>
+      )}
 
-        {/* Recent sessions */}
-        {history && history.length > 0 && (
-          <>
-            <h3 className="label-micro mt-5">Recent sessions</h3>
-            <ul className="mt-2 flex flex-col gap-2">
-              {[...history]
-                .reverse()
-                .slice(0, 5)
-                .map((s) => (
-                  <li
-                    key={s.workoutId}
-                    className="flex items-center justify-between rounded-xl glass-tile px-3 py-2 text-sm tabular-nums"
-                  >
-                    <span className="text-muted">{formatShortDate(s.startedAt)}</span>
-                    <span className="font-medium">
-                      {formatKg(s.topWeightKg)} kg × {s.topWeightReps}
-                    </span>
-                    <span className="text-muted">
-                      {s.setCount} sets · {formatKg(s.volumeKg)} kg
-                    </span>
-                  </li>
-                ))}
-            </ul>
-          </>
-        )}
+      {/* Recent sessions */}
+      {history && history.length > 0 && (
+        <>
+          <Typography variant="overline" color="text.secondary" component="h3" sx={{ display: 'block', mt: 3 }}>
+            Recent sessions
+          </Typography>
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {[...history]
+              .reverse()
+              .slice(0, 5)
+              .map((s) => (
+                <GlassTile
+                  key={s.workoutId}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 1.5,
+                    py: 1,
+                    fontSize: '0.875rem',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    {formatShortDate(s.startedAt)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {formatKg(s.topWeightKg)} kg × {s.topWeightReps}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {s.setCount} sets · {formatKg(s.volumeKg)} kg
+                  </Typography>
+                </GlassTile>
+              ))}
+          </Box>
+        </>
+      )}
 
-        {editOpen && (
-          <ExerciseForm initial={exercise} onClose={() => setEditOpen(false)} />
-        )}
-      </div>
-    </div>
+      {editOpen && <ExerciseForm initial={exercise} onClose={() => setEditOpen(false)} />}
+    </BottomSheet>
   )
 }

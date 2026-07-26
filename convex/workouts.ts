@@ -135,7 +135,7 @@ export const rename = mutation({
   args: { workoutId: v.id('workouts'), name: v.string() },
   handler: async (ctx, args) => {
     await getOwnedWorkout(ctx, args.workoutId)
-    await ctx.db.patch(args.workoutId, { name: cleanName(args.name) })
+    await ctx.db.patch(args.workoutId, { name: cleanName(args.name, 80, 'Workout name') })
   },
 })
 

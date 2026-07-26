@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
+import { Button } from '@mui/material'
 import { api } from '../../convex/_generated/api'
+import { InlineNotice } from './InlineNotice'
 
 // App-wide (mounted once in AppLayout, not per-route) so it shows up
 // regardless of what screen the sender is on when their friend acks a ping.
@@ -29,27 +31,18 @@ export function PingAckBanner() {
   }
 
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-xl glass-card border-accent/30! p-3 text-sm">
-      <p className="flex-1 text-muted">Your friend held you accountable — start your workout?</p>
-      <button
-        type="button"
-        disabled={starting}
-        onClick={() => void handleStart()}
-        className="shrink-0 rounded-lg bg-accent px-3 py-1.5 font-semibold text-accent-fg btn-glow disabled:opacity-50"
-      >
-        Start
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setHidden(true)
-          void dismiss({ pingId: prompt.pingId })
-        }}
-        aria-label="Dismiss"
-        className="shrink-0 text-muted"
-      >
-        ✕
-      </button>
-    </div>
+    <InlineNotice
+      onDismiss={() => {
+        setHidden(true)
+        void dismiss({ pingId: prompt.pingId })
+      }}
+      action={
+        <Button variant="contained" size="small" disabled={starting} onClick={() => void handleStart()}>
+          Start
+        </Button>
+      }
+    >
+      Your friend held you accountable — start your workout?
+    </InlineNotice>
   )
 }

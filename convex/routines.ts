@@ -78,7 +78,7 @@ export const create = mutation({
   args: { name: v.string(), notes: v.optional(v.string()), exercises: exercisesArg },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx)
-    const name = cleanName(args.name)
+    const name = cleanName(args.name, 80, 'Routine name')
     await validateExercises(ctx, userId, args.exercises)
 
     const existing = await ctx.db
@@ -118,7 +118,7 @@ export const update = mutation({
     const routine = await ctx.db.get(args.routineId)
     if (!routine || routine.ownerId !== userId) throw new Error('Routine not found')
 
-    const name = cleanName(args.name)
+    const name = cleanName(args.name, 80, 'Routine name')
     await validateExercises(ctx, userId, args.exercises)
 
     await ctx.db.patch(args.routineId, { name, notes: cleanNotes(args.notes) })

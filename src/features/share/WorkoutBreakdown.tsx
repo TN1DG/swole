@@ -1,3 +1,4 @@
+import { Box, Typography } from '@mui/material'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 
 type Line = {
@@ -11,6 +12,9 @@ type Line = {
 // The summary row (duration/volume/sets/PRs) + per-exercise set×weight×rep
 // breakdown — identical between the owner's ShareCard and a friend's
 // FriendTrophyCard; only what's rendered around it (title, photo) differs.
+// This is captured to a PNG via modern-screenshot (see ShareCard.tsx) — text
+// colors are hardcoded white/white-alpha (not theme-driven) since the card
+// always renders on a dark background regardless of the app's own theme.
 export function WorkoutBreakdown({
   durationMs,
   volumeKg,
@@ -28,37 +32,37 @@ export function WorkoutBreakdown({
 
   return (
     <>
-      <div className="flex gap-4 text-sm">
+      <Box sx={{ display: 'flex', gap: 2, fontSize: '0.875rem', color: '#fff' }}>
         <span>⏱ {formatDuration(durationMs)}</span>
         <span>🏋 {formatKg(volumeKg)} kg</span>
         <span>{setCount} sets</span>
         {prCount > 0 && (
-          <span className="font-semibold text-amber-400">
+          <Box component="span" sx={{ fontWeight: 600, color: '#fbbf24' }}>
             🏆 {prCount} PR{prCount > 1 ? 's' : ''}
-          </span>
+          </Box>
         )}
-      </div>
+      </Box>
 
-      <div className="mt-3 border-t border-white/20 pt-2">
+      <Box sx={{ mt: 1.5, borderTop: '1px solid rgb(255 255 255 / 0.2)', pt: 1 }}>
         {shown.map((line) => (
-          <div key={line.id} className="flex items-baseline justify-between py-0.5 text-sm">
-            <p className="font-medium">
+          <Box key={line.id} sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', py: 0.25 }}>
+            <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, color: '#fff' }}>
               {line.setCount} × {line.name}
               {line.isPr && ' 🏆'}
-            </p>
+            </Typography>
             {line.top && line.top.weightKg > 0 && (
-              <p className="text-white/80">
+              <Typography sx={{ fontSize: '0.875rem', color: 'rgb(255 255 255 / 0.8)' }}>
                 {formatKg(line.top.weightKg)} kg × {line.top.reps}
-              </p>
+              </Typography>
             )}
-          </div>
+          </Box>
         ))}
         {lines.length > shown.length && (
-          <p className="pt-1 text-xs text-white/60">
+          <Typography sx={{ pt: 0.5, fontSize: '0.75rem', color: 'rgb(255 255 255 / 0.6)' }}>
             + {lines.length - shown.length} more exercises
-          </p>
+          </Typography>
         )}
-      </div>
+      </Box>
     </>
   )
 }

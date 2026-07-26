@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { ChecklistIcon, PlateIcon, StopwatchIcon } from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
+import { GlassCard } from '../../components/GlassCard'
+import { GlassTile } from '../../components/GlassTile'
 import { ActiveWorkout, type FinishSummary } from './ActiveWorkout'
 
 export function WorkoutsPage() {
@@ -16,7 +19,11 @@ export function WorkoutsPage() {
   const [summary, setSummary] = useState<FinishSummary | null>(null)
 
   if (active === undefined) {
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 8, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   }
 
   // A workout is running -> show the logging screen.
@@ -26,90 +33,81 @@ export function WorkoutsPage() {
 
   // Otherwise: start screen (plus a celebration card right after finishing).
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Workout</h1>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        Workout
+      </Typography>
       <FirstVisitTip tabKey="workout" />
 
       {summary && (
-        <div className="mt-4 rounded-2xl glass-card border-accent/40! p-4">
+        <GlassCard sx={{ mt: 2, borderColor: 'rgb(193 84 31 / 0.4)' }}>
           {summary.discarded ? (
-            <p className="text-muted">Empty workout discarded.</p>
+            <Typography color="text.secondary">Empty workout discarded.</Typography>
           ) : (
             <>
-              <p className="text-lg font-bold">Workout saved! 💪</p>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <StatTile
-                  icon={<StopwatchIcon />}
-                  label="Duration"
-                  value={formatDuration(summary.durationMs)}
-                />
-                <StatTile
-                  icon={<PlateIcon />}
-                  label="Volume"
-                  value={`${formatKg(summary.totalVolumeKg)} kg`}
-                />
-                <StatTile
-                  icon={<ChecklistIcon />}
-                  label="Sets"
-                  value={String(summary.completedSetCount)}
-                />
-                <StatTile
-                  label="New PRs"
-                  value={summary.prCount > 0 ? `🏆 ${summary.prCount}` : '—'}
-                />
-              </div>
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                Workout saved! 💪
+              </Typography>
+              <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+                <StatTile icon={<StopwatchIcon />} label="Duration" value={formatDuration(summary.durationMs)} />
+                <StatTile icon={<PlateIcon />} label="Volume" value={`${formatKg(summary.totalVolumeKg)} kg`} />
+                <StatTile icon={<ChecklistIcon />} label="Sets" value={String(summary.completedSetCount)} />
+                <StatTile label="New PRs" value={summary.prCount > 0 ? `🏆 ${summary.prCount}` : '—'} />
+              </Box>
             </>
           )}
           {!summary.discarded && (
-            <Link
+            <Button
+              component={Link}
               to={`/share/${summary.workoutId}`}
-              className="btn-glow mt-4 block w-full rounded-xl bg-accent py-2 text-center font-semibold text-accent-fg"
+              variant="contained"
+              fullWidth
+              sx={{ mt: 2 }}
             >
               Share as Photo 📸
-            </Link>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => setSummary(null)}
-            className="mt-3 w-full rounded-xl border border-border py-2 font-semibold text-muted"
-          >
+          <Button variant="outlined" color="inherit" fullWidth sx={{ mt: 1.5 }} onClick={() => setSummary(null)}>
             Close
-          </button>
-        </div>
+          </Button>
+        </GlassCard>
       )}
 
-      <p className="mt-4 text-muted">Ready to lift?</p>
-      <button
-        type="button"
+      <Typography color="text.secondary" sx={{ mt: 2 }}>
+        Ready to lift?
+      </Typography>
+      <Button
+        variant="contained"
+        fullWidth
+        sx={{ mt: 2 }}
         onClick={() => void start({ localHour: new Date().getHours() })}
-        className="btn-glow mt-4 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
       >
         Start Empty Workout
-      </button>
+      </Button>
 
       {/* Quick start from a routine */}
       {routines && routines.length > 0 && (
         <>
-          <h2 className="label-micro mt-8">Routines</h2>
-          <div className="mt-2 flex flex-col gap-2">
+          <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 4 }}>
+            Routines
+          </Typography>
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
             {routines.map((routine) => (
-              <button
+              <GlassTile
                 key={routine._id}
-                type="button"
+                component="button"
                 onClick={() => void startFromRoutine({ routineId: routine._id })}
-                className="rounded-xl glass-tile px-4 py-3 text-left"
+                sx={{ px: 2, py: 1.5, textAlign: 'left', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit' }}
               >
-                <p className="font-semibold">{routine.name}</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  {routine.exercises
-                    .map((ex) => `${ex.targetSets}×${ex.name}`)
-                    .join(' · ')}
-                </p>
-              </button>
+                <Typography sx={{ fontWeight: 600 }}>{routine.name}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {routine.exercises.map((ex) => `${ex.targetSets}×${ex.name}`).join(' · ')}
+                </Typography>
+              </GlassTile>
             ))}
-          </div>
+          </Box>
         </>
       )}
-    </div>
+    </Box>
   )
 }

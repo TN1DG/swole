@@ -1,9 +1,11 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
+import { Box, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { formatDuration, formatKg } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
+import { GlassTile } from '../../components/GlassTile'
 
 // Read-only: a friend's (or a public opt-in user's) workout history. Same
 // card shape as your own History tab; tapping one opens a read-only detail
@@ -13,54 +15,63 @@ export function FriendWorkoutsPage() {
   const data = useQuery(api.friends.friendWorkouts, { userId: userId as Id<'users'> })
 
   return (
-    <div>
-      <Link to="/friends" className="text-sm text-muted">
+    <Box>
+      <Typography component={Link} to="/friends" variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
         ← Friends
-      </Link>
+      </Typography>
 
       {data === undefined ? (
-        <p className="mt-8 text-center text-muted">Loading…</p>
+        <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
       ) : data === null ? (
-        <div className="mt-8 text-center text-muted">
-          <p>Can't view this — you're not friends, and their workouts aren't public.</p>
-        </div>
+        <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+          Can't view this — you're not friends, and their workouts aren't public.
+        </Typography>
       ) : (
         <>
-          <h1 className="mt-2 truncate text-2xl font-bold">{data.displayName}</h1>
+          <Typography noWrap variant="h4" sx={{ mt: 1, fontWeight: 'bold' }}>
+            {data.displayName}
+          </Typography>
           {data.workouts.length === 0 ? (
-            <p className="mt-8 text-center text-muted">No workouts logged yet.</p>
+            <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
+              No workouts logged yet.
+            </Typography>
           ) : (
-            <div className="mt-4 flex flex-col gap-3">
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {data.workouts.map((w) => (
-                <Link
-                  key={w._id}
-                  to={`/friends/${userId}/${w._id}`}
-                  className="block rounded-2xl glass-tile p-4"
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="min-w-0 truncate font-semibold">{w.name}</p>
-                    <p className="shrink-0 text-sm text-muted">{formatWorkoutDate(w.startedAt)}</p>
-                  </div>
-                  <p className="mt-1 text-sm text-muted tabular-nums">
-                    {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg ·{' '}
-                    {w.setCount} sets
-                  </p>
-                  <ul className="mt-2 text-sm text-muted">
-                    {w.exercises.slice(0, 4).map((ex, i) => (
-                      <li key={i}>
-                        {ex.setCount} × {ex.name}
-                      </li>
-                    ))}
-                    {w.exercises.length > 4 && (
-                      <li className="text-xs">+ {w.exercises.length - 4} more</li>
-                    )}
-                  </ul>
+                <Link key={w._id} to={`/friends/${userId}/${w._id}`} style={{ textDecoration: 'none', display: 'block' }}>
+                  <GlassTile sx={{ p: 2, color: 'text.primary' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography noWrap sx={{ minWidth: 0, fontWeight: 600 }}>
+                        {w.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
+                        {formatWorkoutDate(w.startedAt)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                      {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+                    </Typography>
+                    <Box component="ul" sx={{ mt: 1, m: 0, pl: 0, listStyle: 'none' }}>
+                      {w.exercises.slice(0, 4).map((ex, i) => (
+                        <Typography key={i} component="li" variant="body2" color="text.secondary">
+                          {ex.setCount} × {ex.name}
+                        </Typography>
+                      ))}
+                      {w.exercises.length > 4 && (
+                        <Typography component="li" variant="caption" color="text.secondary">
+                          + {w.exercises.length - 4} more
+                        </Typography>
+                      )}
+                    </Box>
+                  </GlassTile>
                 </Link>
               ))}
-            </div>
+            </Box>
           )}
         </>
       )}
-    </div>
+    </Box>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
+import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import {
   ACTIVITY_LEVELS,
@@ -10,6 +11,8 @@ import {
   type Sex,
 } from '../../../convex/fitness'
 import { CalorieBreakdown } from './CalorieBreakdown'
+import { errorMessage } from '../../lib/errors'
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 export function StatsPage() {
   const profile = useQuery(api.profiles.getMine)
@@ -44,7 +47,11 @@ export function StatsPage() {
   }, [profile, hydrated])
 
   if (profile === undefined) {
-    return <p className="mt-8 text-center text-muted">Loading…</p>
+    return (
+      <Typography sx={{ mt: 8, textAlign: 'center' }} color="text.secondary">
+        Loading…
+      </Typography>
+    )
   }
 
   const heightCm = parseFloat(height)
@@ -69,7 +76,7 @@ export function StatsPage() {
       await updateBodyStats({ heightCm, weightKg, age: ageYears, sex, activityLevel })
       setSaved(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
+      setError(errorMessage(err, 'Could not save.'))
     }
   }
 
@@ -81,135 +88,163 @@ export function StatsPage() {
       await setDailyVolumeGoal({ dailyVolumeGoalKg: parseFloat(dailyGoal) })
       setGoalSaved(true)
     } catch (err) {
-      setGoalError(err instanceof Error ? err.message : 'Could not save.')
+      setGoalError(errorMessage(err, 'Could not save.'))
     }
   }
 
   return (
-    <div>
-      <Link to="/profile" className="text-sm text-muted">
+    <Box>
+      <Typography component={Link} to="/profile" variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
         ← Profile
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold">My Stats</h1>
-      <p className="mt-1 text-sm text-muted">
+      </Typography>
+      <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold' }}>
+        My Stats
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
         Used to estimate your daily calorie needs — nothing here is shared.
-      </p>
+      </Typography>
 
-      <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm text-muted">
-            Height (cm)
-            <input
+      <Box component="form" onSubmit={handleSave} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              Height (cm)
+            </Typography>
+            <TextField
               value={height}
               onChange={(e) => setHeight(e.target.value)}
-              inputMode="decimal"
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
               placeholder="180"
-              className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+              fullWidth
+              sx={{ mt: 0.5 }}
             />
-          </label>
-          <label className="text-sm text-muted">
-            Weight (kg)
-            <input
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              Weight (kg)
+            </Typography>
+            <TextField
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              inputMode="decimal"
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
               placeholder="80"
-              className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+              fullWidth
+              sx={{ mt: 0.5 }}
             />
-          </label>
-        </div>
+          </Box>
+        </Box>
 
-        <label className="text-sm text-muted">
-          Age
-          <input
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            Age
+          </Typography>
+          <TextField
             value={age}
             onChange={(e) => setAge(e.target.value)}
-            inputMode="numeric"
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             placeholder="30"
-            className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+            fullWidth
+            sx={{ mt: 0.5 }}
           />
-        </label>
+        </Box>
 
-        <div>
-          <p className="text-sm text-muted">Sex (used for the calorie formula)</p>
-          <div className="mt-1 grid grid-cols-2 rounded-xl glass-tile p-1">
-            {(['male', 'female'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSex(s)}
-                className={`rounded-lg py-2 text-sm font-semibold capitalize ${
-                  sex === s ? 'bg-accent text-accent-fg' : 'text-muted'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            Sex (used for the calorie formula)
+          </Typography>
+          <Box sx={{ mt: 0.5 }}>
+            <SegmentedControl
+              value={sex}
+              onChange={setSex}
+              options={[
+                { value: 'male', label: 'Male' },
+                { value: 'female', label: 'Female' },
+              ]}
+            />
+          </Box>
+        </Box>
 
-        <label className="text-sm text-muted">
-          Activity level
-          <select
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            Activity level
+          </Typography>
+          <Select
             value={activityLevel}
             onChange={(e) => setActivityLevel(e.target.value as ActivityLevel)}
-            className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+            fullWidth
+            sx={{ mt: 0.5 }}
+            inputProps={{ 'aria-label': 'Activity level' }}
           >
             {ACTIVITY_LEVELS.map((level) => (
-              <option key={level.value} value={level.value}>
+              <MenuItem key={level.value} value={level.value}>
                 {level.label} — {level.hint}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Box>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        {saved && <p className="text-sm text-success">Saved.</p>}
+        {error && (
+          <Typography variant="body2" color="error">
+            {error}
+          </Typography>
+        )}
+        {saved && (
+          <Typography variant="body2" color="success.main">
+            Saved.
+          </Typography>
+        )}
 
-        <button
-          type="submit"
-          className="btn-glow mt-1 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
-        >
+        <Button type="submit" variant="contained" fullWidth sx={{ mt: 0.5 }}>
           Save
-        </button>
-      </form>
+        </Button>
+      </Box>
 
       {tdeeValue !== null && bmr !== null ? (
-        <div className="mt-6">
+        <Box sx={{ mt: 3 }}>
           <CalorieBreakdown bmr={bmr} tdeeValue={tdeeValue} weightKg={weightKg} />
-        </div>
+        </Box>
       ) : (
-        <p className="mt-6 text-center text-sm text-muted">
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
           Fill in height, weight, and age above to see your calorie and macro goals.
-        </p>
+        </Typography>
       )}
 
-      <h2 className="mt-8 text-lg font-bold">Daily Lifting Goal</h2>
-      <p className="mt-1 text-sm text-muted">
+      <Typography variant="h6" sx={{ mt: 4, fontWeight: 'bold' }}>
+        Daily Lifting Goal
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
         Powers the rings on History → Calendar — one target, every day.
-      </p>
-      <form onSubmit={handleSaveGoal} className="mt-4 flex flex-col gap-3">
-        <label className="text-sm text-muted">
-          Daily lifting goal (kg)
-          <input
+      </Typography>
+      <Box component="form" onSubmit={handleSaveGoal} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            Daily lifting goal (kg)
+          </Typography>
+          <TextField
             value={dailyGoal}
             onChange={(e) => setDailyGoal(e.target.value)}
-            inputMode="decimal"
+            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
             placeholder="2000"
-            className="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-3 text-text outline-none focus:border-accent"
+            fullWidth
+            sx={{ mt: 0.5 }}
           />
-        </label>
+        </Box>
 
-        {goalError && <p className="text-sm text-red-400">{goalError}</p>}
-        {goalSaved && <p className="text-sm text-success">Saved.</p>}
+        {goalError && (
+          <Typography variant="body2" color="error">
+            {goalError}
+          </Typography>
+        )}
+        {goalSaved && (
+          <Typography variant="body2" color="success.main">
+            Saved.
+          </Typography>
+        )}
 
-        <button
-          type="submit"
-          className="btn-glow mt-1 w-full rounded-xl bg-accent py-3 font-semibold text-accent-fg"
-        >
+        <Button type="submit" variant="contained" fullWidth sx={{ mt: 0.5 }}>
           Save Goal
-        </button>
-      </form>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   )
 }

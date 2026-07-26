@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
@@ -36,7 +36,7 @@ export const send = mutation({
       )
       .collect()
     if (existing.some((p) => p.acknowledgedAt === undefined)) {
-      throw new Error('You already have a pending ping')
+      throw new ConvexError('You already have a pending ping')
     }
 
     await ctx.db.insert('gymPings', {

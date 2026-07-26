@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Authenticated, Unauthenticated, AuthLoading } from 'convex/react'
+import { Box } from '@mui/material'
 import { AppLayout } from './components/AppLayout'
 import { OnboardingGate } from './features/onboarding/OnboardingGate'
 import { SignInPage } from './features/auth/SignInPage'
@@ -23,9 +24,9 @@ export default function App() {
     <>
       {/* While Convex checks for an existing session, show a splash. */}
       <AuthLoading>
-        <div className="flex min-h-svh items-center justify-center text-muted">
+        <Box sx={{ display: 'flex', minHeight: '100svh', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
           Loading…
-        </div>
+        </Box>
       </AuthLoading>
 
       {/* Not signed in -> only the sign-in screen exists. */}

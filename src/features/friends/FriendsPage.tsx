@@ -2,11 +2,15 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { TIER_LABELS } from '../../lib/tierLabels'
 import { ConsistencyRing } from '../../components/ConsistencyRing'
+import { errorMessage } from '../../lib/errors'
+import { GlassTile } from '../../components/GlassTile'
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -42,7 +46,7 @@ export function FriendsPage() {
     try {
       await action()
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+      setActionError(errorMessage(err, 'Something went wrong.'))
     }
   }
 
@@ -54,94 +58,93 @@ export function FriendsPage() {
     : false
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Friends</h1>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        Friends
+      </Typography>
       <FirstVisitTip tabKey="friends" />
 
-      <form onSubmit={handleSearch} className="mt-4 flex gap-2">
-        <input
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Add by username"
-          className="w-full rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
-        />
-        <button
-          type="submit"
-          className="shrink-0 rounded-xl glass-tile px-4 py-3 font-semibold"
-        >
+      <Box component="form" onSubmit={handleSearch} sx={{ mt: 2, display: 'flex', gap: 1 }}>
+        <TextField value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Add by username" fullWidth />
+        <Button type="submit" variant="outlined" color="inherit" sx={{ flexShrink: 0 }}>
           Search
-        </button>
-      </form>
+        </Button>
+      </Box>
 
       {committedSearch && (
-        <div className="mt-2 rounded-xl glass-tile p-3">
+        <GlassTile sx={{ mt: 1.5, p: 1.5 }}>
           {searchResult === undefined ? (
-            <p className="text-sm text-muted">Searching…</p>
+            <Typography variant="body2" color="text.secondary">
+              Searching…
+            </Typography>
           ) : searchResult === null ? (
-            <p className="text-sm text-muted">No user with that username.</p>
+            <Typography variant="body2" color="text.secondary">
+              No user with that username.
+            </Typography>
           ) : searchResult.isMe ? (
-            <p className="text-sm text-muted">That's you!</p>
+            <Typography variant="body2" color="text.secondary">
+              That's you!
+            </Typography>
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate font-medium">{searchResult.displayName}</p>
-                <p className="truncate text-sm text-muted">@{searchResult.username}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Link
-                  to={`/friends/${searchResult.userId}`}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-muted"
-                >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography noWrap sx={{ fontWeight: 500 }}>
+                  {searchResult.displayName}
+                </Typography>
+                <Typography noWrap variant="body2" color="text.secondary">
+                  @{searchResult.username}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                <Button component={Link} to={`/friends/${searchResult.userId}`} variant="outlined" color="inherit" size="small">
                   View
-                </Link>
+                </Button>
                 {alreadyFriends ? (
-                  <span className="px-3 py-1.5 text-sm text-muted">Friends</span>
+                  <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 0.75 }}>
+                    Friends
+                  </Typography>
                 ) : alreadyPending ? (
-                  <span className="px-3 py-1.5 text-sm text-muted">Pending</span>
+                  <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 0.75 }}>
+                    Pending
+                  </Typography>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      runAction(() =>
-                        sendFriendRequest({ username: searchResult.username! }),
-                      )
-                    }
-                    className="btn-glow rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg"
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => runAction(() => sendFriendRequest({ username: searchResult.username! }))}
                   >
                     Add Friend
-                  </button>
+                  </Button>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
-        </div>
+        </GlassTile>
       )}
 
-      {actionError && <p className="mt-2 text-sm text-red-400">{actionError}</p>}
+      {actionError && (
+        <Typography variant="body2" color="error" sx={{ mt: 1.5 }}>
+          {actionError}
+        </Typography>
+      )}
 
-      {/* Segmented control — same pattern as History's Workouts/Records toggle. */}
-      <div className="mt-4 grid grid-cols-2 rounded-xl glass-tile p-1">
-        {(['leaderboard', 'friends'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`relative rounded-lg py-2 text-sm font-semibold ${
-              tab === t ? 'bg-accent text-accent-fg' : 'text-muted'
-            }`}
-          >
-            {t === 'leaderboard' ? 'Leaderboard' : 'Friends'}
-            {t === 'friends' && incoming !== undefined && incoming.length > 0 && (
-              <span className="absolute -top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                {incoming.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Box sx={{ mt: 2 }}>
+        <SegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'leaderboard', label: 'Leaderboard' },
+            { value: 'friends', label: 'Friends', badge: incoming?.length || undefined },
+          ]}
+        />
+      </Box>
 
-      {tab === 'leaderboard' ? <LeaderboardTab /> : <FriendsTab friends={friends} incoming={incoming} outgoing={outgoing} runAction={runAction} />}
-    </div>
+      {tab === 'leaderboard' ? (
+        <LeaderboardTab />
+      ) : (
+        <FriendsTab friends={friends} incoming={incoming} outgoing={outgoing} runAction={runAction} />
+      )}
+    </Box>
   )
 }
 
@@ -150,39 +153,53 @@ function LeaderboardTab() {
 
   return (
     <>
-      <p className="label-micro mt-4">Last 7 days</p>
+      <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+        Last 7 days
+      </Typography>
       {leaderboard === undefined ? (
-        <p className="mt-3 text-center text-muted">Loading…</p>
+        <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
       ) : (
-        <div className="mt-2 flex flex-col gap-2">
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {leaderboard.map((entry, i) => (
-            <Link
-              key={entry.userId}
-              to={`/friends/${entry.userId}`}
-              className={`flex items-center gap-3 rounded-xl glass-tile px-4 py-3 ${
-                entry.isMe ? 'border-accent/40!' : ''
-              }`}
-            >
-              <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">
-                {i + 1}
-              </span>
-              <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
-                  {entry.displayName}
-                  {entry.isMe && <span className="text-muted"> (you)</span>}
-                </p>
-                {TIER_LABELS[entry.tier] && (
-                  <p className="truncate text-xs text-accent">{TIER_LABELS[entry.tier]}</p>
-                )}
-              </div>
-              <div className="shrink-0 text-right tabular-nums">
-                <p className="font-bold">{entry.score} pts</p>
-                <p className="text-xs text-muted">{formatKg(entry.weekVolumeKg)} kg</p>
-              </div>
+            <Link key={entry.userId} to={`/friends/${entry.userId}`} style={{ textDecoration: 'none', display: 'block' }}>
+              <GlassTile
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  px: 2,
+                  py: 1.5,
+                  color: 'text.primary',
+                  ...(entry.isMe && { borderColor: 'rgb(193 84 31 / 0.4)' }),
+                }}
+              >
+                <Typography sx={{ width: 20, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">
+                  {i + 1}
+                </Typography>
+                <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography noWrap sx={{ fontWeight: 500 }}>
+                    {entry.displayName}
+                    {entry.isMe && <Typography component="span" color="text.secondary"> (you)</Typography>}
+                  </Typography>
+                  {TIER_LABELS[entry.tier] && (
+                    <Typography noWrap variant="caption" color="primary.main">
+                      {TIER_LABELS[entry.tier]}
+                    </Typography>
+                  )}
+                </Box>
+                <Box sx={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  <Typography sx={{ fontWeight: 'bold' }}>{entry.score} pts</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatKg(entry.weekVolumeKg)} kg
+                  </Typography>
+                </Box>
+              </GlassTile>
             </Link>
           ))}
-        </div>
+        </Box>
       )}
     </>
   )
@@ -207,98 +224,105 @@ function FriendsTab({
     <>
       {incoming !== undefined && incoming.length > 0 && (
         <>
-          <h2 className="label-micro mt-4">Requests</h2>
-          <div className="mt-2 flex flex-col gap-2">
+          <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
+            Requests
+          </Typography>
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
             {incoming.map((r) => (
-              <div
-                key={r.requestId}
-                className="flex items-center justify-between gap-2 rounded-xl glass-tile px-4 py-3"
-              >
-                <p className="min-w-0 truncate font-medium">{r.from.displayName}</p>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      runAction(() => acceptFriendRequest({ requestId: r.requestId }))
-                    }
-                    className="btn-glow rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg"
-                  >
+              <GlassTile key={r.requestId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
+                <Typography noWrap sx={{ minWidth: 0, fontWeight: 500 }}>
+                  {r.from.displayName}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                  <Button variant="contained" size="small" onClick={() => runAction(() => acceptFriendRequest({ requestId: r.requestId }))}>
                     Accept
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      runAction(() => declineFriendRequest({ requestId: r.requestId }))
-                    }
-                    className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size="small"
+                    onClick={() => runAction(() => declineFriendRequest({ requestId: r.requestId }))}
                   >
                     Decline
-                  </button>
-                </div>
-              </div>
+                  </Button>
+                </Box>
+              </GlassTile>
             ))}
-          </div>
+          </Box>
         </>
       )}
 
       {outgoing !== undefined && outgoing.length > 0 && (
         <>
-          <h2 className="label-micro mt-4">Pending</h2>
-          <div className="mt-2 flex flex-col gap-2">
+          <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
+            Pending
+          </Typography>
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
             {outgoing.map((r) => (
-              <div
-                key={r.requestId}
-                className="flex items-center justify-between gap-2 rounded-xl glass-tile px-4 py-3"
-              >
-                <p className="min-w-0 truncate font-medium">{r.to.displayName}</p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    runAction(() => declineFriendRequest({ requestId: r.requestId }))
-                  }
-                  className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+              <GlassTile key={r.requestId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
+                <Typography noWrap sx={{ minWidth: 0, fontWeight: 500 }}>
+                  {r.to.displayName}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                  sx={{ flexShrink: 0 }}
+                  onClick={() => runAction(() => declineFriendRequest({ requestId: r.requestId }))}
                 >
                   Cancel
-                </button>
-              </div>
+                </Button>
+              </GlassTile>
             ))}
-          </div>
+          </Box>
         </>
       )}
 
-      <h2 className="label-micro mt-4">My Friends</h2>
+      <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
+        My Friends
+      </Typography>
       {friends === undefined ? (
-        <p className="mt-3 text-center text-muted">Loading…</p>
+        <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
+          Loading…
+        </Typography>
       ) : friends.length === 0 ? (
-        <p className="mt-3 text-center text-sm text-muted">
+        <Typography variant="body2" sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
           No friends yet — search a username above to send a request.
-        </p>
+        </Typography>
       ) : (
-        <div className="mt-2 flex flex-col gap-2">
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {friends.map((f) => (
-            <div
-              key={f.userId}
-              className="flex items-center justify-between gap-2 rounded-xl glass-tile px-4 py-3"
-            >
-              <Link to={`/friends/${f.userId}`} className="min-w-0 flex-1 truncate font-medium">
+            <GlassTile key={f.userId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
+              <Typography
+                component={Link}
+                to={`/friends/${f.userId}`}
+                noWrap
+                sx={{ minWidth: 0, flex: 1, fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
+              >
                 {f.displayName}
-              </Link>
-              <Link
+              </Typography>
+              <Button
+                component={Link}
                 to={`/friends/${f.userId}/chat`}
-                className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+                variant="outlined"
+                color="inherit"
+                size="small"
+                sx={{ flexShrink: 0 }}
               >
                 Ping 💬
-              </Link>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="text"
+                color="inherit"
+                size="small"
+                sx={{ flexShrink: 0, color: 'text.secondary' }}
                 onClick={() => runAction(() => removeFriend({ friendId: f.userId }))}
-                className="shrink-0 text-sm text-muted"
               >
                 Remove
-              </button>
-            </div>
+              </Button>
+            </GlassTile>
           ))}
-        </div>
+        </Box>
       )}
     </>
   )

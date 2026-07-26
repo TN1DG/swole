@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
+import { InlineNotice } from './InlineNotice'
 
 const TIP_COPY = {
   workout: 'Tap Start Empty Workout, or launch straight from a routine below.',
@@ -26,19 +27,13 @@ export function FirstVisitTip({ tabKey }: { tabKey: TabKey }) {
   if (!seenTips || dismissed || seenTips.includes(tabKey)) return null
 
   return (
-    <div className="mt-4 flex items-start gap-2 rounded-xl glass-card border-accent/30! p-3 text-sm">
-      <p className="flex-1 text-muted">{TIP_COPY[tabKey]}</p>
-      <button
-        type="button"
-        onClick={() => {
-          setDismissed(true)
-          void markSeen({ tip: tabKey })
-        }}
-        aria-label="Dismiss tip"
-        className="shrink-0 text-muted"
-      >
-        ✕
-      </button>
-    </div>
+    <InlineNotice
+      onDismiss={() => {
+        setDismissed(true)
+        void markSeen({ tip: tabKey })
+      }}
+    >
+      {TIP_COPY[tabKey]}
+    </InlineNotice>
   )
 }

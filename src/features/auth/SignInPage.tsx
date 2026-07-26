@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { Box, Button, TextField, Typography } from '@mui/material'
+import { errorMessage } from '../../lib/errors'
 
 type Step = 'signIn' | 'signUp' | 'forgotPassword' | 'resetCode'
 
@@ -52,7 +54,7 @@ export function SignInPage() {
       setStep('resetCode')
       setInfo('Check your email — enter the 6-digit code below.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send reset code.')
+      setError(errorMessage(err, 'Could not send reset code.'))
     } finally {
       setSubmitting(false)
     }
@@ -78,167 +80,173 @@ export function SignInPage() {
       await signIn('password', { flow: 'reset', email })
       setInfo('New code sent.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not resend code.')
+      setError(errorMessage(err, 'Could not resend code.'))
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col justify-center px-6">
-      <h1 className="text-center text-4xl font-black tracking-tight">SWOLE</h1>
+    <Box sx={{ mx: 'auto', display: 'flex', minHeight: '100svh', maxWidth: '32rem', flexDirection: 'column', justifyContent: 'center', px: 3 }}>
+      <Typography variant="h3" sx={{ textAlign: 'center', fontWeight: 900, letterSpacing: '-0.02em' }}>
+        SWOLE
+      </Typography>
 
       {(step === 'signIn' || step === 'signUp') && (
         <>
-          <p className="mt-2 text-center text-muted">
+          <Typography color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
             {step === 'signIn' ? 'Welcome back.' : 'Create your account.'}
-          </p>
-          <form onSubmit={handleAuthSubmit} className="mt-8 flex flex-col gap-3">
-            <input
+          </Typography>
+          <Box component="form" onSubmit={handleAuthSubmit} sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <TextField
               name="email"
               type="email"
               required
               autoComplete="email"
               placeholder="Email"
-              className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+              fullWidth
             />
-            <input
+            <TextField
               name="password"
               type="password"
               required
-              minLength={8}
               autoComplete={step === 'signIn' ? 'current-password' : 'new-password'}
               placeholder="Password (min. 8 characters)"
-              className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+              fullWidth
+              slotProps={{ htmlInput: { minLength: 8 } }}
             />
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-            >
+            <Button type="submit" variant="contained" fullWidth disabled={submitting} sx={{ mt: 1 }}>
               {submitting ? 'One sec…' : step === 'signIn' ? 'Sign In' : 'Sign Up'}
-            </button>
-          </form>
+            </Button>
+          </Box>
 
           {step === 'signIn' && (
-            <button
-              type="button"
+            <Button
+              variant="text"
+              color="inherit"
+              sx={{ mt: 2, textDecoration: 'underline', color: 'text.secondary' }}
               onClick={() => {
                 resetMessages()
                 setStep('forgotPassword')
               }}
-              className="mt-4 text-center text-sm text-muted underline underline-offset-4"
             >
               Forgot password?
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="text"
+            color="inherit"
+            sx={{ mt: step === 'signIn' ? 0 : 3, textDecoration: 'underline', color: 'text.secondary' }}
             onClick={() => {
               setStep(step === 'signIn' ? 'signUp' : 'signIn')
               resetMessages()
             }}
-            className="mt-6 text-center text-sm text-muted underline underline-offset-4"
           >
-            {step === 'signIn'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
-          </button>
+            {step === 'signIn' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          </Button>
         </>
       )}
 
       {step === 'forgotPassword' && (
         <>
-          <p className="mt-2 text-center text-muted">Reset your password.</p>
-          <form onSubmit={handleForgotPassword} className="mt-8 flex flex-col gap-3">
-            <input
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="Email"
-              className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
-            />
+          <Typography color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+            Reset your password.
+          </Typography>
+          <Box component="form" onSubmit={handleForgotPassword} sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <TextField name="email" type="email" required autoComplete="email" placeholder="Email" fullWidth />
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-            >
+            <Button type="submit" variant="contained" fullWidth disabled={submitting} sx={{ mt: 1 }}>
               {submitting ? 'One sec…' : 'Send reset code'}
-            </button>
-          </form>
-          <button
-            type="button"
+            </Button>
+          </Box>
+          <Button
+            variant="text"
+            color="inherit"
+            sx={{ mt: 3, textDecoration: 'underline', color: 'text.secondary' }}
             onClick={() => {
               resetMessages()
               setStep('signIn')
             }}
-            className="mt-6 text-center text-sm text-muted underline underline-offset-4"
           >
             Back to sign in
-          </button>
+          </Button>
         </>
       )}
 
       {step === 'resetCode' && (
         <>
-          <p className="mt-2 text-center text-muted">Reset code sent to {email}</p>
-          <form onSubmit={handleResetCode} className="mt-8 flex flex-col gap-3">
-            <input
+          <Typography color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+            Reset code sent to {email}
+          </Typography>
+          <Box component="form" onSubmit={handleResetCode} sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <TextField
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              inputMode="numeric"
               autoComplete="one-time-code"
               required
               placeholder="6-digit code"
-              className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-lg tracking-[0.3em] outline-none focus:border-accent"
+              fullWidth
+              slotProps={{ htmlInput: { inputMode: 'numeric', style: { textAlign: 'center', letterSpacing: '0.3em', fontSize: '1.125rem' } } }}
             />
-            <input
+            <TextField
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               type="password"
               required
-              minLength={8}
               autoComplete="new-password"
               placeholder="New password (min. 8 characters)"
-              className="rounded-xl border border-border bg-surface px-4 py-3 outline-none focus:border-accent"
+              fullWidth
+              slotProps={{ htmlInput: { minLength: 8 } }}
             />
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            {info && <p className="text-sm text-success">{info}</p>}
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
+            {info && (
+              <Typography variant="body2" color="success.main">
+                {info}
+              </Typography>
+            )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-glow mt-2 rounded-xl bg-accent py-3 font-semibold text-accent-fg disabled:opacity-50"
-            >
+            <Button type="submit" variant="contained" fullWidth disabled={submitting} sx={{ mt: 1 }}>
               {submitting ? 'One sec…' : 'Reset password'}
-            </button>
-          </form>
-          <button
-            type="button"
+            </Button>
+          </Box>
+          <Button
+            variant="text"
+            color="inherit"
+            sx={{ mt: 2, textDecoration: 'underline', color: 'text.secondary' }}
             onClick={() => void handleResendReset()}
-            className="mt-4 text-center text-sm text-muted underline underline-offset-4"
           >
             Resend code
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="text"
+            color="inherit"
+            sx={{ mt: 0.5, color: 'text.secondary' }}
             onClick={() => {
               resetMessages()
               setStep('signIn')
             }}
-            className="mt-2 text-center text-sm text-muted"
           >
             Back to sign in
-          </button>
+          </Button>
         </>
       )}
-    </div>
+    </Box>
   )
 }

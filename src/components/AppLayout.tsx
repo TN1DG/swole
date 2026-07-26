@@ -1,5 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { Box, useTheme } from '@mui/material'
 import { PingAckBanner } from './PingAckBanner'
+import { PeopleIcon } from './icons'
+import { tokens } from '../theme/tokens'
 
 // Each tab: route path, label, and a simple inline SVG icon.
 const tabs = [
@@ -12,58 +15,131 @@ const tabs = [
 ]
 
 export function AppLayout() {
+  const theme = useTheme()
+  const activeColor = theme.palette.primary.main
+  const mutedColor = theme.palette.text.secondary
+
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col">
+    <Box sx={{ mx: 'auto', display: 'flex', minHeight: '100svh', maxWidth: '32rem', flexDirection: 'column' }}>
       {/* Top bar. iOS status bar is translucent (viewport-fit=cover), so this
           needs its own safe-area padding or it renders under the notch/clock.
           Sticky (not fixed) — the page itself is the scroll container, so this
           avoids having to hand-sync main's padding to the header's real,
           safe-area-variable height. */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border-glass bg-surface-glass px-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-md">
-        <span className="text-lg font-black uppercase tracking-[0.15em] text-accent">SWOLE</span>
+      <Box
+        component="header"
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: (t) => t.zIndex.appBar,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: `1px solid ${tokens.borderGlass}`,
+          bgcolor: tokens.surfaceGlass,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          px: 2,
+          pt: 'max(1rem, env(safe-area-inset-top))',
+        }}
+      >
+        <Box
+          component="span"
+          sx={{
+            fontSize: '1.125rem',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: '0.15em',
+            color: 'primary.main',
+          }}
+        >
+          SWOLE
+        </Box>
         <NavLink
           to="/profile"
           aria-label="Profile"
-          className={({ isActive }) =>
-            `rounded-full border border-border p-2 ${isActive ? 'text-accent' : 'text-muted'}`
-          }
+          style={({ isActive }) => ({
+            display: 'flex',
+            borderRadius: '9999px',
+            border: `1px solid ${tokens.border}`,
+            padding: 8,
+            color: isActive ? activeColor : mutedColor,
+          })}
         >
           <ProfileIcon />
         </NavLink>
-      </header>
+      </Box>
 
       {/* Page content. Bottom padding leaves room for the fixed tab bar. */}
-      <main className="flex-1 px-4 pt-4 pb-24">
+      <Box component="main" sx={{ flex: 1, px: 2, pt: 2, pb: 12 }}>
         <PingAckBanner />
         <Outlet />
-      </main>
+      </Box>
 
-      {/* Bottom tab bar — z-30 like the header, both below ExerciseDetail's
-          z-50 sheet overlay so modals still cover them. */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border-glass bg-surface-glass backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg">
+      {/* Bottom tab bar — same z-index tier as the header, both below any
+          Dialog/Drawer (MUI's modal z-index is always higher) so sheets and
+          confirm dialogs still cover it. */}
+      <Box
+        component="nav"
+        sx={{
+          position: 'fixed',
+          insetInline: 0,
+          bottom: 0,
+          zIndex: (t) => t.zIndex.appBar,
+          borderTop: `1px solid ${tokens.borderGlass}`,
+          bgcolor: tokens.surfaceGlass,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <Box sx={{ mx: 'auto', display: 'flex', maxWidth: '32rem' }}>
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
-              className={({ isActive }) =>
-                `flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-[10px] leading-tight [&>svg]:h-5 [&>svg]:w-5 ${
-                  isActive ? 'text-accent' : 'text-muted'
-                }`
-              }
+              style={({ isActive }) => ({
+                display: 'flex',
+                minWidth: 0,
+                flex: 1,
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                padding: '8px 2px',
+                paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                fontSize: 10,
+                lineHeight: 1.2,
+                color: isActive ? activeColor : mutedColor,
+                textDecoration: 'none',
+              })}
             >
-              <Icon />
-              <span className="w-full truncate text-center">{label}</span>
+              <Box sx={{ '& svg': { width: 20, height: 20 } }}>
+                <Icon />
+              </Box>
+              <Box
+                component="span"
+                sx={{
+                  width: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'center',
+                }}
+              >
+                {label}
+              </Box>
             </NavLink>
           ))}
-        </div>
-      </nav>
-    </div>
+        </Box>
+      </Box>
+    </Box>
   )
 }
 
 // --- Icons (inline SVG keeps us dependency-free) ---
+// PeopleIcon lives in ./icons.tsx (this file used to have an identical local
+// duplicate) — every other tab icon here is only used by this nav, so they
+// stay local.
 
 function DumbbellIcon() {
   return (
@@ -95,17 +171,6 @@ function HeartIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5 6 5c2 0 3.5 1.2 4 2.5C10.5 6.2 12 5 14 5c3.5 0 5 3.5 3.5 6.5C19.5 15.65 12 20 12 20z" />
-    </svg>
-  )
-}
-
-function PeopleIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8" r="3" />
-      <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
-      <circle cx="17" cy="8" r="2.5" />
-      <path d="M15.5 14.7c2.6.3 4.5 2.3 4.5 5.3" />
     </svg>
   )
 }
