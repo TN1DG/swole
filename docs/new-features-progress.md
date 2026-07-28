@@ -2,7 +2,12 @@
 
 Six features brainstormed and scoped in a planning session (plan file: `i-want-us-to-robust-boole.md`): profile picture, rest timer, unit toggle (ft/lb), PR red-slash visual, in-app notifications, and a friends-page redesign with unified chat + text messaging. Three related ideas were explicitly deferred (animated muscle-highlight exercise demos, a public social feed, real push notifications) — not tracked here.
 
-**How to use this file**: read it first thing when resuming this task. Each wave section below gets updated (status, files touched, decisions/deviations, verification results) as work completes.
+**Status: all six waves shipped to production** on 2026-07-28 (commit `1093d03`).
+
+**How to use this file**: this is the *why* — the decisions, deviations, and
+tradeoffs behind each wave, kept so a later session doesn't re-litigate them.
+For what's still **open** (bugs, scope gaps, deferred features), see
+**[`docs/backlog.md`](./backlog.md)** — that's the one to start from.
 
 ---
 
