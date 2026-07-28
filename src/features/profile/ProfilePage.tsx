@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { Box, Button, Checkbox, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, ButtonBase, Checkbox, Stack, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
@@ -22,6 +22,8 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Avatar } from '../../components/Avatar'
 import { AvatarUploadDialog } from './AvatarUploadDialog'
 import { useAvatarPicker } from './useAvatarPicker'
+import { WhatsNewDialog } from '../releases/WhatsNewDialog'
+import { CURRENT_RELEASE } from '../releases/releaseNotes'
 import { TIER_LABELS } from '../../lib/tierLabels'
 
 export function ProfilePage() {
@@ -43,6 +45,7 @@ export function ProfilePage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false)
 
   const removeAvatar = useMutation(api.profiles.removeAvatar)
   const { imageSrc, onFileChange, clear: clearPickedImage } = useAvatarPicker()
@@ -302,6 +305,30 @@ export function ProfilePage() {
           <FlameIcon /> My Stats
         </GlassTile>
       </Link>
+
+      {/* The post-update popup shows once and is then gone for good, so give
+          it somewhere to live afterwards. */}
+      <ButtonBase onClick={() => setWhatsNewOpen(true)} sx={{ mt: 1.5, width: '100%', display: 'block' }}>
+        <GlassTile
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            py: 1.5,
+            fontWeight: 600,
+            color: 'text.primary',
+          }}
+        >
+          ✨ What&rsquo;s new
+        </GlassTile>
+      </ButtonBase>
+
+      <WhatsNewDialog
+        open={whatsNewOpen}
+        release={CURRENT_RELEASE}
+        onClose={() => setWhatsNewOpen(false)}
+      />
 
       <Button
         fullWidth

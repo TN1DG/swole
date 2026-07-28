@@ -311,3 +311,50 @@ describe('setDailyVolumeGoal', () => {
     ).rejects.toThrow(/not signed in/i)
   })
 })
+
+describe('markReleaseSeen', () => {
+  it('defaults to null', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    expect((await user.query(api.profiles.getMine, {}))!.lastSeenRelease).toBeNull()
+  })
+
+  it('records the dismissed release and overwrites an older one', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.markReleaseSeen, { version: '1.0.0' })
+    expect((await user.query(api.profiles.getMine, {}))!.lastSeenRelease).toBe('1.0.0')
+
+    await user.mutation(api.profiles.markReleaseSeen, { version: '1.1.0' })
+    expect((await user.query(api.profiles.getMine, {}))!.lastSeenRelease).toBe('1.1.0')
+  })
+
+  it('rejects an empty or oversized version', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await expect(
+      user.mutation(api.profiles.markReleaseSeen, { version: '   ' }),
+    ).rejects.toThrow(/required/i)
+    await expect(
+      user.mutation(api.profiles.markReleaseSeen, { version: 'v'.repeat(41) }),
+    ).rejects.toThrow(/too long/i)
+  })
+
+  it('is scoped to the caller', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.markReleaseSeen, { version: '1.1.0' })
+    expect((await bob.query(api.profiles.getMine, {}))!.lastSeenRelease).toBeNull()
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.markReleaseSeen, { version: '1.1.0' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})

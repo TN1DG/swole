@@ -108,6 +108,7 @@ export const getMine = query({
       pointsBalance: profile?.pointsBalance ?? 0,
       username: profile?.username ?? null,
       workoutsPublic: profile?.workoutsPublic ?? false,
+      lastSeenRelease: profile?.lastSeenRelease ?? null,
       onboarded: profile?.onboardedAt != null,
       streakWeeks,
       tier,
@@ -201,6 +202,26 @@ export const markTipSeen = mutation({
     const seen = profile.seenTips ?? []
     if (seen.includes(args.tip) || seen.length >= MAX_SEEN_TIPS) return
     await ctx.db.patch(profile._id, { seenTips: [...seen, args.tip] })
+  },
+})
+
+// Records that the user dismissed the "What's new" popup for this release,
+// so it doesn't come back on their next visit or their other devices.
+//
+// The version is whatever the client's bundle calls the current release
+// (src/features/releases/releaseNotes.ts). A tampered-with client can only
+// suppress or re-show its own popup, so this is length-capped rather than
+// checked against a server-side list of known versions — the server has no
+// reason to know the release history.
+export const markReleaseSeen = mutation({
+  args: { version: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const version = cleanName(args.version, LIMITS.releaseVersionMaxLength, 'Version')
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { lastSeenRelease: version })
   },
 })
 

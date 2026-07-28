@@ -36,6 +36,13 @@ export default defineSchema({
     onboardedAt: v.optional(v.number()),
     // Which first-visit tab tips have been dismissed, so they show at most once.
     seenTips: v.optional(v.array(v.string())),
+    // Version of the newest "What's new" popup this user has dismissed (see
+    // src/features/releases/releaseNotes.ts). Absent means they've never
+    // dismissed one — which is not the same as "show them nothing", since
+    // whether to show also depends on whether the account predates the
+    // release. Stored per-account rather than in localStorage so it doesn't
+    // reappear on every device, matching seenTips above.
+    lastSeenRelease: v.optional(v.string()),
     // Single global target for the History calendar's daily rings.
     dailyVolumeGoalKg: v.optional(v.number()),
     // Earned by finishing workouts, spent/won via challenges (convex/challenges.ts).

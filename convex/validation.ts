@@ -56,6 +56,7 @@ export const LIMITS = {
   messageMaxLength: 1000,
   featureRequestsPerUser: 20,
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
+  releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"
   challengeMinWeeks: 1,
   challengeMaxWeeks: 8,
   maxWagerPoints: 1000,

@@ -6,6 +6,7 @@ import { api } from '../../convex/_generated/api'
 import { PingAckBanner } from './PingAckBanner'
 import { NotificationsBanner } from './NotificationsBanner'
 import { Avatar } from './Avatar'
+import { WhatsNewGate } from '../features/releases/WhatsNewDialog'
 import { PeopleIcon } from './icons'
 import { tokens } from '../theme/tokens'
 
@@ -142,6 +143,7 @@ export function AppLayout() {
       >
         <PingAckBanner />
         <NotificationsBanner />
+        <WhatsNewGate />
         <Outlet />
       </Box>
 

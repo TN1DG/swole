@@ -171,6 +171,16 @@ they are not oversights.
 
 ---
 
+## Shipping a release
+
+Users see a "What's new" popup once per release. To publish one, add an entry
+at the **top** of `RELEASES` in `src/features/releases/releaseNotes.ts` with a
+version string nobody has seen before, then deploy. Everyone whose account
+predates `releasedAt` gets it once; newer accounts never do (they get the
+welcome carousel instead). Dismissal is stored per-account in
+`profiles.lastSeenRelease`, so it doesn't reappear on their other devices.
+It stays re-readable from Profile → "What's new".
+
 ## Verification commands
 
 ```
