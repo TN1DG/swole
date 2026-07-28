@@ -5,6 +5,22 @@ production). Ordered by priority. Companion to `docs/new-features-progress.md`,
 which has the wave-by-wave *why* behind the six features that just shipped —
 this file is the *what's left*.
 
+> **2026-07-28, scoring rework (Wave 2).** Points are now earned per distinct
+> training day on a calendar Mon–Sun week, unified with the spendable coin
+> balance. `convex/fitness.ts` holds the pure functions, `convex/points.ts`
+> the reconciliation. **`points.ts:reconcileWeek` is the only thing allowed to
+> write `workouts.pointsAwarded`** — the invariant
+> `pointsBalance == sum(pointsAwarded) − challenge spend` depends on it, and
+> nothing will warn you if another writer breaks it.
+> `migrations:backfillScoring` has been run on dev and prod.
+>
+> **Still open before Wave 3 (social feed) can start** — both were planned as
+> prerequisites and are NOT yet done:
+> - The `deleteAccount` P1 bug below (`gymPings`/`challenges`). Fix it before
+>   adding five more tables to that function.
+> - Extracting `convex/identity.ts` so feed code can't reach `profileFor`,
+>   which falls back to the user's **email address**.
+
 > **2026-07-28, mobile pass.** A responsiveness sweep landed after the above;
 > see `docs/mobile-responsiveness.md` for what changed and what it means for
 > new code (short version: never hardcode the header or tab-bar height, use
