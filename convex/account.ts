@@ -1,6 +1,8 @@
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation } from './_generated/server'
 import { rateLimiter } from './rateLimiter'
+import { awardPoints } from './profiles'
+import { cascadeDeletePost } from './feed'
 
 // Permanently deletes everything tied to the signed-in account: every
 // workout/set, routine, custom exercise, favorite, PR, friend connection,
@@ -124,6 +126,111 @@ export const deleteAccount = mutation({
       .withIndex('by_user_friend', (q) => q.eq('userId', userId))
       .collect()
     for (const r of reads) await ctx.db.delete(r._id)
+
+    // Gym pings in both directions. Left behind, these render in the
+    // surviving friend's chat thread with the sender's name falling back to
+    // '?' once the user document is gone.
+    const sentPings = await ctx.db
+      .query('gymPings')
+      .withIndex('by_from', (q) => q.eq('fromUserId', userId))
+      .collect()
+    for (const p of sentPings) await ctx.db.delete(p._id)
+
+    const receivedPings = await ctx.db
+      .query('gymPings')
+      .withIndex('by_to', (q) => q.eq('toUserId', userId))
+      .collect()
+    for (const p of receivedPings) await ctx.db.delete(p._id)
+
+    // Challenges in both directions.
+    //
+    // The refund is the load-bearing part. Both sides escrow their wager up
+    // front (challenges.ts propose/accept), so deleting a pending or active
+    // challenge without paying the survivor back leaves their points debited
+    // with no path to recovery. Worse, leaving the rows entirely meant
+    // challenges.resolveExpired would later award points to a deleted user,
+    // and awardPoints -> getOrCreateProfile would insert a fresh profile row
+    // pointing at a user document that no longer exists — one new orphan per
+    // cron run.
+    const challenges = [
+      ...(await ctx.db
+        .query('challenges')
+        .withIndex('by_challenger', (q) => q.eq('challengerId', userId))
+        .collect()),
+      ...(await ctx.db
+        .query('challenges')
+        .withIndex('by_opponent', (q) => q.eq('opponentId', userId))
+        .collect()),
+    ]
+    for (const challenge of challenges) {
+      const survivorId =
+        challenge.challengerId === userId ? challenge.opponentId : challenge.challengerId
+
+      // 'pending' means only the challenger has escrowed; 'active' means both
+      // have. Resolved/declined/cancelled rows already settled up.
+      if (challenge.status === 'active') {
+        await awardPoints(ctx, survivorId, challenge.wagerPoints)
+      } else if (challenge.status === 'pending' && challenge.challengerId !== userId) {
+        // The departing user is the opponent, who hasn't escrowed yet — so
+        // it's the surviving challenger who needs their stake back.
+        await awardPoints(ctx, survivorId, challenge.wagerPoints)
+      }
+      await ctx.db.delete(challenge._id)
+    }
+
+    // Feed posts, in BOTH directions — my own posts, and the likes and
+    // comments I left on other people's.
+    //
+    // The counter decrements on the second half are the part that gets
+    // forgotten: without them, deleting a prolific liker leaves every post
+    // they ever touched permanently over-counted, and nothing would ever
+    // correct it.
+    const myPosts = await ctx.db
+      .query('posts')
+      .withIndex('by_author_createdAt', (q) => q.eq('authorId', userId))
+      .collect()
+    for (const post of myPosts) await cascadeDeletePost(ctx, post)
+
+    const myLikes = await ctx.db
+      .query('postLikes')
+      .withIndex('by_user_post', (q) => q.eq('userId', userId))
+      .collect()
+    for (const like of myLikes) {
+      const post = await ctx.db.get(like.postId)
+      if (post) await ctx.db.patch(post._id, { likeCount: Math.max(0, post.likeCount - 1) })
+      await ctx.db.delete(like._id)
+    }
+
+    const myComments = await ctx.db
+      .query('postComments')
+      .withIndex('by_author', (q) => q.eq('authorId', userId))
+      .collect()
+    for (const comment of myComments) {
+      const post = await ctx.db.get(comment.postId)
+      if (post) {
+        await ctx.db.patch(post._id, { commentCount: Math.max(0, post.commentCount - 1) })
+      }
+      await ctx.db.delete(comment._id)
+    }
+
+    const myReports = await ctx.db
+      .query('postReports')
+      .withIndex('by_reporter', (q) => q.eq('reporterId', userId))
+      .collect()
+    for (const report of myReports) await ctx.db.delete(report._id)
+
+    // Blocks in both directions.
+    const blocksIMade = await ctx.db
+      .query('blockedUsers')
+      .withIndex('by_user_blocked', (q) => q.eq('userId', userId))
+      .collect()
+    for (const b of blocksIMade) await ctx.db.delete(b._id)
+
+    const blocksAgainstMe = await ctx.db
+      .query('blockedUsers')
+      .withIndex('by_blocked', (q) => q.eq('blockedUserId', userId))
+      .collect()
+    for (const b of blocksAgainstMe) await ctx.db.delete(b._id)
 
     // Notifications in both directions: the ones addressed to this user, and
     // the ones this user left sitting in other people's banners (which would

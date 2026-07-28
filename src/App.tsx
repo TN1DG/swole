@@ -17,6 +17,9 @@ import { FriendWorkoutsPage } from './features/friends/FriendWorkoutsPage'
 import { FriendWorkoutDetailPage } from './features/friends/FriendWorkoutDetailPage'
 import { FriendTrophyPage } from './features/friends/FriendTrophyPage'
 import { FriendChatPage } from './features/friends/FriendChatPage'
+import { ComposePostPage } from './features/feed/ComposePostPage'
+import { PostDetailPage } from './features/feed/PostDetailPage'
+import { NotificationsPage } from './features/notifications/NotificationsPage'
 
 export default function App() {
   return (
@@ -42,6 +45,10 @@ export default function App() {
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/history/:workoutId" element={<WorkoutDetailPage />} />
               <Route path="/share/:workoutId" element={<SharePage />} />
+              {/* 3 segments vs 2, so these can never collide. */}
+              <Route path="/feed/compose/:workoutId" element={<ComposePostPage />} />
+              <Route path="/feed/:postId" element={<PostDetailPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/favorites" element={<Navigate to="/exercises" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/stats" element={<StatsPage />} />

@@ -53,4 +53,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // but never calls setAvatar leaves an orphan behind — so the mint rate is
   // capped well below what any human re-cropping their photo would need.
   avatarUploadUrl: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
+
+  // --- social feed ---
+  // Posting is deliberate and infrequent; the burst allowance covers someone
+  // sharing a backlog of a few workouts in one sitting.
+  postCreate: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 3 },
+  // Each call is permission to write a blob, same reasoning as avatarUploadUrl.
+  postPhotoUploadUrl: { kind: 'token bucket', rate: 20, period: 60 * MINUTE, capacity: 5 },
+  // Likes are a tap, so the ceiling is high — this only stops scripted floods.
+  postLike: { kind: 'token bucket', rate: 60, period: MINUTE, capacity: 20 },
+  postComment: { kind: 'token bucket', rate: 20, period: MINUTE, capacity: 10 },
+  postRepost: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 5 },
+  postReport: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 3 },
 })

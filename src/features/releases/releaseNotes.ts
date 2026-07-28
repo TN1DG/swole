@@ -22,6 +22,19 @@ export type Release = {
 // Newest first.
 export const RELEASES: Release[] = [
   {
+    version: '1.4.0',
+    releasedAt: Date.UTC(2026, 6, 28),
+    summary: 'The feed is here — share a workout with a photo, and see what everyone else is lifting.',
+    changes: [
+      'Finish a workout, open it, and tap "Share to Feed". Add a photo and a caption if you want.',
+      'You choose who sees each post: Friends only, or Everyone. Friends only is the default, and you pick per post — it is not an account-wide setting.',
+      'Like, comment, and repost. Only public posts can be reposted, because your friends are not the original poster\'s friends.',
+      'Find it under Friends, on the new Feed tab. "Friends" shows people you have added; "Discover" shows public posts from everyone.',
+      'There is now a proper notifications page at the top of the banner stack, so likes and comments do not bury your friend requests.',
+      'You can report a post or block someone from the "…" menu on any post.',
+    ],
+  },
+  {
     version: '1.3.0',
     releasedAt: Date.UTC(2026, 6, 28),
     summary:

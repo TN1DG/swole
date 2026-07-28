@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
-import { Button } from '@mui/material'
+import { Button, Typography } from '@mui/material'
 import type { FunctionReturnType } from 'convex/server'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
@@ -29,6 +29,25 @@ function describe(notification: Notification): { text: string; actionLabel: stri
         actionLabel: "I'm in",
         to: `/friends/${notification.fromUserId}/chat`,
       }
+    case 'post_liked':
+    case 'post_commented':
+    case 'post_reposted': {
+      const others =
+        notification.othersCount > 0
+          ? ` and ${notification.othersCount} other${notification.othersCount > 1 ? 's' : ''}`
+          : ''
+      const verb =
+        notification.kind === 'post_liked'
+          ? 'liked your post'
+          : notification.kind === 'post_commented'
+            ? 'commented on your post'
+            : 'reposted you'
+      return {
+        text: `${who}${others} ${verb}`,
+        actionLabel: 'View',
+        to: notification.postId ? `/feed/${notification.postId}` : '/notifications',
+      }
+    }
     case 'workout_finished_after_ping':
       return {
         text: `${who} won the battle 🏆`,
@@ -55,8 +74,12 @@ export function NotificationsBanner() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
   if (!notifications) return null
-  const visible = notifications.filter((n) => !dismissed.has(n._id)).slice(0, MAX_VISIBLE)
+  const undismissed = notifications.filter((n) => !dismissed.has(n._id))
+  const visible = undismissed.slice(0, MAX_VISIBLE)
   if (visible.length === 0) return null
+  // Anything past the third has nowhere to go in this stack, so point at the
+  // inbox rather than silently queueing it behind the others.
+  const overflow = undismissed.length - visible.length
 
   function hide(id: Id<'notifications'>) {
     setDismissed((prev) => new Set(prev).add(id))
@@ -99,6 +122,17 @@ export function NotificationsBanner() {
           </InlineNotice>
         )
       })}
+      {overflow > 0 && (
+        <Typography
+          component={Link}
+          to="/notifications"
+          variant="body2"
+          color="primary.main"
+          sx={{ display: 'block', mb: 1.5, textDecoration: 'underline' }}
+        >
+          See all {undismissed.length} notifications
+        </Typography>
+      )}
     </>
   )
 }

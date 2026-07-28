@@ -14,6 +14,7 @@ import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
+import { FeedTab } from '../feed/FeedTab'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -29,7 +30,7 @@ export function FriendsPage() {
 
   const sendFriendRequest = useMutation(api.friends.sendFriendRequest)
 
-  const [tab, setTab] = useState<'leaderboard' | 'friends'>('leaderboard')
+  const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>('feed')
   const [searchTerm, setSearchTerm] = useState('')
   const [committedSearch, setCommittedSearch] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -135,14 +136,19 @@ export function FriendsPage() {
         <SegmentedControl
           value={tab}
           onChange={setTab}
+          // Three short labels rather than a sixth bottom tab — five tabs
+          // already ellipsize "Exercises" on a 360px phone.
           options={[
-            { value: 'leaderboard', label: 'Leaderboard' },
+            { value: 'feed', label: 'Feed' },
+            { value: 'leaderboard', label: 'Board' },
             { value: 'friends', label: 'Friends', badge: incoming?.length || undefined },
           ]}
         />
       </Box>
 
-      {tab === 'leaderboard' ? (
+      {tab === 'feed' ? (
+        <FeedTab />
+      ) : tab === 'leaderboard' ? (
         <LeaderboardTab />
       ) : (
         <FriendsTab friends={friends} incoming={incoming} outgoing={outgoing} runAction={runAction} />

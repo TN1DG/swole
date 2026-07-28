@@ -164,7 +164,17 @@ export function WorkoutDetailPage() {
         ))}
       </Box>
 
-      <Button component={Link} to={`/share/${detail._id}`} variant="contained" fullWidth sx={{ mt: 3 }}>
+      <Button component={Link} to={`/feed/compose/${detail._id}`} variant="contained" fullWidth sx={{ mt: 3 }}>
+        Share to Feed
+      </Button>
+      <Button
+        component={Link}
+        to={`/share/${detail._id}`}
+        variant="outlined"
+        color="inherit"
+        fullWidth
+        sx={{ mt: 1.5 }}
+      >
         Share as Photo
       </Button>
       <Button

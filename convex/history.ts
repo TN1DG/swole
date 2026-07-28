@@ -362,6 +362,19 @@ export const deleteWorkout = mutation({
       await reconcileWeek(ctx, userId, workout.startedAt, workout.pointsAwarded ?? 0)
     }
 
+    // Any feed post about this workout is UNLINKED, not deleted. The post
+    // carries its own snapshot of the stats, so it stands on its own — and
+    // silently destroying someone's post and its comment thread because they
+    // tidied their workout history would be worse than a post whose "view
+    // full workout" link is simply absent.
+    const posts = await ctx.db
+      .query('posts')
+      .withIndex('by_workout', (q) => q.eq('workoutId', args.workoutId))
+      .collect()
+    for (const post of posts) {
+      await ctx.db.patch(post._id, { workoutId: undefined })
+    }
+
     for (const exerciseId of affectedExerciseIds) {
       await recomputeRecord(ctx, userId, exerciseId)
     }

@@ -57,6 +57,19 @@ export const LIMITS = {
   featureRequestsPerUser: 20,
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
   releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"
+  // --- social feed ---
+  postCaptionMaxLength: 500,
+  postCommentMaxLength: 500,
+  commentsPerPost: 500,
+  // Guards the account-deletion transaction (which cascades every post's
+  // likes, comments and reposts), not spam — that's the rate limiter's job.
+  postsPerUser: 2000,
+  feedPageSize: 12,
+  // Past this a user's Friends feed silently omits authors. See
+  // convex/feed.ts for the documented escape hatch.
+  feedMaxAuthors: 40,
+  reportReasonMaxLength: 300,
+  blockedUsersPerUser: 200,
   challengeMinWeeks: 1,
   challengeMaxWeeks: 8,
   // Retuned from 1000 when points moved from a flat 10-per-workout award to

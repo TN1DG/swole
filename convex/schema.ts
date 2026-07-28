@@ -61,6 +61,115 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
 
+  // ---------- social feed ----------
+
+  // A shared workout — the unit of the feed. Denormalized hard, on purpose:
+  // a page renders 20 of these, and history.summarizeWorkout costs ~1+2N
+  // reads per workout, so re-deriving each one would be 200+ reads before a
+  // single pixel. Everything under "snapshot" is copied at post time and
+  // deliberately NOT kept in sync afterwards — a post is something you
+  // published, not a live view of a workout you may since have edited.
+  posts: defineTable({
+    authorId: v.id('users'),
+    createdAt: v.number(),
+    // Chosen per post by the author; the composer preselects 'friends'.
+    // Immutable after creation — see feed.ts:repost for why flipping this
+    // later would turn every existing repost into a leak.
+    visibility: v.union(v.literal('public'), v.literal('friends')),
+    caption: v.optional(v.string()),
+    photoStorageId: v.optional(v.id('_storage')),
+
+    // Optional because a repost has no workout of its own, and because
+    // history.deleteWorkout unlinks rather than destroying the post.
+    workoutId: v.optional(v.id('workouts')),
+
+    // ---- snapshot, copied from the workout at post time ----
+    workoutName: v.optional(v.string()),
+    workoutStartedAt: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    volumeKg: v.optional(v.number()),
+    setCount: v.optional(v.number()),
+    prCount: v.optional(v.number()),
+    // Bounded by LIMITS.exercisesPerWorkout (30), so this can't run away.
+    exerciseNames: v.optional(v.array(v.string())),
+
+    // Points at the ORIGINAL, never at another repost — repost() collapses
+    // the chain, so the embed is at most one level deep and never nests.
+    repostOfId: v.optional(v.id('posts')),
+
+    // Denormalized counters, patched in the same mutation as the child row.
+    // Never counted from rows: Convex has no count operator and
+    // .collect().length is the anti-pattern its guidelines call out. Kept on
+    // the post rather than a sibling table because the feed reads the post
+    // anyway — splitting them adds a read per post without avoiding the
+    // reactive invalidation that would motivate the split.
+    //
+    // If a post ever gets hot enough to see OCC retries, the escape hatch is
+    // @convex-dev/aggregate or a sharded counter table.
+    likeCount: v.number(),
+    commentCount: v.number(),
+    repostCount: v.number(),
+  })
+    // The Friends-feed merge stream. Prefix-usable: authorId alone also
+    // serves "all my posts" and the account-deletion sweep.
+    .index('by_author_createdAt', ['authorId', 'createdAt'])
+    // The Discover stream, and the only index that reads visibility.
+    .index('by_visibility_createdAt', ['visibility', 'createdAt'])
+    // "have I already shared this workout?" + the unlink on workout deletion.
+    .index('by_workout', ['workoutId'])
+    // Deleting an original has to clean up everyone's reposts of it.
+    .index('by_repostOf', ['repostOfId']),
+
+  // One like. A row rather than a counter-only design because "did I like
+  // this" has to be answerable per viewer.
+  postLikes: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    createdAt: v.number(),
+  })
+    // "who liked this", and the cascade when a post is deleted.
+    .index('by_post', ['postId'])
+    // Serves both the per-post "did I like it" point lookup and, on the
+    // userId prefix alone, "every like I ever left" for account deletion —
+    // the same two-for-one shape as notifications' by_user_readAt.
+    .index('by_user_post', ['userId', 'postId']),
+
+  postComments: defineTable({
+    postId: v.id('posts'),
+    authorId: v.id('users'),
+    text: v.string(),
+    createdAt: v.number(),
+  })
+    // The thread, oldest-first; the postId prefix alone serves post deletion.
+    .index('by_post_createdAt', ['postId', 'createdAt'])
+    // Account deletion, the other direction: my comments on other's posts.
+    .index('by_author', ['authorId']),
+
+  // A user-filed report. There is deliberately no moderator UI and no query
+  // over this table — reports are read from the Convex dashboard and emailed
+  // to the owner, exactly like featureRequests.
+  postReports: defineTable({
+    postId: v.id('posts'),
+    reporterId: v.id('users'),
+    reason: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_reporter', ['reporterId']),
+
+  // One-directional: blocking hides them from me, and does not tell them.
+  // Deliberately not stored as a pair the way friendships are — the two
+  // directions mean different things and are set independently.
+  blockedUsers: defineTable({
+    userId: v.id('users'), // the blocker
+    blockedUserId: v.id('users'),
+    createdAt: v.number(),
+  })
+    // Point lookup, and on the userId prefix "everyone I've blocked".
+    .index('by_user_blocked', ['userId', 'blockedUserId'])
+    // Account deletion, the other direction.
+    .index('by_blocked', ['blockedUserId']),
+
   // A pending "add friend by username" request, until accepted or declined.
   friendRequests: defineTable({
     fromUserId: v.id('users'),
@@ -216,6 +325,9 @@ export default defineSchema({
       v.literal('friend_request_accepted'),
       v.literal('ping_received'),
       v.literal('workout_finished_after_ping'), // "X won the battle"
+      v.literal('post_liked'),
+      v.literal('post_commented'),
+      v.literal('post_reposted'),
     ),
     fromUserId: v.id('users'), // who caused it
     createdAt: v.number(),
@@ -223,6 +335,11 @@ export default defineSchema({
     // Only set for the kinds that need them, so the banner can deep-link.
     pingId: v.optional(v.id('gymPings')),
     workoutId: v.optional(v.id('workouts')),
+    postId: v.optional(v.id('posts')),
+    // How many people this notice stands for after coalescing, so a busy
+    // post says "X and 4 others" instead of burying everything else in the
+    // 3-slot banner stack. Unset means 1.
+    count: v.optional(v.number()),
   })
     // Serves both "my unread" (eq userId + eq readAt undefined) and
     // "all mine" (userId prefix only, for account deletion).

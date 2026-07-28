@@ -3,6 +3,9 @@ import { api } from './_generated/api'
 import {
   createBackend,
   createBuiltInExercise,
+  givePoints,
+  pointsOf,
+  twoFriends,
   userWithUsername,
   type T,
 } from './test.helpers'
@@ -134,5 +137,79 @@ describe('deleteAccount', () => {
   it('requires sign-in', async () => {
     const t: T = createBackend()
     await expect(t.mutation(api.account.deleteAccount, {})).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('deleteAccount: pings and challenges', () => {
+  it('removes gym pings in both directions', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+
+    await alice.user.mutation(api.pings.send, { toUserId: bob.userId })
+    await bob.user.mutation(api.pings.send, { toUserId: alice.userId })
+
+    await alice.user.mutation(api.account.deleteAccount, {})
+
+    const remaining = await t.run(async (ctx) => ctx.db.query('gymPings').collect())
+    expect(remaining).toHaveLength(0)
+  })
+
+  it('refunds an active challenge to the surviving friend', async () => {
+    // Both sides escrowed. Deleting without a refund debits the survivor
+    // permanently, with no path to recovery.
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await givePoints(t, alice.userId, 100)
+    await givePoints(t, bob.userId, 100)
+
+    const challengeId = await alice.user.mutation(api.challenges.propose, {
+      opponentId: bob.userId,
+      weeks: 2,
+      wagerPoints: 20,
+    })
+    await bob.user.mutation(api.challenges.accept, { challengeId })
+    expect(await pointsOf(t, bob.userId)).toBe(80)
+
+    await alice.user.mutation(api.account.deleteAccount, {})
+
+    expect(await pointsOf(t, bob.userId)).toBe(100)
+    const remaining = await t.run(async (ctx) => ctx.db.query('challenges').collect())
+    expect(remaining).toHaveLength(0)
+  })
+
+  it('refunds a pending challenge to the challenger when the opponent leaves', async () => {
+    // Only the challenger has escrowed at this point, so they are the one
+    // owed their stake back.
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await givePoints(t, alice.userId, 100)
+
+    await alice.user.mutation(api.challenges.propose, {
+      opponentId: bob.userId,
+      weeks: 2,
+      wagerPoints: 30,
+    })
+    expect(await pointsOf(t, alice.userId)).toBe(70)
+
+    await bob.user.mutation(api.account.deleteAccount, {})
+
+    expect(await pointsOf(t, alice.userId)).toBe(100)
+  })
+
+  it('does not refund an already-settled challenge', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await givePoints(t, alice.userId, 100)
+
+    const challengeId = await alice.user.mutation(api.challenges.propose, {
+      opponentId: bob.userId,
+      weeks: 2,
+      wagerPoints: 20,
+    })
+    await bob.user.mutation(api.challenges.decline, { challengeId })
+    expect(await pointsOf(t, alice.userId)).toBe(100) // already refunded
+
+    await bob.user.mutation(api.account.deleteAccount, {})
+    expect(await pointsOf(t, alice.userId)).toBe(100) // not double-refunded
   })
 })
