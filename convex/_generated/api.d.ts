@@ -13,7 +13,6 @@ import type * as auth from "../auth.js";
 import type * as challenges from "../challenges.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
-import type * as diagnostics from "../diagnostics.js";
 import type * as emailAuth from "../emailAuth.js";
 import type * as exercises from "../exercises.js";
 import type * as favorites from "../favorites.js";
@@ -48,7 +47,6 @@ declare const fullApi: ApiFromModules<{
   challenges: typeof challenges;
   constants: typeof constants;
   crons: typeof crons;
-  diagnostics: typeof diagnostics;
   emailAuth: typeof emailAuth;
   exercises: typeof exercises;
   favorites: typeof favorites;
