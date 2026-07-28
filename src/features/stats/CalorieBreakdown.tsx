@@ -69,7 +69,19 @@ export function CalorieBreakdown({
               <Typography variant="body2" color="text.secondary">
                 {goal.hint}
               </Typography>
-              <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, textAlign: 'center' }}>
+              {/* auto-fit rather than a hard 4 columns: at 4 across on a
+                  narrow phone each cell is ~42px of content, which clips
+                  "Protein". This keeps one row where it fits and drops to
+                  2×2 where it doesn't. */}
+              <Box
+                sx={{
+                  mt: 1.5,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))',
+                  gap: 1,
+                  textAlign: 'center',
+                }}
+              >
                 <Macro label="Protein" value={macros.proteinG} />
                 <Macro label="Carbs" value={macros.carbsG} />
                 <Macro label="Fat" value={macros.fatG} />

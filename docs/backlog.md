@@ -5,6 +5,12 @@ production). Ordered by priority. Companion to `docs/new-features-progress.md`,
 which has the wave-by-wave *why* behind the six features that just shipped —
 this file is the *what's left*.
 
+> **2026-07-28, mobile pass.** A responsiveness sweep landed after the above;
+> see `docs/mobile-responsiveness.md` for what changed and what it means for
+> new code (short version: never hardcode the header or tab-bar height, use
+> `var(--app-header-h)` / `var(--app-nav-h)`; give any flexible text column
+> `minWidth: 0`). Not yet verified on a physical phone.
+
 **Start here next session.** Each item says what's wrong, where, and what the
 fix involves. Nothing below is blocking the live app except P1.
 

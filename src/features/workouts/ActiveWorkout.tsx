@@ -213,6 +213,17 @@ function ElapsedTimer({ since }: { since: number }) {
 // ---------- one exercise with its set rows ----------
 
 const SET_ROW_COLUMNS = '2.5rem 1fr 1fr 2.75rem 2rem'
+// 4px, not 8px. Everything except the two weight/reps columns is a fixed
+// width, so every pixel of gap comes straight out of the number fields —
+// which are the narrowest thing on the app's narrowest screen.
+const SET_ROW_GAP = 0.5
+
+// MUI's default 14px of horizontal input padding is sized for a full-width
+// text field, not a ~70px numeric cell where it ate more room than the digits
+// did. At 6px, "102.5" fits on a 360px-wide phone.
+const NUMBER_FIELD_SX = {
+  '& .MuiInputBase-input': { px: 0.75, fontVariantNumeric: 'tabular-nums' },
+} as const
 
 function ExerciseCard({
   entry,
@@ -264,9 +275,22 @@ function ExerciseCard({
           </IconButton>
         </Box>
 
+        {/* minWidth: 0 is load-bearing — a flex item defaults to
+            min-width: auto, so without it a long custom exercise name
+            refuses to shrink and pushes the whole row past the screen edge.
+            whiteSpace: normal lets it wrap to a second line instead, which
+            beats truncating the one word that identifies the exercise. */}
         <ButtonBase
           onClick={() => setDetailOpen(true)}
-          sx={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left', fontWeight: 600, color: 'primary.main' }}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            whiteSpace: 'normal',
+            fontWeight: 600,
+            color: 'primary.main',
+          }}
         >
           {entry.exercise.name}
         </ButtonBase>
@@ -287,7 +311,7 @@ function ExerciseCard({
           display: 'grid',
           gridTemplateColumns: SET_ROW_COLUMNS,
           alignItems: 'center',
-          gap: 1,
+          gap: SET_ROW_GAP,
         }}
       >
         {['Set', 'kg', 'Reps', '✓', ''].map((label, i) => (
@@ -387,7 +411,7 @@ function SetRow({
         display: 'grid',
         gridTemplateColumns: SET_ROW_COLUMNS,
         alignItems: 'center',
-        gap: 1,
+        gap: SET_ROW_GAP,
         borderRadius: '8px',
         py: 0.25,
         bgcolor: set.completed ? 'rgb(122 154 82 / 0.1)' : 'transparent',
@@ -402,7 +426,9 @@ function SetRow({
         sx={{
           justifySelf: 'center',
           borderRadius: '6px',
-          px: 1,
+          // 0.25 rather than 1 — with the trophy appended, "12 🏆" overflowed
+          // this 2.5rem column and spilled over the weight field beside it.
+          px: 0.25,
           py: 0.5,
           fontSize: '0.875rem',
           fontWeight: 600,
@@ -432,7 +458,7 @@ function SetRow({
             onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
           },
         }}
-        sx={{ '& .MuiInputBase-input': { fontVariantNumeric: 'tabular-nums' } }}
+        sx={NUMBER_FIELD_SX}
       />
       <TextField
         value={reps}
@@ -447,7 +473,7 @@ function SetRow({
             onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
           },
         }}
-        sx={{ '& .MuiInputBase-input': { fontVariantNumeric: 'tabular-nums' } }}
+        sx={NUMBER_FIELD_SX}
       />
 
       {/* Done toggle — also commits current weight/reps */}

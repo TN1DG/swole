@@ -206,7 +206,7 @@ export function ProfilePage() {
         </Typography>
       </GlassCard>
 
-      <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5 }}>
+      <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 1.5 }}>
         <StatTile centered icon={<BarbellIcon />} label="Workouts" value={String(profile!.workoutCount)} />
         <StatTile centered label="PRs" value={`🏆 ${profile!.prCount}`} />
         <StatTile centered icon={<HeartOutlineIcon />} label="Favorites" value={String(profile!.favoriteCount)} />

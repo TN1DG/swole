@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
-import { Badge, Box, Button, TextField, Typography } from '@mui/material'
+import { Badge, Box, Button, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
@@ -12,6 +12,7 @@ import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { Avatar } from '../../components/Avatar'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -165,18 +166,22 @@ function LeaderboardTab() {
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {leaderboard.map((entry, i) => (
             <Link key={entry.userId} to={`/friends/${entry.userId}`} style={{ textDecoration: 'none', display: 'block' }}>
+              {/* Five things compete for one phone-width row here (rank,
+                  streak ring, avatar, name, score), so the gutters are 8px
+                  and the rank column is only as wide as two digits — all of
+                  it buys width for the name, the only flexible column. */}
               <GlassTile
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.5,
-                  px: 2,
+                  gap: 1,
+                  px: 1.5,
                   py: 1.5,
                   color: 'text.primary',
                   ...(entry.isMe && { borderColor: 'rgb(193 84 31 / 0.4)' }),
                 }}
               >
-                <Typography sx={{ width: 20, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">
+                <Typography sx={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">
                   {i + 1}
                 </Typography>
                 <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
@@ -204,6 +209,68 @@ function LeaderboardTab() {
         </Box>
       )}
     </>
+  )
+}
+
+// One row in My Friends. Chat and Remove used to be full-width text buttons,
+// which together with the avatar left roughly 80px for the name on a 360px
+// phone — most display names were truncated to a few characters. As icon
+// buttons they cost about a third of that.
+//
+// Remove is destructive and previously fired with no confirmation at all;
+// shrinking its hit area without adding one would have turned a mis-tap into
+// a silently deleted friendship.
+function FriendRow({
+  friend,
+  hasUnread,
+  onRemove,
+}: {
+  friend: Friends[number]
+  hasUnread: boolean
+  onRemove: () => void
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  return (
+    <GlassTile sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
+      <Avatar src={friend.avatarUrl} name={friend.displayName} size={36} />
+      <Typography
+        component={Link}
+        to={`/friends/${friend.userId}`}
+        noWrap
+        sx={{ minWidth: 0, flex: 1, fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
+      >
+        {friend.displayName}
+      </Typography>
+      <Badge color="error" variant="dot" invisible={!hasUnread} sx={{ flexShrink: 0 }}>
+        <IconButton
+          component={Link}
+          to={`/friends/${friend.userId}/chat`}
+          aria-label={`Chat with ${friend.displayName}`}
+          sx={{ border: '1px solid', borderColor: 'divider', fontSize: '1.125rem' }}
+        >
+          💬
+        </IconButton>
+      </Badge>
+      <IconButton
+        aria-label={`Remove ${friend.displayName}`}
+        size="small"
+        sx={{ flexShrink: 0, color: 'text.secondary' }}
+        onClick={() => setConfirmOpen(true)}
+      >
+        ✕
+      </IconButton>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={`Remove ${friend.displayName}?`}
+        description="You'll disappear from each other's friends list and leaderboard. You can send a new request any time."
+        confirmLabel="Remove"
+        destructive
+        onConfirm={onRemove}
+      />
+    </GlassTile>
   )
 }
 
@@ -298,42 +365,12 @@ function FriendsTab({
       ) : (
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {friends.map((f) => (
-            <GlassTile key={f.userId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
-              <Avatar src={f.avatarUrl} name={f.displayName} size={36} />
-              <Typography
-                component={Link}
-                to={`/friends/${f.userId}`}
-                noWrap
-                sx={{ minWidth: 0, flex: 1, fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
-              >
-                {f.displayName}
-              </Typography>
-              <Badge
-                color="error"
-                variant="dot"
-                invisible={!unread.has(f.userId)}
-                sx={{ flexShrink: 0 }}
-              >
-                <Button
-                  component={Link}
-                  to={`/friends/${f.userId}/chat`}
-                  variant="outlined"
-                  color="inherit"
-                  size="small"
-                >
-                  Chat 💬
-                </Button>
-              </Badge>
-              <Button
-                variant="text"
-                color="inherit"
-                size="small"
-                sx={{ flexShrink: 0, color: 'text.secondary' }}
-                onClick={() => runAction(() => removeFriend({ friendId: f.userId }))}
-              >
-                Remove
-              </Button>
-            </GlassTile>
+            <FriendRow
+              key={f.userId}
+              friend={f}
+              hasUnread={unread.has(f.userId)}
+              onRemove={() => runAction(() => removeFriend({ friendId: f.userId }))}
+            />
           ))}
         </Box>
       )}

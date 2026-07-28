@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { Box, useTheme } from '@mui/material'
@@ -17,10 +18,42 @@ const tabs = [
   { to: '/exercises', label: 'Exercises', icon: BookIcon },
 ]
 
+// Publishes the *measured* height of the sticky header and the fixed tab bar
+// as CSS custom properties on <html>, so anything that has to sit below one
+// or above the other can just say `top: var(--app-header-h)`.
+//
+// Measured rather than hardcoded because both heights are genuinely variable
+// per device: the header grows by the status-bar safe-area inset (which is 0
+// on Android, 47px+ on a notched iPhone) and both grow with the user's OS
+// font-size setting. A magic number would be wrong on most real phones.
+function useChromeHeights() {
+  const headerRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const root = document.documentElement
+    const targets: [HTMLElement | null, string][] = [
+      [headerRef.current, '--app-header-h'],
+      [navRef.current, '--app-nav-h'],
+    ]
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const varName = targets.find(([el]) => el === entry.target)?.[1]
+        if (varName) root.style.setProperty(varName, `${entry.target.getBoundingClientRect().height}px`)
+      }
+    })
+    for (const [el] of targets) if (el) observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return { headerRef, navRef }
+}
+
 export function AppLayout() {
   const theme = useTheme()
   const activeColor = theme.palette.primary.main
   const mutedColor = theme.palette.text.secondary
+  const { headerRef, navRef } = useChromeHeights()
   // Already subscribed to on most screens, so this is a cache hit rather
   // than an extra round trip.
   const profile = useQuery(api.profiles.getMine)
@@ -34,6 +67,7 @@ export function AppLayout() {
           safe-area-variable height. */}
       <Box
         component="header"
+        ref={headerRef}
         sx={{
           position: 'sticky',
           top: 0,
@@ -45,8 +79,12 @@ export function AppLayout() {
           bgcolor: tokens.surfaceGlass,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          px: 2,
+          pl: 'var(--app-gutter-left)',
+          pr: 'var(--app-gutter-right)',
           pt: 'max(1rem, env(safe-area-inset-top))',
+          // Was top-padding only, which left the logo and avatar sitting
+          // flush against the bottom border.
+          pb: 1,
         }}
       >
         <Box
@@ -89,8 +127,19 @@ export function AppLayout() {
         )}
       </Box>
 
-      {/* Page content. Bottom padding leaves room for the fixed tab bar. */}
-      <Box component="main" sx={{ flex: 1, px: 2, pt: 2, pb: 12 }}>
+      {/* Page content. Bottom padding clears the fixed tab bar — derived from
+          the tab bar's measured height rather than a fixed 6rem, which was
+          both a guess and noticeably more dead space than needed. */}
+      <Box
+        component="main"
+        sx={{
+          flex: 1,
+          pl: 'var(--app-gutter-left)',
+          pr: 'var(--app-gutter-right)',
+          pt: 2,
+          pb: 'calc(var(--app-nav-h) + 1rem)',
+        }}
+      >
         <PingAckBanner />
         <NotificationsBanner />
         <Outlet />
@@ -101,6 +150,7 @@ export function AppLayout() {
           confirm dialogs still cover it. */}
       <Box
         component="nav"
+        ref={navRef}
         sx={{
           position: 'fixed',
           insetInline: 0,
@@ -110,6 +160,8 @@ export function AppLayout() {
           bgcolor: tokens.surfaceGlass,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
+          pl: 'env(safe-area-inset-left)',
+          pr: 'env(safe-area-inset-right)',
         }}
       >
         <Box sx={{ mx: 'auto', display: 'flex', maxWidth: '32rem' }}>

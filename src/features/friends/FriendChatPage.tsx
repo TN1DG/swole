@@ -83,20 +83,26 @@ export function FriendChatPage() {
 
   return (
     <Box>
+      {/* Sticks *below* the app header, not at the viewport top — at top: 0
+          it slid underneath the (higher z-index) app bar and vanished the
+          moment you scrolled. --app-header-h is the app bar's measured
+          height; see useChromeHeights in AppLayout. */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
           gap: 1.5,
-          mx: -2,
+          ml: 'calc(-1 * var(--app-gutter-left))',
+          mr: 'calc(-1 * var(--app-gutter-right))',
           mt: -2,
-          px: 2,
+          pl: 'var(--app-gutter-left)',
+          pr: 'var(--app-gutter-right)',
           py: 1.5,
           borderBottom: '1px solid',
           borderColor: 'divider',
           position: 'sticky',
-          top: 0,
-          zIndex: 10,
+          top: 'var(--app-header-h)',
+          zIndex: (t) => t.zIndex.appBar - 1,
           bgcolor: 'rgb(30 28 25 / 0.9)',
           backdropFilter: 'blur(4px)',
         }}
@@ -114,7 +120,10 @@ export function FriendChatPage() {
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 2, minHeight: '50vh' }}>
+      {/* svh, not vh: on mobile Safari `vh` is the *largest* viewport height
+          (toolbars hidden), so 50vh reserved more empty space than the thread
+          could ever occupy on a short thread. */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 2, minHeight: '50svh' }}>
         {thread === undefined ? (
           <Typography sx={{ textAlign: 'center' }} color="text.secondary">
             Loading…
@@ -155,36 +164,29 @@ export function FriendChatPage() {
         </Typography>
       )}
 
-      {/* Composer: message row, then Ping and Challenge side by side. */}
+      {/* Composer: Ping and Challenge side by side, then the message row —
+          the message box sits closest to the thumb, where the thing you do
+          most often belongs.
+
+          Pinned above the tab bar rather than at bottom: 0, where the fixed
+          nav covered it whenever the thread was scrolled mid-way. Full-bleed
+          (negative gutter margins) so the blur covers the whole strip instead
+          of leaving message text visible in the side gutters. */}
       <Box
         sx={{
           position: 'sticky',
-          bottom: 0,
+          bottom: 'var(--app-nav-h)',
+          ml: 'calc(-1 * var(--app-gutter-left))',
+          mr: 'calc(-1 * var(--app-gutter-right))',
+          pl: 'var(--app-gutter-left)',
+          pr: 'var(--app-gutter-right)',
           pb: 1,
           pt: 1,
           bgcolor: 'rgb(30 28 25 / 0.9)',
           backdropFilter: 'blur(4px)',
         }}
       >
-        <Box component="form" onSubmit={handleSendMessage} sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Message…"
-            size="small"
-            fullWidth
-            slotProps={{ htmlInput: { maxLength: 1000, 'aria-label': 'Message' } }}
-          />
-          <IconButton
-            type="submit"
-            aria-label="Send message"
-            disabled={sending || !draft.trim()}
-            sx={{ flexShrink: 0, color: 'primary.main' }}
-          >
-            ➤
-          </IconButton>
-        </Box>
-        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
             fullWidth
@@ -202,6 +204,24 @@ export function FriendChatPage() {
           >
             Challenge ⚔️
           </Button>
+        </Box>
+        <Box component="form" onSubmit={handleSendMessage} sx={{ mt: 1, display: 'flex', gap: 1 }}>
+          <TextField
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Message…"
+            size="small"
+            fullWidth
+            slotProps={{ htmlInput: { maxLength: 1000, 'aria-label': 'Message' } }}
+          />
+          <IconButton
+            type="submit"
+            aria-label="Send message"
+            disabled={sending || !draft.trim()}
+            sx={{ flexShrink: 0, color: 'primary.main' }}
+          >
+            ➤
+          </IconButton>
         </Box>
       </Box>
 

@@ -98,24 +98,41 @@ export function RoutineEditor({ initial, onClose }: Props) {
 
       <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {exercises.map((entry, i) => (
-          <GlassTile key={`${entry.exerciseId}-${i}`} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
-            {/* reorder */}
-            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-              <IconButton size="small" onClick={() => move(i, -1)} aria-label="Move up" sx={{ color: 'text.secondary', py: 0.25 }}>
-                ▲
-              </IconButton>
-              <IconButton size="small" onClick={() => move(i, 1)} aria-label="Move down" sx={{ color: 'text.secondary', py: 0.25 }}>
-                ▼
+          // Two rows, not one. The reorder arrows, name, sets stepper and
+          // remove button together need ~210px of fixed width, which left
+          // ~85px for the name on a 360px phone — and since the name had no
+          // minWidth: 0 it wouldn't shrink into that, it just pushed the row
+          // off-screen. Name on top, controls beneath, both readable.
+          <GlassTile key={`${entry.exerciseId}-${i}`} sx={{ px: 1.5, py: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* reorder */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                <IconButton size="small" onClick={() => move(i, -1)} aria-label="Move up" sx={{ color: 'text.secondary', py: 0.25 }}>
+                  ▲
+                </IconButton>
+                <IconButton size="small" onClick={() => move(i, 1)} aria-label="Move down" sx={{ color: 'text.secondary', py: 0.25 }}>
+                  ▼
+                </IconButton>
+              </Box>
+
+              <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 500 }}>{entry.name}</Typography>
+
+              <IconButton
+                size="small"
+                aria-label="Remove"
+                sx={{ flexShrink: 0, color: 'text.secondary' }}
+                onClick={() => setExercises((list) => list.filter((_, j) => j !== i))}
+              >
+                ✕
               </IconButton>
             </Box>
 
-            <Typography sx={{ flex: 1, fontWeight: 500 }}>{entry.name}</Typography>
-
             {/* target sets stepper */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
               <IconButton
                 size="small"
                 onClick={() => setTargetSets(i, -1)}
+                aria-label="One fewer set"
                 sx={{ height: 32, width: 32, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.secondary' }}
               >
                 −
@@ -126,20 +143,12 @@ export function RoutineEditor({ initial, onClose }: Props) {
               <IconButton
                 size="small"
                 onClick={() => setTargetSets(i, 1)}
+                aria-label="One more set"
                 sx={{ height: 32, width: 32, borderRadius: '8px', border: '1px solid', borderColor: 'divider', color: 'text.secondary' }}
               >
                 +
               </IconButton>
             </Box>
-
-            <IconButton
-              size="small"
-              aria-label="Remove"
-              sx={{ color: 'text.secondary' }}
-              onClick={() => setExercises((list) => list.filter((_, j) => j !== i))}
-            >
-              ✕
-            </IconButton>
           </GlassTile>
         ))}
       </Box>
