@@ -5,6 +5,9 @@ import type { Id } from './_generated/dataModel'
 import { getWorkoutExercises, summarizeWorkout } from './history'
 import { consistencyStreakWeeks, consistencyTier, leaderboardScore, weeksAgo } from './fitness'
 import { cleanUsername, LIMITS } from './validation'
+import { rateLimiter } from './rateLimiter'
+import { markHandled, notify } from './notifications'
+import { areFriends } from './friendships'
 
 async function requireUserId(ctx: QueryCtx) {
   const userId = await getAuthUserId(ctx)
@@ -12,7 +15,11 @@ async function requireUserId(ctx: QueryCtx) {
   return userId
 }
 
-async function profileFor(ctx: QueryCtx, userId: Id<'users'>) {
+// The user document plus their profile row. Both public identity helpers
+// below build on this so the pair is only ever read once per user — the
+// leaderboard and friends list call them once per friend, so a duplicated
+// read here is a duplicated read across the whole list.
+async function identityOf(ctx: QueryCtx, userId: Id<'users'>) {
   const [user, profile] = await Promise.all([
     ctx.db.get(userId),
     ctx.db
@@ -21,19 +28,34 @@ async function profileFor(ctx: QueryCtx, userId: Id<'users'>) {
       .unique(),
   ])
   return {
-    userId,
-    username: profile?.username ?? null,
-    displayName: profile?.displayName ?? user?.email ?? '?',
+    profile,
+    info: {
+      userId,
+      username: profile?.username ?? null,
+      displayName: profile?.displayName ?? user?.email ?? '?',
+    },
   }
 }
 
-async function areFriends(ctx: QueryCtx, userId: Id<'users'>, otherId: Id<'users'>) {
-  const row = await ctx.db
-    .query('friendships')
-    .withIndex('by_user_friend', (q) => q.eq('userId', userId).eq('friendId', otherId))
-    .unique()
-  return row !== null
+async function profileFor(ctx: QueryCtx, userId: Id<'users'>) {
+  return (await identityOf(ctx, userId)).info
 }
+
+// profileFor + the avatar image URL. Deliberately a separate helper rather
+// than folding avatarUrl into profileFor itself: profileFor also backs
+// resolveUsername, and adding it there would hand a stranger's photo to
+// anyone who guesses their username. Only paths that have already
+// established a friendship (or public opt-in) use this one.
+async function profileForWithAvatar(ctx: QueryCtx, userId: Id<'users'>) {
+  const { profile, info } = await identityOf(ctx, userId)
+  return {
+    ...info,
+    avatarUrl: profile?.avatarStorageId
+      ? await ctx.storage.getUrl(profile.avatarStorageId)
+      : null,
+  }
+}
+
 
 // Streak/tier for one specific owner — leaderboard computes this inline for
 // a whole friends-batch (and needs the same workouts for volume too, so it
@@ -122,7 +144,7 @@ export const myFriends = query({
       .query('friendships')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .collect()
-    return Promise.all(friendships.map((f) => profileFor(ctx, f.friendId)))
+    return Promise.all(friendships.map((f) => profileForWithAvatar(ctx, f.friendId)))
   },
 })
 
@@ -144,7 +166,7 @@ export const leaderboard = query({
     const entries = await Promise.all(
       memberIds.map(async (id) => {
         const [info, workouts] = await Promise.all([
-          profileFor(ctx, id),
+          profileForWithAvatar(ctx, id),
           ctx.db
             .query('workouts')
             .withIndex('by_owner', (q) => q.eq('ownerId', id))
@@ -194,7 +216,7 @@ export const friendWorkouts = query({
       if (!isFriend && !targetProfile?.workoutsPublic) return null
     }
 
-    const info = await profileFor(ctx, args.userId)
+    const info = await profileForWithAvatar(ctx, args.userId)
     const workouts = await ctx.db
       .query('workouts')
       .withIndex('by_owner', (q) => q.eq('ownerId', args.userId))
@@ -244,7 +266,7 @@ export const getFriendWorkoutDetail = query({
       .map((r) => r.exerciseId)
 
     const [owner, consistency] = await Promise.all([
-      profileFor(ctx, ownerId),
+      profileForWithAvatar(ctx, ownerId),
       ownerConsistency(ctx, ownerId, Date.now()),
     ])
 
@@ -258,6 +280,7 @@ export const sendFriendRequest = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx)
+    await rateLimiter.limit(ctx, 'sendFriendRequest', { key: userId, throws: true })
     const username = cleanUsername(args.username)
 
     const targetProfile = await ctx.db
@@ -295,6 +318,11 @@ export const sendFriendRequest = mutation({
     }
 
     await ctx.db.insert('friendRequests', { fromUserId: userId, toUserId })
+    await notify(ctx, {
+      userId: toUserId,
+      kind: 'friend_request_received',
+      fromUserId: userId,
+    })
   },
 })
 
@@ -308,6 +336,9 @@ export const declineFriendRequest = mutation({
       throw new Error('Request not found')
     }
     await ctx.db.delete(args.requestId)
+    // The recipient's "X sent you a friend request" notice is stale either
+    // way now — whether they declined it or the sender withdrew it.
+    await markHandled(ctx, request.toUserId, 'friend_request_received', request.fromUserId)
   },
 })
 
@@ -329,6 +360,16 @@ export const acceptFriendRequest = mutation({
     await ctx.db.delete(args.requestId)
     await ctx.db.insert('friendships', { userId, friendId: request.fromUserId })
     await ctx.db.insert('friendships', { userId: request.fromUserId, friendId: userId })
+
+    // Tell the sender they're in…
+    await notify(ctx, {
+      userId: request.fromUserId,
+      kind: 'friend_request_accepted',
+      fromUserId: userId,
+    })
+    // …and retire my own "X sent you a friend request" notice, which is now
+    // stale whether I accepted from the banner or from the Friends page.
+    await markHandled(ctx, userId, 'friend_request_received', request.fromUserId)
   },
 })
 

@@ -53,6 +53,7 @@ export const LIMITS = {
   friendsPerUser: 200,
   friendRequestsPerUser: 50, // pending outgoing requests
   featureRequestTextMaxLength: 1000,
+  messageMaxLength: 1000,
   featureRequestsPerUser: 20,
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
   challengeMinWeeks: 1,

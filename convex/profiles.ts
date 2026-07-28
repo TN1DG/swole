@@ -4,6 +4,7 @@ import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { assertRange, cleanName, cleanUsername, LIMITS } from './validation'
 import { consistencyStreakWeeks, consistencyTier } from './fitness'
+import { rateLimiter } from './rateLimiter'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
 // tab, generous headroom for future tabs without growing unbounded.
@@ -89,6 +90,9 @@ export const getMine = query({
 
     return {
       email: user?.email ?? null,
+      avatarUrl: profile?.avatarStorageId
+        ? await ctx.storage.getUrl(profile.avatarStorageId)
+        : null,
       displayName: profile?.displayName ?? null,
       unitPreference: profile?.unitPreference ?? 'kg',
       memberSince: user?._creationTime ?? Date.now(),
@@ -209,6 +213,95 @@ export const setWorkoutsPublic = mutation({
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { workoutsPublic: args.workoutsPublic })
+  },
+})
+
+// Largest avatar blob we'll keep. The client crops to a small square JPEG
+// (see src/lib/cropImage.ts), so anything near this ceiling means the upload
+// didn't come from our own UI.
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+// Step 1 of the avatar flow: mint a one-shot upload URL. Rate-limited because
+// each call is permission to write a blob, and a client that never follows up
+// with setAvatar leaves an orphaned file behind.
+export const generateAvatarUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+    await rateLimiter.limit(ctx, 'avatarUploadUrl', { key: userId, throws: true })
+    return await ctx.storage.generateUploadUrl()
+  },
+})
+
+// Step 2: adopt an uploaded blob as this user's avatar. The upload URL itself
+// can't enforce type or size, so both are checked here.
+//
+// Returns `{ ok: false, error }` on a bad upload rather than throwing, and
+// this is load-bearing: a Convex mutation is all-or-nothing, so throwing
+// AFTER `ctx.storage.delete(...)` would roll the delete back too and leave
+// the rejected blob orphaned in storage forever. Returning lets the cleanup
+// commit. (The client turns a false result back into a thrown error — see
+// AvatarUploadDialog.)
+export const setAvatar = mutation({
+  args: { storageId: v.id('_storage') },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const metadata = await ctx.db.system.get('_storage', args.storageId)
+    if (!metadata) return { ok: false, error: 'Upload not found — try again' }
+
+    // `contentType` comes from the client's own upload header, so it is NOT a
+    // security boundary — anyone malicious just claims "image/png". It's
+    // checked to catch honest mistakes (picking a PDF), which is why a
+    // *missing* type is tolerated rather than rejected: refusing it would buy
+    // nothing an attacker can't sidestep, while breaking any uploader that
+    // omits the header. `size` is measured server-side, so that one is real.
+    const wrongType =
+      metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
+    if (wrongType || metadata.size > MAX_AVATAR_BYTES) {
+      await ctx.storage.delete(args.storageId)
+      return { ok: false, error: 'That file needs to be an image under 5MB' }
+    }
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    // Replacing an avatar should not leave the old blob behind paying rent.
+    if (profile.avatarStorageId) {
+      await ctx.storage.delete(profile.avatarStorageId)
+    }
+    await ctx.db.patch(profile._id, { avatarStorageId: args.storageId })
+    return { ok: true }
+  },
+})
+
+export const removeAvatar = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    if (!profile.avatarStorageId) return
+    await ctx.storage.delete(profile.avatarStorageId)
+    await ctx.db.patch(profile._id, { avatarStorageId: undefined })
+  },
+})
+
+// Display-only preference — height/weight are always stored canonically as
+// cm/kg (see updateBodyStats below); this just controls whether the Stats
+// page shows cm/kg or ft+in/lb.
+export const setUnitPreference = mutation({
+  args: { unitPreference: v.union(v.literal('kg'), v.literal('lb')) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) throw new Error('Not signed in')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { unitPreference: args.unitPreference })
   },
 })
 

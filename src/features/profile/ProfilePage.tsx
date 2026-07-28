@@ -19,6 +19,9 @@ import { ConsistencyRing } from '../../components/ConsistencyRing'
 import { GlassCard } from '../../components/GlassCard'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Avatar } from '../../components/Avatar'
+import { AvatarUploadDialog } from './AvatarUploadDialog'
+import { useAvatarPicker } from './useAvatarPicker'
 import { TIER_LABELS } from '../../lib/tierLabels'
 
 export function ProfilePage() {
@@ -40,6 +43,9 @@ export function ProfilePage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const removeAvatar = useMutation(api.profiles.removeAvatar)
+  const { imageSrc, onFileChange, clear: clearPickedImage } = useAvatarPicker()
 
   if (profile === undefined) {
     return (
@@ -120,10 +126,24 @@ export function ProfilePage() {
         ) : (
           <Stack
             direction="row"
-            spacing={1}
+            spacing={1.5}
             sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
           >
-            <Box sx={{ minWidth: 0 }}>
+            <Box
+              component="label"
+              sx={{ cursor: 'pointer', flexShrink: 0, position: 'relative' }}
+              title="Change photo"
+            >
+              <Avatar src={profile?.avatarUrl} name={profile?.displayName ?? profile?.email} size={64} />
+              <Box
+                component="input"
+                type="file"
+                accept="image/*"
+                onChange={onFileChange}
+                sx={{ display: 'none' }}
+              />
+            </Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography noWrap variant="h6" sx={{ fontWeight: 'bold' }}>
                 {profile?.displayName ?? profile?.email}
               </Typography>
@@ -141,18 +161,30 @@ export function ProfilePage() {
                 Member since {formatShortDate(profile!.memberSince)}
               </Typography>
             </Box>
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
-              sx={{ flexShrink: 0 }}
-              onClick={() => {
-                setName(profile?.displayName ?? '')
-                setEditing(true)
-              }}
-            >
-              Edit
-            </Button>
+            <Stack spacing={0.5} sx={{ flexShrink: 0, alignItems: 'stretch' }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                onClick={() => {
+                  setName(profile?.displayName ?? '')
+                  setEditing(true)
+                }}
+              >
+                Edit
+              </Button>
+              {profile?.avatarUrl && (
+                <Button
+                  size="small"
+                  variant="text"
+                  color="inherit"
+                  sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+                  onClick={() => void removeAvatar({})}
+                >
+                  Remove photo
+                </Button>
+              )}
+            </Stack>
           </Stack>
         )}
       </GlassCard>
@@ -305,6 +337,8 @@ export function ProfilePage() {
           {deleting ? 'Deleting…' : 'Delete Account'}
         </Button>
       </GlassCard>
+
+      {imageSrc && <AvatarUploadDialog imageSrc={imageSrc} onClose={clearPickedImage} />}
 
       <ConfirmDialog
         open={confirmOpen}

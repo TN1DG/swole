@@ -74,6 +74,24 @@ describe('submit', () => {
       t.mutation(api.featureRequests.submit, { text: 'hello' }),
     ).rejects.toThrow(/not signed in/i)
   })
+
+  it('rate limits a burst of submissions from the same user', async () => {
+    mockFetchOk()
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    // The 'featureRequestSubmit' token bucket (convex/rateLimiter.ts) has a
+    // burst capacity of 3. A rejected submission rolls back its own
+    // mutation (Convex mutations are all-or-nothing), which undoes the
+    // token it consumed — so this has to be a run of *successful*
+    // submissions to actually observe the limit.
+    for (let i = 0; i < 3; i++) {
+      await user.mutation(api.featureRequests.submit, { text: `request ${i}` })
+    }
+    await expect(
+      user.mutation(api.featureRequests.submit, { text: 'one more' }),
+    ).rejects.toThrow(/rate/i)
+  })
 })
 
 describe('notifyOwner', () => {

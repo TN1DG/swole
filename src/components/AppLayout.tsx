@@ -1,6 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useQuery } from 'convex/react'
 import { Box, useTheme } from '@mui/material'
+import { api } from '../../convex/_generated/api'
 import { PingAckBanner } from './PingAckBanner'
+import { NotificationsBanner } from './NotificationsBanner'
+import { Avatar } from './Avatar'
 import { PeopleIcon } from './icons'
 import { tokens } from '../theme/tokens'
 
@@ -17,6 +21,9 @@ export function AppLayout() {
   const theme = useTheme()
   const activeColor = theme.palette.primary.main
   const mutedColor = theme.palette.text.secondary
+  // Already subscribed to on most screens, so this is a cache hit rather
+  // than an extra round trip.
+  const profile = useQuery(api.profiles.getMine)
 
   return (
     <Box sx={{ mx: 'auto', display: 'flex', minHeight: '100svh', maxWidth: '32rem', flexDirection: 'column' }}>
@@ -54,24 +61,38 @@ export function AppLayout() {
         >
           SWOLE
         </Box>
-        <NavLink
-          to="/profile"
-          aria-label="Profile"
-          style={({ isActive }) => ({
-            display: 'flex',
-            borderRadius: '9999px',
-            border: `1px solid ${tokens.border}`,
-            padding: 8,
-            color: isActive ? activeColor : mutedColor,
-          })}
-        >
-          <ProfileIcon />
-        </NavLink>
+        {/* Your own photo once you've set one; the generic silhouette until
+            then. Sized to match the icon's outer circle so the header height
+            doesn't shift when an avatar loads. */}
+        {profile?.avatarUrl ? (
+          <NavLink to="/profile" aria-label="Profile" style={{ display: 'flex' }}>
+            <Avatar
+              src={profile.avatarUrl}
+              name={profile.displayName ?? profile.email}
+              size={34}
+            />
+          </NavLink>
+        ) : (
+          <NavLink
+            to="/profile"
+            aria-label="Profile"
+            style={({ isActive }) => ({
+              display: 'flex',
+              borderRadius: '9999px',
+              border: `1px solid ${tokens.border}`,
+              padding: 8,
+              color: isActive ? activeColor : mutedColor,
+            })}
+          >
+            <ProfileIcon />
+          </NavLink>
+        )}
       </Box>
 
       {/* Page content. Bottom padding leaves room for the fixed tab bar. */}
       <Box component="main" sx={{ flex: 1, px: 2, pt: 2, pb: 12 }}>
         <PingAckBanner />
+        <NotificationsBanner />
         <Outlet />
       </Box>
 

@@ -18,13 +18,18 @@ import type * as exercises from "../exercises.js";
 import type * as favorites from "../favorites.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as fitness from "../fitness.js";
+import type * as friendThread from "../friendThread.js";
 import type * as friends from "../friends.js";
+import type * as friendships from "../friendships.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
+import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
+import type * as notifications from "../notifications.js";
 import type * as pings from "../pings.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
+import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seedData from "../seedData.js";
 import type * as validation from "../validation.js";
@@ -47,13 +52,18 @@ declare const fullApi: ApiFromModules<{
   favorites: typeof favorites;
   featureRequests: typeof featureRequests;
   fitness: typeof fitness;
+  friendThread: typeof friendThread;
   friends: typeof friends;
+  friendships: typeof friendships;
   history: typeof history;
   http: typeof http;
+  messages: typeof messages;
   migrations: typeof migrations;
+  notifications: typeof notifications;
   pings: typeof pings;
   profiles: typeof profiles;
   prs: typeof prs;
+  rateLimiter: typeof rateLimiter;
   routines: typeof routines;
   seedData: typeof seedData;
   validation: typeof validation;
@@ -86,4 +96,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

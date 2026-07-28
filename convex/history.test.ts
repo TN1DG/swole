@@ -179,3 +179,43 @@ describe('listForCalendar', () => {
     ).toEqual([])
   })
 })
+
+// The "conquered" red slash (see getDetail's eligibleRecords + fitness.ts's
+// behindRecord): a record may only be measured against the workout that set
+// it and workouts logged afterwards — never against earlier history.
+describe('getDetail eligibleRecords', () => {
+  it('exposes the record to the workout that set it', async () => {
+    const { user, exerciseId } = await oneUser()
+    const workoutId = await finishedWorkout(user, exerciseId, 100, 5)
+
+    const detail = await user.query(api.history.getDetail, { workoutId })
+    expect(detail!.eligibleRecords).toEqual([
+      { exerciseId, bestWeightKg: 100, bestEst1rm: epley1rm(100, 5) },
+    ])
+  })
+
+  it('exposes a later PR to workouts logged after it, but not before it', async () => {
+    const { t, user, exerciseId } = await oneUser()
+    const older = await finishedWorkout(user, exerciseId, 100, 5)
+    const prWorkout = await finishedWorkout(user, exerciseId, 140, 5)
+
+    // The PR's achievedAt is stamped at finish time. Push the older workout
+    // firmly into the past so it is unambiguously "before" that.
+    const [record] = await user.query(api.prs.listMine, {})
+    expect(record.workoutId).toBe(prWorkout)
+    await t.run(async (ctx) => {
+      await ctx.db.patch(older, { startedAt: record.achievedAt - 60_000 })
+    })
+
+    // Earlier workout: nothing to measure against — no slash rewriting history.
+    const olderDetail = await user.query(api.history.getDetail, { workoutId: older })
+    expect(olderDetail!.eligibleRecords).toEqual([])
+
+    // A workout logged after the PR is measured against it.
+    const newer = await finishedWorkout(user, exerciseId, 90, 5)
+    const newerDetail = await user.query(api.history.getDetail, { workoutId: newer })
+    expect(newerDetail!.eligibleRecords).toEqual([
+      { exerciseId, bestWeightKg: 140, bestEst1rm: epley1rm(140, 5) },
+    ])
+  })
+})

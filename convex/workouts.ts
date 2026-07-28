@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm, POINTS_PER_FINISHED_WORKOUT } from './fitness'
 import { assertRange, cleanName, LIMITS } from './validation'
 import { awardPoints } from './profiles'
+import { notify } from './notifications'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -382,7 +383,22 @@ export const finish = mutation({
       const target = recentPings.find(
         (p) => p.linkedWorkoutId === undefined && now - p.sentAt <= SIX_HOURS,
       )
-      if (target) await ctx.db.patch(target._id, { linkedWorkoutId: args.workoutId })
+      if (target) {
+        await ctx.db.patch(target._id, { linkedWorkoutId: args.workoutId })
+        // "X won the battle" goes to the friend who held me accountable —
+        // only if they actually acknowledged the ping, since the whole point
+        // is that they took up the challenge. (The linking above doesn't care
+        // about ack state, so this is a deliberately narrower condition.)
+        if (target.acknowledgedAt !== undefined) {
+          await notify(ctx, {
+            userId: target.toUserId,
+            kind: 'workout_finished_after_ping',
+            fromUserId: userId,
+            pingId: target._id,
+            workoutId: args.workoutId,
+          })
+        }
+      }
     } catch {
       // best-effort — never block workout completion
     }

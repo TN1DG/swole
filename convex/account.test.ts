@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { asUser, createBackend, createBuiltInExercise, createUser, type T } from './test.helpers'
-
-async function userWithUsername(t: T, name: string) {
-  const userId = await createUser(t, name)
-  const user = asUser(t, userId)
-  await user.mutation(api.profiles.setUsername, { username: name })
-  return { userId, user }
-}
+import {
+  createBackend,
+  createBuiltInExercise,
+  userWithUsername,
+  type T,
+} from './test.helpers'
 
 describe('deleteAccount', () => {
   it('removes every owned row across the app: workouts, routines, favorites, PRs, custom exercises, feature requests, profile', async () => {

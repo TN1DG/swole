@@ -21,6 +21,44 @@ export function beatsRecord(
   )
 }
 
+// The near-inverse of beatsRecord: a set the record has left behind, shown
+// with a red slash ("you've conquered this"). Deliberately NOT `!beatsRecord`
+// — that uses `>` on either axis, so a set merely *tying* the record (most
+// importantly, the very set that SET the record) would count as behind it.
+// Requiring strictly-worse on BOTH axes means a tie earns neither the trophy
+// nor the slash.
+export function behindRecord(
+  weightKg: number,
+  reps: number,
+  record: { bestWeightKg: number; bestEst1rm: number } | undefined | null,
+): boolean {
+  if (!record || weightKg <= 0 || reps <= 0) return false
+  return weightKg < record.bestWeightKg && epley1rm(weightKg, reps) < record.bestEst1rm
+}
+
+// ---------- Unit conversions (canonical storage is always cm/kg) ----------
+
+const KG_PER_LB = 0.45359237
+const CM_PER_INCH = 2.54
+
+export function kgToLb(kg: number): number {
+  return kg / KG_PER_LB
+}
+
+export function lbToKg(lb: number): number {
+  return lb * KG_PER_LB
+}
+
+// Whole feet + remaining inches (rounded), e.g. 178cm -> {ft: 5, inch: 10}.
+export function cmToFtIn(cm: number): { ft: number; inch: number } {
+  const totalInches = Math.round(cm / CM_PER_INCH)
+  return { ft: Math.floor(totalInches / 12), inch: totalInches % 12 }
+}
+
+export function ftInToCm(ft: number, inch: number): number {
+  return (ft * 12 + inch) * CM_PER_INCH
+}
+
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000)
   const h = Math.floor(totalSeconds / 3600)

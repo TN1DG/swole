@@ -4,26 +4,10 @@ import {
   asUser,
   createBackend,
   createBuiltInExercise,
-  createUser,
+  twoFriends,
+  userWithUsername,
   type T,
 } from './test.helpers'
-
-async function userWithUsername(t: T, name: string) {
-  const userId = await createUser(t, name)
-  const user = asUser(t, userId)
-  await user.mutation(api.profiles.setUsername, { username: name })
-  return { userId, user }
-}
-
-// Alice sends, Bob accepts. Returns everyone's handles.
-async function twoFriends(t: T) {
-  const alice = await userWithUsername(t, 'alice')
-  const bob = await userWithUsername(t, 'bob')
-  await alice.user.mutation(api.friends.sendFriendRequest, { username: 'bob' })
-  const [incoming] = await bob.user.query(api.friends.myIncomingRequests, {})
-  await bob.user.mutation(api.friends.acceptFriendRequest, { requestId: incoming.requestId })
-  return { alice, bob }
-}
 
 // Logs one completed workout for `user` on `exerciseId`, `daysAgo` in the past.
 async function logWorkout(
@@ -115,6 +99,25 @@ describe('sendFriendRequest', () => {
     await expect(
       alice.user.mutation(api.friends.sendFriendRequest, { username: 'bob' }),
     ).rejects.toThrow(/already friends/i)
+  })
+
+  it('rate limits a burst of requests from the same sender', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+
+    // The 'sendFriendRequest' token bucket (convex/rateLimiter.ts) has a
+    // burst capacity of 5. A rejected request rolls back its own mutation
+    // (Convex mutations are all-or-nothing), which undoes the token it
+    // consumed — so this has to be a run of *successful* sends, each to a
+    // distinct target, to actually observe the limit.
+    for (let i = 0; i < 5; i++) {
+      await userWithUsername(t, `target${i}`)
+      await alice.user.mutation(api.friends.sendFriendRequest, { username: `target${i}` })
+    }
+    await userWithUsername(t, 'target5')
+    await expect(
+      alice.user.mutation(api.friends.sendFriendRequest, { username: 'target5' }),
+    ).rejects.toThrow(/rate/i)
   })
 })
 

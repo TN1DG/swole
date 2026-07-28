@@ -1,5 +1,6 @@
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation } from './_generated/server'
+import { rateLimiter } from './rateLimiter'
 
 // Permanently deletes everything tied to the signed-in account: every
 // workout/set, routine, custom exercise, favorite, PR, friend connection,
@@ -102,11 +103,53 @@ export const deleteAccount = mutation({
       await ctx.db.delete(f._id)
     }
 
+    // Chat messages in both directions, and this user's read markers. The
+    // friend's own read marker pointing back at this user is left alone —
+    // it's a harmless timestamp keyed by a now-dead friendId, and finding
+    // them would need an index that exists for nothing else.
+    const sentMessages = await ctx.db
+      .query('messages')
+      .withIndex('by_from', (q) => q.eq('fromUserId', userId))
+      .collect()
+    for (const m of sentMessages) await ctx.db.delete(m._id)
+
+    const receivedMessages = await ctx.db
+      .query('messages')
+      .withIndex('by_to', (q) => q.eq('toUserId', userId))
+      .collect()
+    for (const m of receivedMessages) await ctx.db.delete(m._id)
+
+    const reads = await ctx.db
+      .query('threadReads')
+      .withIndex('by_user_friend', (q) => q.eq('userId', userId))
+      .collect()
+    for (const r of reads) await ctx.db.delete(r._id)
+
+    // Notifications in both directions: the ones addressed to this user, and
+    // the ones this user left sitting in other people's banners (which would
+    // otherwise render as "Someone" once the user document is gone).
+    const receivedNotifications = await ctx.db
+      .query('notifications')
+      .withIndex('by_user_readAt', (q) => q.eq('userId', userId))
+      .collect()
+    for (const n of receivedNotifications) await ctx.db.delete(n._id)
+
+    const sentNotifications = await ctx.db
+      .query('notifications')
+      .withIndex('by_fromUser', (q) => q.eq('fromUserId', userId))
+      .collect()
+    for (const n of sentNotifications) await ctx.db.delete(n._id)
+
     const profile = await ctx.db
       .query('profiles')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique()
-    if (profile) await ctx.db.delete(profile._id)
+    if (profile) {
+      // Deleting the profile row alone would orphan the avatar blob in file
+      // storage, where nothing would ever reference or reclaim it.
+      if (profile.avatarStorageId) await ctx.storage.delete(profile.avatarStorageId)
+      await ctx.db.delete(profile._id)
+    }
 
     // Auth records: sessions + their refresh tokens, accounts + their
     // verification codes, then any rate-limit counters keyed to this
@@ -146,17 +189,14 @@ export const deleteAccount = mutation({
       await ctx.db.delete(account._id)
     }
 
-    // Our own email-send throttle table (convex/emailAuth.ts), keyed by
-    // email — same reasoning as the auth rate limits above.
+    // Our own OTP-send throttle (convex/emailAuth.ts, backed by the shared
+    // rate-limiter component — see convex/rateLimiter.ts), keyed by email —
+    // same reasoning as the auth rate limits above.
     const user = await ctx.db.get(userId)
     if (user?.email) {
       const email = user.email.toLowerCase()
       for (const kind of ['verify', 'reset'] as const) {
-        const attempt = await ctx.db
-          .query('emailSendAttempts')
-          .withIndex('by_key', (q) => q.eq('key', `${kind}:${email}`))
-          .unique()
-        if (attempt) await ctx.db.delete(attempt._id)
+        await rateLimiter.reset(ctx, 'otpSend', { key: `${kind}:${email}` })
       }
     }
 

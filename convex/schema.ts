@@ -40,6 +40,9 @@ export default defineSchema({
     dailyVolumeGoalKg: v.optional(v.number()),
     // Earned by finishing workouts, spent/won via challenges (convex/challenges.ts).
     pointsBalance: v.optional(v.number()),
+    // Uploaded + cropped on the client (see src/features/profile/
+    // AvatarUploadDialog.tsx). Visible to the owner and their friends only.
+    avatarStorageId: v.optional(v.id('_storage')),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -142,14 +145,55 @@ export default defineSchema({
     text: v.string(),
   }).index('by_user', ['userId']),
 
-  // Throttles how often a verification/reset email can be sent to a given
-  // address — the auth library's own rate limiter guards wrong-code guesses,
-  // not "please resend my code" spam (see convex/emailAuth.ts).
-  emailSendAttempts: defineTable({
-    key: v.string(), // `${kind}:${email.toLowerCase()}`, kind = 'verify' | 'reset'
-    windowStart: v.number(),
-    count: v.number(),
-  }).index('by_key', ['key']),
+  // Free-text chat between friends. Same shape/index style as gymPings —
+  // both are one-directional events between a friend pair, and the chat
+  // thread reads them the same way (both directions, merged).
+  messages: defineTable({
+    fromUserId: v.id('users'),
+    toUserId: v.id('users'),
+    text: v.string(),
+    sentAt: v.number(),
+  })
+    .index('by_from_to', ['fromUserId', 'toUserId'])
+    .index('by_to', ['toUserId'])
+    .index('by_from', ['fromUserId']),
+
+  // How far through a friend's thread I've read. One row per (viewer,
+  // friend) — deliberately NOT per-message read receipts, which would cost a
+  // row per message to answer the one question the UI actually asks ("is
+  // there anything new from this friend?").
+  threadReads: defineTable({
+    userId: v.id('users'), // the reader
+    friendId: v.id('users'),
+    lastReadAt: v.number(),
+  }).index('by_user_friend', ['userId', 'friendId']),
+
+  // In-app notifications (no OS/push delivery — see docs/new-features-progress.md).
+  // One generalized table rather than a bespoke reactive query per feature,
+  // which is the pattern friends.ts/pings.ts grew organically and which
+  // doesn't scale to a cross-cutting concern like this.
+  notifications: defineTable({
+    userId: v.id('users'), // recipient
+    kind: v.union(
+      v.literal('friend_request_received'),
+      v.literal('friend_request_accepted'),
+      v.literal('ping_received'),
+      v.literal('workout_finished_after_ping'), // "X won the battle"
+    ),
+    fromUserId: v.id('users'), // who caused it
+    createdAt: v.number(),
+    readAt: v.optional(v.number()), // unset = unread
+    // Only set for the kinds that need them, so the banner can deep-link.
+    pingId: v.optional(v.id('gymPings')),
+    workoutId: v.optional(v.id('workouts')),
+  })
+    // Serves both "my unread" (eq userId + eq readAt undefined) and
+    // "all mine" (userId prefix only, for account deletion).
+    .index('by_user_readAt', ['userId', 'readAt'])
+    // Only used by account deletion, to clear the notices a departing user
+    // left in other people's banners (which would otherwise render as
+    // "Someone" once their user document is gone).
+    .index('by_fromUser', ['fromUserId']),
 
   // A friend-vs-friend consistency-streak wager, started from the ping
   // thread. Points are escrowed off both balances as soon as each side

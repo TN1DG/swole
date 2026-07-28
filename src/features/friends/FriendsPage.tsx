@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
-import { Box, Button, TextField, Typography } from '@mui/material'
+import { Badge, Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
@@ -11,6 +11,7 @@ import { ConsistencyRing } from '../../components/ConsistencyRing'
 import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
 import { SegmentedControl } from '../../components/SegmentedControl'
+import { Avatar } from '../../components/Avatar'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -179,6 +180,7 @@ function LeaderboardTab() {
                   {i + 1}
                 </Typography>
                 <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
+                <Avatar src={entry.avatarUrl} name={entry.displayName} size={32} />
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography noWrap sx={{ fontWeight: 500 }}>
                     {entry.displayName}
@@ -219,6 +221,10 @@ function FriendsTab({
   const acceptFriendRequest = useMutation(api.friends.acceptFriendRequest)
   const declineFriendRequest = useMutation(api.friends.declineFriendRequest)
   const removeFriend = useMutation(api.friends.removeFriend)
+  // Separate from myFriends so the chat page (which also loads myFriends)
+  // doesn't pay for unread computation it never shows.
+  const unreadIds = useQuery(api.friendThread.unreadFriendIds)
+  const unread = new Set(unreadIds ?? [])
 
   return (
     <>
@@ -293,6 +299,7 @@ function FriendsTab({
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {friends.map((f) => (
             <GlassTile key={f.userId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
+              <Avatar src={f.avatarUrl} name={f.displayName} size={36} />
               <Typography
                 component={Link}
                 to={`/friends/${f.userId}`}
@@ -301,16 +308,22 @@ function FriendsTab({
               >
                 {f.displayName}
               </Typography>
-              <Button
-                component={Link}
-                to={`/friends/${f.userId}/chat`}
-                variant="outlined"
-                color="inherit"
-                size="small"
+              <Badge
+                color="error"
+                variant="dot"
+                invisible={!unread.has(f.userId)}
                 sx={{ flexShrink: 0 }}
               >
-                Ping 💬
-              </Button>
+                <Button
+                  component={Link}
+                  to={`/friends/${f.userId}/chat`}
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                >
+                  Chat 💬
+                </Button>
+              </Badge>
               <Button
                 variant="text"
                 color="inherit"

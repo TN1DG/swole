@@ -70,6 +70,36 @@ describe('sign up', () => {
     expect(result.tokens).toBeTruthy()
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('throttles a flood of new-account creation app-wide', async () => {
+    const t = createBackend()
+
+    // The 'signUp' fixed-window limit (convex/rateLimiter.ts) allows 20
+    // new accounts per 10 minutes, app-wide — it fires via
+    // callbacks.afterUserCreatedOrUpdated (convex/auth.ts) only for brand
+    // new accounts, not ordinary logins.
+    for (let i = 0; i < 20; i++) {
+      const result = await t.action(api.auth.signIn, {
+        provider: 'password',
+        params: { flow: 'signUp', email: `flood${i}@test.local`, password: 'longenough123' },
+      })
+      expect(result.tokens).toBeTruthy()
+    }
+
+    await expect(
+      t.action(api.auth.signIn, {
+        provider: 'password',
+        params: { flow: 'signUp', email: 'flood20@test.local', password: 'longenough123' },
+      }),
+    ).rejects.toThrow(/rate/i)
+
+    // Ordinary sign-in to an already-created account is unaffected.
+    const signedIn = await t.action(api.auth.signIn, {
+      provider: 'password',
+      params: { flow: 'signIn', email: 'flood0@test.local', password: 'longenough123' },
+    })
+    expect(signedIn.tokens).toBeTruthy()
+  })
 })
 
 describe('password reset', () => {
@@ -146,7 +176,9 @@ describe('password reset', () => {
   })
 
   it('rejects a wrong reset code', async () => {
-    const fetchMock = mockFetchOk()
+    // The stub is still needed (the reset flow sends a mail), but this test
+    // asserts on the rejection, not on what was sent.
+    mockFetchOk()
     const t = createBackend()
 
     await t.action(api.auth.signIn, {

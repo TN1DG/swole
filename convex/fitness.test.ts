@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   beatsRecord,
+  behindRecord,
+  cmToFtIn,
   consistencyStreakWeeks,
   consistencyTier,
   epley1rm,
   forwardStreakWeeks,
   formatDuration,
+  ftInToCm,
   goalCalories,
+  kgToLb,
+  lbToKg,
   leaderboardScore,
   macroTargets,
   mifflinStJeorBmr,
@@ -60,12 +65,82 @@ describe('beatsRecord', () => {
   })
 })
 
+describe('behindRecord', () => {
+  const record = { bestWeightKg: 100, bestEst1rm: epley1rm(100, 5) }
+
+  it('a strictly worse set is behind the record', () => {
+    expect(behindRecord(80, 5, record)).toBe(true)
+  })
+
+  it('the set that SET the record is not behind it', () => {
+    // The exact record-setting set ties on both axes. This is the case a
+    // naive `!beatsRecord` would wrongly slash.
+    expect(behindRecord(100, 5, record)).toBe(false)
+    expect(beatsRecord(100, 5, record)).toBe(false)
+  })
+
+  it('is not behind when it wins on either axis', () => {
+    expect(behindRecord(105, 1, record)).toBe(false) // heavier, fewer reps
+    expect(behindRecord(95, 20, record)).toBe(false) // lighter, better 1RM
+  })
+
+  it('nothing is behind a record that does not exist yet', () => {
+    expect(behindRecord(80, 5, undefined)).toBe(false)
+    expect(behindRecord(80, 5, null)).toBe(false)
+  })
+
+  it('ignores empty sets', () => {
+    expect(behindRecord(0, 5, record)).toBe(false)
+    expect(behindRecord(80, 0, record)).toBe(false)
+  })
+
+  it('never both beats and trails the same record', () => {
+    for (const [w, r] of [[80, 5], [100, 5], [105, 1], [95, 20], [120, 10]]) {
+      expect(beatsRecord(w, r, record) && behindRecord(w, r, record)).toBe(false)
+    }
+  })
+})
+
 describe('formatDuration', () => {
   it('formats minutes and seconds', () => {
     expect(formatDuration(65_000)).toBe('1:05')
   })
   it('formats hours', () => {
     expect(formatDuration(3_665_000)).toBe('1:01:05')
+  })
+})
+
+// Display-only conversions — cm/kg stay the canonical stored units, so the
+// round trips below are what keep a saved profile from drifting every time
+// the Stats page toggle is flipped.
+describe('unit conversions', () => {
+  it('converts kg to lb and back', () => {
+    expect(kgToLb(100)).toBeCloseTo(220.462, 2)
+    expect(lbToKg(220.462)).toBeCloseTo(100, 2)
+    expect(lbToKg(kgToLb(83.5))).toBeCloseTo(83.5, 6)
+  })
+
+  it('converts cm to feet + inches', () => {
+    expect(cmToFtIn(180)).toEqual({ ft: 5, inch: 11 })
+    expect(cmToFtIn(177.8)).toEqual({ ft: 5, inch: 10 })
+    // Exactly 6 foot — the inches remainder must roll over to 0, not read 12.
+    expect(cmToFtIn(182.88)).toEqual({ ft: 6, inch: 0 })
+  })
+
+  it('converts feet + inches back to cm', () => {
+    expect(ftInToCm(5, 10)).toBeCloseTo(177.8, 6)
+    expect(ftInToCm(6, 0)).toBeCloseTo(182.88, 6)
+  })
+
+  it('survives a cm -> ft/in -> cm round trip within rounding', () => {
+    // cmToFtIn rounds to whole inches, so the worst case is half an inch
+    // (1.27cm / 2) of drift — e.g. 190cm -> 5'75" -> 190.5cm lands exactly
+    // on that bound.
+    const maxDriftCm = 2.54 / 2
+    for (const cm of [155, 168, 177.8, 190]) {
+      const { ft, inch } = cmToFtIn(cm)
+      expect(Math.abs(ftInToCm(ft, inch) - cm)).toBeLessThanOrEqual(maxDriftCm)
+    }
   })
 })
 

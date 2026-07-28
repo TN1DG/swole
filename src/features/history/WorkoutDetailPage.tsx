@@ -14,7 +14,7 @@ import {
 } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { behindRecord, formatDuration, formatKg } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { GlassTile } from '../../components/GlassTile'
@@ -59,6 +59,12 @@ export function WorkoutDetailPage() {
     .reduce((sum, s) => sum + s.weightKg * s.reps, 0)
   const setCount = detail.exercises.reduce((n, e) => n + e.sets.length, 0)
   const prSet = new Set(detail.prExerciseIds)
+  // Separate from `recordByExercise` above (which feeds the ExerciseDetail
+  // popup and holds every record): these are only the records this workout
+  // is actually allowed to be measured against — see history.ts:getDetail.
+  const eligibleRecordByExercise = new Map(
+    detail.eligibleRecords.map((r) => [r.exerciseId, r]),
+  )
 
   async function handleDelete() {
     await deleteWorkout({ workoutId: detail!._id })
@@ -113,19 +119,45 @@ export function WorkoutDetailPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {entry.sets.map((set) => (
-                  <TableRow key={set._id}>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, color: set.isWarmup ? 'pr.main' : 'text.secondary' }}>
-                      {set.isWarmup ? 'W' : set.setNumber}
-                    </TableCell>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatKg(set.weightKg)}
-                    </TableCell>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums' }}>
-                      {set.reps}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {entry.sets.map((set) => {
+                  // Warm-ups never count toward records, so they're never
+                  // "conquered" either.
+                  const conquered =
+                    !set.isWarmup &&
+                    behindRecord(
+                      set.weightKg,
+                      set.reps,
+                      eligibleRecordByExercise.get(entry.exercise._id),
+                    )
+                  const conqueredSx = conquered
+                    ? { textDecoration: 'line-through', textDecorationColor: 'var(--color-error)', opacity: 0.55 }
+                    : null
+                  return (
+                    <TableRow key={set._id} title={conquered ? 'Beaten by your PR' : undefined}>
+                      <TableCell
+                        sx={{
+                          border: 0,
+                          py: 0.5,
+                          px: 0,
+                          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+                          ...conqueredSx,
+                        }}
+                      >
+                        {set.isWarmup ? 'W' : set.setNumber}
+                      </TableCell>
+                      <TableCell
+                        sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
+                      >
+                        {formatKg(set.weightKg)}
+                      </TableCell>
+                      <TableCell
+                        sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
+                      >
+                        {set.reps}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </GlassTile>

@@ -1,23 +1,37 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { asUser, createBackend, createUser, type T } from './test.helpers'
+import {
+  createBackend,
+  makeFriends,
+  twoFriends,
+  userWithUsername,
+  type T,
+} from './test.helpers'
 
-async function userWithUsername(t: T, name: string) {
-  const userId = await createUser(t, name)
-  const user = asUser(t, userId)
-  await user.mutation(api.profiles.setUsername, { username: name })
-  return { userId, user }
-}
+describe('send', () => {
+  it('rate limits a burst of sends from the same user', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const friends = []
+    for (let i = 0; i < 6; i++) {
+      const friend = await userWithUsername(t, `friend${i}`)
+      await makeFriends(t, alice.userId, friend.userId)
+      friends.push(friend)
+    }
 
-// Alice sends, Bob accepts. Returns everyone's handles.
-async function twoFriends(t: T) {
-  const alice = await userWithUsername(t, 'alice')
-  const bob = await userWithUsername(t, 'bob')
-  await alice.user.mutation(api.friends.sendFriendRequest, { username: 'bob' })
-  const [incoming] = await bob.user.query(api.friends.myIncomingRequests, {})
-  await bob.user.mutation(api.friends.acceptFriendRequest, { requestId: incoming.requestId })
-  return { alice, bob }
-}
+    // The 'pingSend' token bucket (convex/rateLimiter.ts) has a burst
+    // capacity of 5. A rejected send rolls back its own mutation (Convex
+    // mutations are all-or-nothing), which undoes the token it consumed —
+    // so this has to be a run of *successful* sends, each to a distinct
+    // friend, to actually observe the limit.
+    for (let i = 0; i < 5; i++) {
+      await alice.user.mutation(api.pings.send, { toUserId: friends[i].userId })
+    }
+    await expect(
+      alice.user.mutation(api.pings.send, { toUserId: friends[5].userId }),
+    ).rejects.toThrow(/rate/i)
+  })
+})
 
 describe('getAckPrompt / dismissPrompt', () => {
   it('is null with no pings at all', async () => {

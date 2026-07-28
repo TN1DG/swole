@@ -155,7 +155,22 @@ export const getDetail = query({
       .filter((r) => r.workoutId === workout._id)
       .map((r) => r.exerciseId)
 
-    return { ...workout, exercises, prExerciseIds }
+    // Which records this workout's sets may be measured against for the
+    // "conquered" red slash. A record only applies to the workout that set
+    // it and to workouts logged afterwards — slashing sets in workouts that
+    // happened BEFORE the PR would rewrite history with knowledge the lifter
+    // didn't have yet. The explicit `workoutId` check isn't redundant with
+    // the timestamp one: a PR's `achievedAt` is stamped at finish time, which
+    // is always *after* its own workout's `startedAt`.
+    const eligibleRecords = records
+      .filter((r) => r.workoutId === workout._id || workout.startedAt >= r.achievedAt)
+      .map((r) => ({
+        exerciseId: r.exerciseId,
+        bestWeightKg: r.bestWeightKg,
+        bestEst1rm: r.bestEst1rm,
+      }))
+
+    return { ...workout, exercises, prExerciseIds, eligibleRecords }
   },
 })
 

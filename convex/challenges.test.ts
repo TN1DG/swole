@@ -1,36 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { api, internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
-import { asUser, createBackend, createUser, type T } from './test.helpers'
+import {
+  createBackend,
+  createUser,
+  givePoints,
+  makeFriends,
+  twoFriends,
+  userWithUsername,
+  type T,
+} from './test.helpers'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
-
-async function userWithUsername(t: T, name: string) {
-  const userId = await createUser(t, name)
-  const user = asUser(t, userId)
-  await user.mutation(api.profiles.setUsername, { username: name })
-  return { userId, user }
-}
-
-// Alice sends, Bob accepts. Returns everyone's handles.
-async function twoFriends(t: T) {
-  const alice = await userWithUsername(t, 'alice')
-  const bob = await userWithUsername(t, 'bob')
-  await alice.user.mutation(api.friends.sendFriendRequest, { username: 'bob' })
-  const [incoming] = await bob.user.query(api.friends.myIncomingRequests, {})
-  await bob.user.mutation(api.friends.acceptFriendRequest, { requestId: incoming.requestId })
-  return { alice, bob }
-}
-
-async function givePoints(t: T, userId: Id<'users'>, amount: number) {
-  await t.run(async (ctx) => {
-    const profile = await ctx.db
-      .query('profiles')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique()
-    await ctx.db.patch(profile!._id, { pointsBalance: (profile!.pointsBalance ?? 0) + amount })
-  })
-}
 
 async function pointsOf(t: T, userId: Id<'users'>): Promise<number> {
   return await t.run(async (ctx) => {
@@ -61,6 +42,38 @@ describe('propose', () => {
         wagerPoints: 10,
       }),
     ).rejects.toThrow(/yourself/i)
+  })
+
+  it('rate limits a burst of proposals from the same user', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    await givePoints(t, alice.userId, 1000)
+    const opponents = []
+    for (let i = 0; i < 6; i++) {
+      const opponent = await userWithUsername(t, `opponent${i}`)
+      await makeFriends(t, alice.userId, opponent.userId)
+      opponents.push(opponent)
+    }
+
+    // The 'challengePropose' token bucket (convex/rateLimiter.ts) has a
+    // burst capacity of 5. A rejected proposal rolls back its own mutation
+    // (Convex mutations are all-or-nothing), which undoes the token it
+    // consumed — so this has to be a run of *successful* proposals, each
+    // against a distinct opponent, to actually observe the limit.
+    for (let i = 0; i < 5; i++) {
+      await alice.user.mutation(api.challenges.propose, {
+        opponentId: opponents[i].userId,
+        weeks: 2,
+        wagerPoints: 10,
+      })
+    }
+    await expect(
+      alice.user.mutation(api.challenges.propose, {
+        opponentId: opponents[5].userId,
+        weeks: 2,
+        wagerPoints: 10,
+      }),
+    ).rejects.toThrow(/rate/i)
   })
 
   it('rejects challenging a non-friend', async () => {

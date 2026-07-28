@@ -3,6 +3,7 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { internalAction, mutation } from './_generated/server'
 import { internal } from './_generated/api'
 import { cleanText, LIMITS } from './validation'
+import { rateLimiter } from './rateLimiter'
 
 // This file exports public/internal functions, so it's pulled into the
 // frontend's TS program too (via _generated/api) — which has no Node types.
@@ -21,6 +22,7 @@ export const submit = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (userId === null) throw new Error('Not signed in')
+    await rateLimiter.limit(ctx, 'featureRequestSubmit', { key: userId, throws: true })
 
     const text = cleanText(args.text, LIMITS.featureRequestTextMaxLength, 'Feature request')
 

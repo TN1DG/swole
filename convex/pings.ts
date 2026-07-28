@@ -2,6 +2,9 @@ import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
+import { rateLimiter } from './rateLimiter'
+import { markHandled, notify } from './notifications'
+import { areFriends } from './friendships'
 
 async function requireUserId(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx)
@@ -11,18 +14,11 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-async function areFriends(ctx: QueryCtx | MutationCtx, userId: Id<'users'>, otherId: Id<'users'>) {
-  const row = await ctx.db
-    .query('friendships')
-    .withIndex('by_user_friend', (q) => q.eq('userId', userId).eq('friendId', otherId))
-    .unique()
-  return row !== null
-}
-
 export const send = mutation({
   args: { toUserId: v.id('users') },
   handler: async (ctx, args) => {
     const fromUserId = await requireUserId(ctx)
+    await rateLimiter.limit(ctx, 'pingSend', { key: fromUserId, throws: true })
     if (fromUserId === args.toUserId) throw new Error("Can't ping yourself")
 
     if (!(await areFriends(ctx, fromUserId, args.toUserId))) {
@@ -39,10 +35,16 @@ export const send = mutation({
       throw new ConvexError('You already have a pending ping')
     }
 
-    await ctx.db.insert('gymPings', {
+    const pingId = await ctx.db.insert('gymPings', {
       fromUserId,
       toUserId: args.toUserId,
       sentAt: Date.now(),
+    })
+    await notify(ctx, {
+      userId: args.toUserId,
+      kind: 'ping_received',
+      fromUserId,
+      pingId,
     })
   },
 })
@@ -56,50 +58,72 @@ export const acknowledge = mutation({
     if (ping.toUserId !== userId) throw new Error('Not authorized')
     if (ping.acknowledgedAt !== undefined) return
     await ctx.db.patch(args.pingId, { acknowledgedAt: Date.now() })
+    // Acknowledging from the chat thread should retire the banner too.
+    await markHandled(ctx, userId, 'ping_received', ping.fromUserId)
   },
 })
+
+// Both directions of a ping thread, oldest first, with the linked workout
+// hydrated. A plain exported helper rather than a query so friendThread.ts
+// can fold pings into the unified thread without a nested ctx.runQuery —
+// it's all one transaction already, so a direct call is cheaper and keeps
+// the permission checks in one place.
+export async function pingsBetween(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+) {
+  const [sentPings, receivedPings] = await Promise.all([
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', userId).eq('toUserId', friendId))
+      .collect(),
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
+      .collect(),
+  ])
+
+  const all = [...sentPings, ...receivedPings].sort((a, b) => a.sentAt - b.sentAt).slice(-20)
+
+  return Promise.all(
+    all.map(async (p) => {
+      const linkedWorkout = p.linkedWorkoutId ? await ctx.db.get(p.linkedWorkoutId) : null
+      return {
+        _id: p._id,
+        fromUserId: p.fromUserId,
+        toUserId: p.toUserId,
+        sentAt: p.sentAt,
+        acknowledgedAt: p.acknowledgedAt ?? null,
+        linkedWorkout: linkedWorkout
+          ? { _id: linkedWorkout._id, name: linkedWorkout.name }
+          : null,
+        isMine: p.fromUserId === userId,
+      }
+    }),
+  )
+}
+
+// The most recent ping this friend sent me, for the unread check.
+export async function latestIncomingPingAt(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+): Promise<number> {
+  const latest = await ctx.db
+    .query('gymPings')
+    .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
+    .order('desc')
+    .first()
+  return latest?.sentAt ?? 0
+}
 
 export const getThread = query({
   args: { friendUserId: v.id('users') },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (userId === null) return []
-
-    const [sentPings, receivedPings] = await Promise.all([
-      ctx.db
-        .query('gymPings')
-        .withIndex('by_from_to', (q) =>
-          q.eq('fromUserId', userId).eq('toUserId', args.friendUserId),
-        )
-        .collect(),
-      ctx.db
-        .query('gymPings')
-        .withIndex('by_from_to', (q) =>
-          q.eq('fromUserId', args.friendUserId).eq('toUserId', userId),
-        )
-        .collect(),
-    ])
-
-    const all = [...sentPings, ...receivedPings]
-      .sort((a, b) => a.sentAt - b.sentAt)
-      .slice(-20)
-
-    return Promise.all(
-      all.map(async (p) => {
-        const linkedWorkout = p.linkedWorkoutId ? await ctx.db.get(p.linkedWorkoutId) : null
-        return {
-          _id: p._id,
-          fromUserId: p.fromUserId,
-          toUserId: p.toUserId,
-          sentAt: p.sentAt,
-          acknowledgedAt: p.acknowledgedAt ?? null,
-          linkedWorkout: linkedWorkout
-            ? { _id: linkedWorkout._id, name: linkedWorkout.name }
-            : null,
-          isMine: p.fromUserId === userId,
-        }
-      }),
-    )
+    return await pingsBetween(ctx, userId, args.friendUserId)
   },
 })
 

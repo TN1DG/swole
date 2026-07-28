@@ -233,6 +233,50 @@ describe('seen tips', () => {
   })
 })
 
+describe('setUnitPreference', () => {
+  it('defaults to kg', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    expect((await user.query(api.profiles.getMine, {}))!.unitPreference).toBe('kg')
+  })
+
+  it('saves lb and back to kg', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setUnitPreference, { unitPreference: 'lb' })
+    expect((await user.query(api.profiles.getMine, {}))!.unitPreference).toBe('lb')
+
+    await user.mutation(api.profiles.setUnitPreference, { unitPreference: 'kg' })
+    expect((await user.query(api.profiles.getMine, {}))!.unitPreference).toBe('kg')
+  })
+
+  // Display preference only — the stored body stats must stay canonical.
+  it('does not touch stored heightCm/weightKg', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await user.mutation(api.profiles.updateBodyStats, {
+      heightCm: 180,
+      weightKg: 80,
+      age: 30,
+      sex: 'male',
+      activityLevel: 'moderate',
+    })
+
+    await user.mutation(api.profiles.setUnitPreference, { unitPreference: 'lb' })
+
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({ heightCm: 180, weightKg: 80, unitPreference: 'lb' })
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.setUnitPreference, { unitPreference: 'lb' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})
+
 describe('setDailyVolumeGoal', () => {
   it('defaults to null and pointsBalance defaults to 0', async () => {
     const t = createBackend()

@@ -11,6 +11,8 @@ import type { Doc, Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
 import { forwardStreakWeeks } from './fitness'
 import { awardPoints, escrowPoints } from './profiles'
+import { rateLimiter } from './rateLimiter'
+import { areFriends } from './friendships'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -20,15 +22,6 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
   return userId
 }
 
-// Same check as friends.ts/pings.ts — each domain file keeps its own copy by
-// existing repo convention rather than importing across domain files.
-async function areFriends(ctx: QueryCtx | MutationCtx, userId: Id<'users'>, otherId: Id<'users'>) {
-  const row = await ctx.db
-    .query('friendships')
-    .withIndex('by_user_friend', (q) => q.eq('userId', userId).eq('friendId', otherId))
-    .unique()
-  return row !== null
-}
 
 // One open (pending or active) challenge per friend pair at a time — keeps a
 // balance meaning "what's actually spendable right now" without needing to
@@ -62,6 +55,7 @@ export const propose = mutation({
   args: { opponentId: v.id('users'), weeks: v.number(), wagerPoints: v.number() },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx)
+    await rateLimiter.limit(ctx, 'challengePropose', { key: userId, throws: true })
     if (userId === args.opponentId) throw new Error("Can't challenge yourself")
     if (!(await areFriends(ctx, userId, args.opponentId))) {
       throw new Error('You can only challenge friends')
@@ -131,42 +125,50 @@ export const cancel = mutation({
   },
 })
 
-// Most recent challenges between me and a friend (both directions), newest
-// first — same "thread" shape as pings.getThread. Active challenges get a
-// *live* (unpersisted) forwardStreakWeeks so the UI can show in-progress
-// standings before the cron resolves anything.
+// Challenges between two people, newest first, each with a *live*
+// (unpersisted) streak so an in-progress challenge can show real standings
+// before the cron resolves it. A plain exported helper rather than a query so
+// friendThread.ts can fold challenges into the unified thread without a
+// nested ctx.runQuery.
+export async function challengesBetween(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+) {
+  const [asChallenger, asOpponent] = await Promise.all([
+    ctx.db.query('challenges').withIndex('by_challenger', (q) => q.eq('challengerId', userId)).collect(),
+    ctx.db.query('challenges').withIndex('by_opponent', (q) => q.eq('opponentId', userId)).collect(),
+  ])
+
+  const all = [...asChallenger, ...asOpponent]
+    .filter((c) => c.challengerId === friendId || c.opponentId === friendId)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 10)
+
+  const now = Date.now()
+  return Promise.all(
+    all.map(async (c: Doc<'challenges'>) => {
+      let liveChallengerStreak = c.challengerStreakWeeks
+      let liveOpponentStreak = c.opponentStreakWeeks
+      if (c.status === 'active' && c.startedAt !== undefined && c.endsAt !== undefined) {
+        const [challengerAts, opponentAts] = await Promise.all([
+          workoutStartedAts(ctx, c.challengerId),
+          workoutStartedAts(ctx, c.opponentId),
+        ])
+        liveChallengerStreak = forwardStreakWeeks(challengerAts, c.startedAt, c.endsAt, now)
+        liveOpponentStreak = forwardStreakWeeks(opponentAts, c.startedAt, c.endsAt, now)
+      }
+      return { ...c, isMine: c.challengerId === userId, liveChallengerStreak, liveOpponentStreak }
+    }),
+  )
+}
+
 export const getThread = query({
   args: { friendUserId: v.id('users') },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (userId === null) return []
-
-    const [asChallenger, asOpponent] = await Promise.all([
-      ctx.db.query('challenges').withIndex('by_challenger', (q) => q.eq('challengerId', userId)).collect(),
-      ctx.db.query('challenges').withIndex('by_opponent', (q) => q.eq('opponentId', userId)).collect(),
-    ])
-
-    const all = [...asChallenger, ...asOpponent]
-      .filter((c) => c.challengerId === args.friendUserId || c.opponentId === args.friendUserId)
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 10)
-
-    const now = Date.now()
-    return Promise.all(
-      all.map(async (c: Doc<'challenges'>) => {
-        let liveChallengerStreak = c.challengerStreakWeeks
-        let liveOpponentStreak = c.opponentStreakWeeks
-        if (c.status === 'active' && c.startedAt !== undefined && c.endsAt !== undefined) {
-          const [challengerAts, opponentAts] = await Promise.all([
-            workoutStartedAts(ctx, c.challengerId),
-            workoutStartedAts(ctx, c.opponentId),
-          ])
-          liveChallengerStreak = forwardStreakWeeks(challengerAts, c.startedAt, c.endsAt, now)
-          liveOpponentStreak = forwardStreakWeeks(opponentAts, c.startedAt, c.endsAt, now)
-        }
-        return { ...c, isMine: c.challengerId === userId, liveChallengerStreak, liveOpponentStreak }
-      }),
-    )
+    return await challengesBetween(ctx, userId, args.friendUserId)
   },
 })
 

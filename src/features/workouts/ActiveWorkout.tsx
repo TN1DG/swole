@@ -4,9 +4,10 @@ import type { FunctionReturnType } from 'convex/server'
 import { Box, Button, ButtonBase, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { beatsRecord, formatDuration, formatKg } from '../../../convex/fitness'
+import { beatsRecord, behindRecord, formatDuration, formatKg } from '../../../convex/fitness'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { ExercisePicker } from './ExercisePicker'
+import { RestTimer } from './RestTimer'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 
@@ -48,6 +49,10 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
   // Set whenever any save fails (bad connection, etc.) so nothing is lost silently.
   const [saveError, setSaveError] = useState(false)
   const reportSaveError = () => setSaveError(true)
+
+  // Bumped every time a set is checked off; RestTimer restarts on each bump.
+  const [restSignal, setRestSignal] = useState(0)
+  const startRest = () => setRestSignal((n) => n + 1)
 
   // Live stats shown at the top.
   const allSets = workout.exercises.flatMap((e) => e.sets)
@@ -128,6 +133,10 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
         </Button>
       </Box>
 
+      <Box sx={{ mt: 2 }}>
+        <RestTimer autoStartSignal={restSignal} />
+      </Box>
+
       {/* Exercise cards */}
       <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
         {workout.exercises.map((entry, i) => (
@@ -136,6 +145,7 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
             entry={entry}
             record={recordByExercise.get(entry.exercise._id)}
             onSaveError={reportSaveError}
+            onSetCompleted={startRest}
             isFirst={i === 0}
             isLast={i === workout.exercises.length - 1}
           />
@@ -208,12 +218,14 @@ function ExerciseCard({
   entry,
   record,
   onSaveError,
+  onSetCompleted,
   isFirst,
   isLast,
 }: {
   entry: ActiveWorkoutData['exercises'][number]
   record: { bestWeightKg: number; bestWeightReps: number; bestEst1rm: number } | undefined
   onSaveError: () => void
+  onSetCompleted: () => void
   isFirst: boolean
   isLast: boolean
 }) {
@@ -292,7 +304,13 @@ function ExerciseCard({
 
       <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
         {entry.sets.map((set) => (
-          <SetRow key={set._id} set={set} record={record} onSaveError={onSaveError} />
+          <SetRow
+            key={set._id}
+            set={set}
+            record={record}
+            onSaveError={onSaveError}
+            onSetCompleted={onSetCompleted}
+          />
         ))}
       </Box>
 
@@ -328,10 +346,12 @@ function SetRow({
   set,
   record,
   onSaveError,
+  onSetCompleted,
 }: {
   set: Doc<'sets'>
   record: { bestWeightKg: number; bestEst1rm: number } | undefined
   onSaveError: () => void
+  onSetCompleted: () => void
 }) {
   const updateSet = useMutation(api.workouts.updateSet)
   const removeSet = useMutation(api.workouts.removeSet)
@@ -346,6 +366,11 @@ function SetRow({
 
   // A completed working set that beats (or sets) the record gets a trophy.
   const isPr = set.completed && !set.isWarmup && beatsRecord(set.weightKg, set.reps, record)
+  // …and one the record has left behind gets a red slash. The active workout
+  // is always eligible to be measured against the record (it's happening
+  // now), so unlike the history view there's no achievedAt check here.
+  const conquered =
+    set.completed && !set.isWarmup && behindRecord(set.weightKg, set.reps, record)
 
   function commit(extra?: { completed?: boolean }) {
     updateSet({
@@ -368,9 +393,12 @@ function SetRow({
         bgcolor: set.completed ? 'rgb(122 154 82 / 0.1)' : 'transparent',
       }}
     >
-      {/* Set number badge; tap to toggle warm-up */}
+      {/* Set number badge; tap to toggle warm-up. The "conquered" slash lands
+          here rather than on the weight/reps fields — those are live text
+          inputs, and striking through what you're mid-way through typing
+          reads as an error state rather than an achievement. */}
       <ButtonBase
-        title="Tap to toggle warm-up"
+        title={conquered ? 'Beaten by your PR' : 'Tap to toggle warm-up'}
         sx={{
           justifySelf: 'center',
           borderRadius: '6px',
@@ -379,6 +407,11 @@ function SetRow({
           fontSize: '0.875rem',
           fontWeight: 600,
           color: set.isWarmup ? 'pr.main' : 'text.secondary',
+          ...(conquered && {
+            textDecoration: 'line-through',
+            textDecorationColor: 'var(--color-error)',
+            opacity: 0.55,
+          }),
         }}
         onClick={() => updateSet({ setId: set._id, isWarmup: !set.isWarmup }).catch(onSaveError)}
       >
@@ -431,7 +464,13 @@ function SetRow({
           border: set.completed ? 'none' : '1px solid',
           borderColor: 'divider',
         }}
-        onClick={() => commit({ completed: !set.completed })}
+        onClick={() => {
+          const nowCompleted = !set.completed
+          commit({ completed: nowCompleted })
+          // Only finishing a set starts a rest — un-checking one (a
+          // correction) shouldn't.
+          if (nowCompleted) onSetCompleted()
+        }}
       >
         ✓
       </ButtonBase>

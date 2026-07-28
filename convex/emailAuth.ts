@@ -3,6 +3,7 @@ import type { EmailConfig, GenericActionCtxWithAuthConfig } from '@convex-dev/au
 import { internalMutation } from './_generated/server'
 import { internal } from './_generated/api'
 import type { Doc, DataModel } from './_generated/dataModel'
+import { rateLimiter } from './rateLimiter'
 
 // Password's `verify`/`reset` options are typed as the abstract, unparametrized
 // `EmailConfig` (i.e. `EmailConfig<GenericDataModel>`) regardless of our own
@@ -16,35 +17,22 @@ type ActionCtx = GenericActionCtxWithAuthConfig<DataModel>
 // Same trick as convex/featureRequests.ts.
 declare const process: { env: Record<string, string | undefined> }
 
-const OTP_WINDOW_MS = 15 * 60 * 1000
-const OTP_MAX_SENDS = 3 // per email, per kind, per window
-
 // Throttles how often we'll actually send an email for a given address+kind,
 // regardless of how many times a client asks. Convex Auth's own rate limiter
 // (authRateLimits, wired via `maxFailedAttempsPerHour` in convex/auth.ts)
 // only throttles *wrong-code guesses* — this is the one it doesn't cover.
+// Uses the shared rate-limiter component (see convex/rateLimiter.ts) rather
+// than a hand-rolled window counter, which would admit a race under
+// concurrent requests (two simultaneous sends could both read the same
+// count and both pass).
 export const recordSendAttemptOrThrow = internalMutation({
   args: { email: v.string(), kind: v.union(v.literal('verify'), v.literal('reset')) },
   handler: async (ctx, args) => {
     const key = `${args.kind}:${args.email.toLowerCase()}`
-    const now = Date.now()
-    const existing = await ctx.db
-      .query('emailSendAttempts')
-      .withIndex('by_key', (q) => q.eq('key', key))
-      .unique()
-
-    if (!existing || now - existing.windowStart >= OTP_WINDOW_MS) {
-      if (existing) {
-        await ctx.db.patch(existing._id, { windowStart: now, count: 1 })
-      } else {
-        await ctx.db.insert('emailSendAttempts', { key, windowStart: now, count: 1 })
-      }
-      return
-    }
-    if (existing.count >= OTP_MAX_SENDS) {
+    const { ok } = await rateLimiter.limit(ctx, 'otpSend', { key })
+    if (!ok) {
       throw new Error('Too many requests — check your inbox or try again in a few minutes.')
     }
-    await ctx.db.patch(existing._id, { count: existing.count + 1 })
   },
 })
 
