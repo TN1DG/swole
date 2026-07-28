@@ -195,3 +195,12 @@ npm run deploy              # convex prod + vercel prod
 - **Prefer explicit per-file edits over regex sweeps.** A lazy `[\s\S]*?`
   intended to match one import block spanned six files' entire import headers
   and broke 60 tests during cleanup.
+- **`vercel.json`'s security headers only exist in production.** The Vite dev
+  server serves no CSP at all, so a policy that blocks something is invisible
+  locally and 100% reproducible once deployed. This shipped a broken feature
+  once: `img-src` was missing `https://*.convex.cloud`, so every avatar in
+  production silently rendered as the fallback initial while uploads, storage
+  and `getUrl()` all worked perfectly. `vercel-headers.test.ts` now pins the
+  directives that matter. Anything loaded from a new origin — fonts, an
+  analytics script, remote images — needs a CSP entry *and* a check that the
+  live `curl -sI` response actually carries it.

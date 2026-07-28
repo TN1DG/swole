@@ -19,5 +19,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  // vercel-headers.test.ts lives here rather than under src/ because it reads
+  // vercel.json off disk with node:fs — and the app project deliberately has
+  // no node types, so app code can't reach for node APIs by accident.
+  "include": ["vite.config.ts", "vercel-headers.test.ts"]
 }
