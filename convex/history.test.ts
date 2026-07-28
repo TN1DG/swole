@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { epley1rm } from './fitness'
+import { DAY_MS, epley1rm, utcWeekStart, weeklyPoints } from './fitness'
 import {
   asUser,
   createBackend,
   createBuiltInExercise,
   createUser,
+  logWorkoutOn,
+  pointsOf,
   type T,
 } from './test.helpers'
 
@@ -217,5 +219,88 @@ describe('getDetail eligibleRecords', () => {
     expect(newerDetail!.eligibleRecords).toEqual([
       { exerciseId, bestWeightKg: 140, bestEst1rm: epley1rm(140, 5) },
     ])
+  })
+})
+
+describe('deleteWorkout points clawback', () => {
+  // Monday noon of the current week, so a whole week's days are addressable.
+  const day = (n: number) => utcWeekStart(Date.now()) + n * DAY_MS + 12 * 3600_000
+
+  async function setup() {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const userId = await createUser(t, 'alice')
+    return { t, exerciseId, userId, user: asUser(t, userId) }
+  }
+
+  it('returns the balance to zero when the week has nothing left', async () => {
+    const { t, user, exerciseId, userId } = await setup()
+    const workoutId = await logWorkoutOn(t, user, exerciseId, { startedAt: day(0) })
+    expect(await pointsOf(t, userId)).toBeGreaterThan(0)
+
+    await user.mutation(api.history.deleteWorkout, { workoutId })
+    expect(await pointsOf(t, userId)).toBe(0)
+  })
+
+  it('re-prices the survivors when an earlier day is removed', async () => {
+    // Removing day 1 of a three-day week moves days 2 and 3 back down the
+    // curve, so it is not enough to subtract what the deleted row awarded.
+    const { t, user, exerciseId, userId } = await setup()
+    const first = await logWorkoutOn(t, user, exerciseId, { startedAt: day(0) })
+    await logWorkoutOn(t, user, exerciseId, { startedAt: day(1) })
+    await logWorkoutOn(t, user, exerciseId, { startedAt: day(2) })
+
+    await user.mutation(api.history.deleteWorkout, { workoutId: first })
+
+    const balance = await pointsOf(t, userId)
+    const survivors = await t.run(async (ctx) =>
+      ctx.db
+        .query('workouts')
+        .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+        .collect(),
+    )
+    expect(survivors).toHaveLength(2)
+
+    // The telescoping invariant: the stamped awards still sum to the balance.
+    const stamped = survivors.reduce((sum, w) => sum + (w.pointsAwarded ?? 0), 0)
+    expect(stamped).toBe(balance)
+    // prCount is 0, not 1: the PR belonged to the workout that was deleted,
+    // and prCount is stamped per workout at finish time.
+    expect(balance).toBe(
+      weeklyPoints({ daysTrained: 2, volumeKg: 1000, prCount: 0, streakWeeks: 1 }),
+    )
+  })
+
+  it('makes delete-and-relog worth nothing', async () => {
+    // Without a clawback this loop is a points printer.
+    const { t, user, exerciseId, userId } = await setup()
+    await logWorkoutOn(t, user, exerciseId, { startedAt: day(0) })
+    const before = await pointsOf(t, userId)
+
+    for (let i = 0; i < 3; i++) {
+      const extra = await logWorkoutOn(t, user, exerciseId, { startedAt: day(0) })
+      await user.mutation(api.history.deleteWorkout, { workoutId: extra })
+    }
+
+    expect(await pointsOf(t, userId)).toBe(before)
+  })
+
+  it('floors the clawback at zero when the points are already spent', async () => {
+    const { t, user, exerciseId, userId } = await setup()
+    const workoutId = await logWorkoutOn(t, user, exerciseId, { startedAt: day(0) })
+
+    // Simulate the balance being escrowed into a live challenge.
+    await t.run(async (ctx) => {
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      await ctx.db.patch(profile!._id, { pointsBalance: 0 })
+    })
+
+    // Deleting must still succeed rather than failing an unexplainable
+    // "insufficient points" error at the user.
+    await user.mutation(api.history.deleteWorkout, { workoutId })
+    expect(await pointsOf(t, userId)).toBe(0)
   })
 })

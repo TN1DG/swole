@@ -166,41 +166,212 @@ export function macroTargets(calories: number, bodyWeightKg: number, goal: Goal)
   return { calories, proteinG, fatG, carbsG, fiberG }
 }
 
-// ---------- Friends leaderboard: weekly volume + consistency bonus ----------
-// A rolling 7-day window (not calendar weeks) anchored to "now", so the
-// leaderboard doesn't reset at a fixed clock time.
+// ---------- Swole Points: the scoring model ----------
+//
+// One currency. The points you earn each week ARE your spendable balance
+// (challenge wagers draw on it), and the leaderboard ranks on points EARNED
+// in a period — never on the balance, so spending a wager can't drop your
+// rank and winning one can't inflate it.
+//
+// Points come from DISTINCT TRAINING DAYS, not from workouts. Three sessions
+// on a Tuesday is one training day. That's what makes the old "log ten empty
+// workouts for 100 points" exploit impossible by construction rather than by
+// special case.
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
-const STREAK_BONUS_PER_WEEK = 0.05 // +5% per consecutive week logged
-const STREAK_BONUS_CAP_WEEKS = 10 // max +50% bonus
+export const DAY_MS = 24 * 60 * 60 * 1000
+export const WEEK_MS = 7 * DAY_MS
 
-// How many rolling weeks ago a timestamp falls — 0 = this week, 1 = last week…
-export function weeksAgo(startedAt: number, now: number): number {
-  return Math.floor((now - startedAt) / WEEK_MS)
+// ---------- Calendar bucketing (UTC, Monday-anchored) ----------
+//
+// Fixed to UTC deliberately. The leaderboard is a shared scoreboard, so every
+// user has to be scored against the same boundary — a local-time week would
+// let a friend in UTC+13 start next week while you're still in this one. The
+// cost is that a late Sunday session in a far-western timezone lands in the
+// week that just closed; that's stated in the UI rather than hidden.
+
+// Whole days since the epoch, UTC.
+export function utcDayIndex(ms: number): number {
+  return Math.floor(ms / DAY_MS)
 }
 
-// How many *consecutive* weeks, counting back from this one, had at least
-// one workout. A gap anywhere stops the count — one big week last month
-// doesn't cover for going quiet since.
-export function consistencyStreakWeeks(startedAts: number[], now: number): number {
-  const weeksWithWorkout = new Set(startedAts.map((t) => weeksAgo(t, now)))
+// Monday-anchored week ordinal. 1970-01-01 was a Thursday, so day indices are
+// shifted by 4 (to 1970-01-05, the first Monday) before dividing. Math.floor
+// rather than trunc so pre-epoch timestamps still land on a Monday.
+export function utcWeekIndex(ms: number): number {
+  return Math.floor((utcDayIndex(ms) - 4) / 7)
+}
+
+export function utcWeekStart(ms: number): number {
+  return (utcWeekIndex(ms) * 7 + 4) * DAY_MS
+}
+
+export function utcWeekEnd(ms: number): number {
+  return utcWeekStart(ms) + WEEK_MS
+}
+
+// Calendar-month ordinal and bounds, UTC. Date.UTC handles the Dec -> Jan roll.
+export function utcMonthIndex(ms: number): number {
+  const d = new Date(ms)
+  return d.getUTCFullYear() * 12 + d.getUTCMonth()
+}
+
+export function utcMonthStart(ms: number): number {
+  const d = new Date(ms)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
+}
+
+// Exclusive.
+export function utcMonthEnd(ms: number): number {
+  const d = new Date(ms)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)
+}
+
+// ---------- Training days ----------
+
+// Distinct UTC calendar days represented in a set of workout start times.
+export function distinctTrainingDays(startedAts: number[]): number {
+  return new Set(startedAts.map(utcDayIndex)).size
+}
+
+// ---------- The day curve ----------
+
+// Cumulative weekly points by distinct days trained. Marginals are
+// 10, 15, 20, 10, 10, 8, 7 — the third day is the biggest single jump,
+// because three sessions a week is the habit worth pulling people toward,
+// and it flattens after that so a junk seventh session is worth a third of a
+// real third one.
+export const WEEKLY_DAY_POINTS = [0, 10, 25, 45, 55, 65, 73, 80] as const
+
+export function dayCurvePoints(daysTrained: number): number {
+  const days = Math.max(0, Math.min(WEEKLY_DAY_POINTS.length - 1, Math.floor(daysTrained)))
+  return WEEKLY_DAY_POINTS[days]
+}
+
+// ---------- Garnish (capped) ----------
+//
+// Volume and PRs are seasoning, not the meal. Together they cap at 50 against
+// a day curve worth up to 80, so no amount of either beats simply showing up
+// more often. This is the whole point of the rework: the old formula was raw
+// kilograms with a +50% streak bonus, which meant a heavy-compound lifter
+// outranked a consistent one no matter what.
+
+export const VOLUME_BONUS_CAP = 20
+export const VOLUME_KG_PER_POINT = 1000 // cap binds at 20,000 kg in a week
+
+export function volumeBonus(weekVolumeKg: number): number {
+  if (!Number.isFinite(weekVolumeKg) || weekVolumeKg <= 0) return 0
+  return Math.min(VOLUME_BONUS_CAP, Math.floor(weekVolumeKg / VOLUME_KG_PER_POINT))
+}
+
+// This cap is a security control, not a balance knob. beatsRecord() returns
+// true for any exercise with no record yet, and a user may create up to
+// LIMITS.customExercisesPerUser (300) exercises — so PRs are mintable. The
+// cap bounds that exploit at 30 points a week, forever.
+export const PR_BONUS_CAP = 30
+export const POINTS_PER_PR = 5
+
+export function prBonus(weekPrCount: number): number {
+  if (!Number.isFinite(weekPrCount) || weekPrCount <= 0) return 0
+  return Math.min(PR_BONUS_CAP, Math.floor(weekPrCount) * POINTS_PER_PR)
+}
+
+// ---------- Streak ----------
+
+export const STREAK_BONUS_PER_WEEK = 0.05
+export const STREAK_BONUS_CAP_WEEKS = 10 // max +50%
+
+export function streakMultiplier(streakWeeks: number): number {
+  return 1 + STREAK_BONUS_PER_WEEK * Math.min(Math.max(0, streakWeeks), STREAK_BONUS_CAP_WEEKS)
+}
+
+// Consecutive trained weeks ending at AND INCLUDING `weekIndex`. Returns 0 if
+// that week itself is empty.
+//
+// This is the SCORING streak, so it has to be a deterministic property of the
+// week being scored and never of "now" — that determinism is exactly what
+// lets finish() and the leaderboard agree without either of them storing it.
+export function streakEndingAt(trainedWeeks: Set<number>, weekIndex: number): number {
   let streak = 0
-  while (weeksWithWorkout.has(streak)) streak++
+  while (trainedWeeks.has(weekIndex - streak)) streak++
   return streak
 }
 
-// This week's volume, boosted by the consistency streak.
-export function leaderboardScore(weekVolumeKg: number, streakWeeks: number): number {
-  const bonusWeeks = Math.min(streakWeeks, STREAK_BONUS_CAP_WEEKS)
-  return Math.round(weekVolumeKg * (1 + STREAK_BONUS_PER_WEEK * bonusWeeks))
+// The streak to SHOW. Same count, except the current week hasn't finished
+// yet, so an untrained Monday morning falls back to the streak as it stood at
+// the end of last week. Without this a five-week run reads "0 weeks" every
+// Monday until you train. Display only — never feeds a score.
+export function displayStreakWeeks(trainedWeeks: Set<number>, currentWeekIndex: number): number {
+  if (trainedWeeks.has(currentWeekIndex)) return streakEndingAt(trainedWeeks, currentWeekIndex)
+  return streakEndingAt(trainedWeeks, currentWeekIndex - 1)
 }
+
+// ---------- The week's score ----------
+
+export type WeekScoreInput = {
+  daysTrained: number
+  volumeKg: number
+  prCount: number
+  streakWeeks: number
+}
+
+// Every points number in the app derives from this one function.
+// Ceiling: (80 + 20 + 30) * 1.5 = 195 in a week.
+export function weeklyPoints({ daysTrained, volumeKg, prCount, streakWeeks }: WeekScoreInput): number {
+  const base = dayCurvePoints(daysTrained) + volumeBonus(volumeKg) + prBonus(prCount)
+  return Math.round(base * streakMultiplier(streakWeeks))
+}
+
+/**
+ * What each workout in a week is individually worth.
+ *
+ * Replays the week in chronological order and returns, per workout, the
+ * increase in `weeklyPoints` that workout caused when it landed. Because
+ * these are consecutive diffs over a growing prefix, they always sum to
+ * `weeklyPoints` for the whole week — and THAT is what makes "sum the stamped
+ * pointsAwarded over a date range" a valid leaderboard score.
+ *
+ * The telescoping property is load-bearing; convex/fitness.test.ts pins it.
+ */
+export function weeklyPointsIncrements(
+  workouts: { startedAt: number; volumeKg: number; prCount: number }[],
+  streakWeeks: number,
+): number[] {
+  const chronological = [...workouts].sort((a, b) => a.startedAt - b.startedAt)
+  const days: number[] = []
+  let volumeKg = 0
+  let prCount = 0
+  let previous = 0
+
+  return chronological.map((w) => {
+    days.push(w.startedAt)
+    volumeKg += w.volumeKg
+    prCount += w.prCount
+    const total = weeklyPoints({
+      daysTrained: distinctTrainingDays(days),
+      volumeKg,
+      prCount,
+      streakWeeks,
+    })
+    const increment = total - previous
+    previous = total
+    return increment
+  })
+}
+
+// ---------- Consistency tiers ----------
 
 export type ConsistencyTier = 'none' | 'consistent' | 'dedicated' | 'relentless' | 'iron_will'
 
 // Named badges for a streak — "Consistency Accolades". Checked longest-first.
+// Re-anchored so Iron Will lands exactly where STREAK_BONUS_CAP_WEEKS maxes
+// the multiplier out: past it there is nothing further to earn, which is why
+// the ring stops filling there rather than wrapping round again.
+//
+// Tiers stay purely cosmetic. Giving them their own bonus would double-count
+// the multiplier, which already scales on the same input.
 export const CONSISTENCY_TIERS = [
-  { min: 12, value: 'iron_will', label: 'Iron Will' },
-  { min: 8, value: 'relentless', label: 'Relentless' },
+  { min: 10, value: 'iron_will', label: 'Iron Will' },
+  { min: 7, value: 'relentless', label: 'Relentless' },
   { min: 4, value: 'dedicated', label: 'Dedicated' },
   { min: 2, value: 'consistent', label: 'Consistent' },
 ] as const satisfies readonly { min: number; value: ConsistencyTier; label: string }[]
@@ -212,19 +383,17 @@ export function consistencyTier(streakWeeks: number): ConsistencyTier {
   return 'none'
 }
 
-// ---------- Consistency points (earned) & challenges (wagered) ----------
-
-// Flat award per finished workout. A named constant (not folded into
-// workouts.ts) so it's easy to find/retune later without touching finish()'s
-// control flow.
-export const POINTS_PER_FINISHED_WORKOUT = 10
-
-// The forward-window twin of consistencyStreakWeeks: that one counts
-// *backward* from "now" (week 0 = this week), which is the wrong direction
-// for a challenge with a fixed start/end date. This counts consecutive weeks
-// starting at windowStart with >=1 workout, capped at windowEnd (so a
-// fully-elapsed challenge can't over-score) and at `now` (so an in-progress
-// challenge shows a legitimate partial score, never future weeks).
+// The challenge-window streak. Counts consecutive weeks *forward* from
+// windowStart with >=1 workout, capped at windowEnd (so a fully-elapsed
+// challenge can't over-score) and at `now` (so an in-progress challenge shows
+// a legitimate partial score, never future weeks).
+//
+// A deliberate inconsistency worth knowing about: this measures "weeks since
+// we shook hands" — rolling 7-day blocks from the moment the challenge was
+// accepted — while everything above measures Mon-Sun calendar weeks. They are
+// genuinely different concepts, and converting challenges to calendar weeks
+// would change the outcome of every wager currently in flight, so it isn't
+// something to tidy up casually.
 export function forwardStreakWeeks(
   startedAts: number[],
   windowStart: number,

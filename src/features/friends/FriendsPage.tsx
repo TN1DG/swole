@@ -4,7 +4,6 @@ import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { Badge, Box, Button, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { formatKg } from '../../../convex/fitness'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { TIER_LABELS } from '../../lib/tierLabels'
 import { ConsistencyRing } from '../../components/ConsistencyRing'
@@ -14,6 +13,7 @@ import { SegmentedControl } from '../../components/SegmentedControl'
 import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -152,12 +152,24 @@ export function FriendsPage() {
 }
 
 function LeaderboardTab() {
-  const leaderboard = useQuery(api.friends.leaderboard)
+  const [period, setPeriod] = useState<LeaderboardPeriod>('week')
+  const periodStartMs = usePeriodStart(period)
+  const leaderboard = useQuery(api.friends.leaderboard, { period, periodStartMs })
 
   return (
     <>
-      <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-        Last 7 days
+      <Box sx={{ mt: 2 }}>
+        <SegmentedControl
+          value={period}
+          onChange={setPeriod}
+          options={[
+            { value: 'week', label: 'This week' },
+            { value: 'month', label: 'This month' },
+          ]}
+        />
+      </Box>
+      <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+        {period === 'week' ? 'Mon–Sun · UTC' : 'Calendar month · UTC'}
       </Typography>
       {leaderboard === undefined ? (
         <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
@@ -185,7 +197,7 @@ function LeaderboardTab() {
                 <Typography sx={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">
                   {i + 1}
                 </Typography>
-                <ConsistencyRing streakWeeks={entry.streakWeeks} size={36} />
+                <ConsistencyRing streakWeeks={entry.streakWeeks} capped={entry.streakCapped} size={36} />
                 <Avatar src={entry.avatarUrl} name={entry.displayName} size={32} />
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography noWrap sx={{ fontWeight: 500 }}>
@@ -204,10 +216,13 @@ function LeaderboardTab() {
                       360px phone (see docs/mobile-responsiveness.md). */}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
                     <SwoleCoin size={16} title="points" />
-                    <Typography sx={{ fontWeight: 'bold' }}>{entry.score}</Typography>
+                    <Typography sx={{ fontWeight: 'bold' }}>{entry.points}</Typography>
                   </Box>
+                  {/* Days trained, not kilograms — it's what the score is
+                      actually driven by now, so showing volume here would
+                      point people at the wrong lever. */}
                   <Typography variant="caption" color="text.secondary">
-                    {formatKg(entry.weekVolumeKg)} kg
+                    {entry.daysTrained} {entry.daysTrained === 1 ? 'day' : 'days'}
                   </Typography>
                 </Box>
               </GlassTile>

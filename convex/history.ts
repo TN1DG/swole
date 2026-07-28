@@ -4,6 +4,7 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
+import { reconcileWeek } from './points'
 
 // exerciseHistory looks at this many recent completed workouts at most, so
 // the query stays within Convex read limits as history grows for years.
@@ -345,6 +346,21 @@ export const deleteWorkout = mutation({
       await ctx.db.delete(we._id)
     }
     await ctx.db.delete(args.workoutId)
+
+    // Claw the points back. Without this, delete-and-relog is a points
+    // printer and the "balance == sum of pointsAwarded" invariant the
+    // leaderboard rests on stops holding. reconcileWeek re-prices every
+    // surviving workout in the week too, since removing day 1 of a three-day
+    // week moves days 2 and 3 back down the curve.
+    //
+    // Scoped to the deleted workout's own week. Deleting the only session of
+    // some past week also shortens the streak, which should in principle
+    // lower every LATER week's multiplier — recomputing all of them is
+    // unbounded, so that drift is accepted. The live leaderboard is
+    // unaffected either way; it re-derives the current streak on every read.
+    if (workout.endedAt !== undefined) {
+      await reconcileWeek(ctx, userId, workout.startedAt, workout.pointsAwarded ?? 0)
+    }
 
     for (const exerciseId of affectedExerciseIds) {
       await recomputeRecord(ctx, userId, exerciseId)

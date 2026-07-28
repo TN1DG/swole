@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { asUser, createBackend, createUser, type T } from './test.helpers'
+import { utcWeekStart } from './fitness'
+import {
+  asUser,
+  createBackend,
+  createBuiltInExercise,
+  createUser,
+  logWorkoutOn,
+  type T,
+} from './test.helpers'
 
 describe('profiles', () => {
   it('defaults before any profile row exists', async () => {
@@ -356,5 +364,55 @@ describe('markReleaseSeen', () => {
     await expect(
       t.mutation(api.profiles.markReleaseSeen, { version: '1.1.0' }),
     ).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('getMine points fields', () => {
+  it('defaults week and month points to 0', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile).toMatchObject({ pointsBalance: 0, weekPoints: 0, monthPoints: 0 })
+  })
+
+  it('reports points earned this week alongside the balance', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    await logWorkoutOn(t, user, exerciseId, {
+      startedAt: utcWeekStart(Date.now()) + 12 * 3600_000,
+    })
+
+    const profile = (await user.query(api.profiles.getMine, {}))!
+    expect(profile.weekPoints).toBeGreaterThan(0)
+    expect(profile.weekPoints).toBe(profile.pointsBalance)
+  })
+
+  it('keeps the balance when points are spent, but not the earned total', async () => {
+    // Earned and balance diverge the moment a wager is escrowed; the
+    // leaderboard follows the earned number.
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    await logWorkoutOn(t, user, exerciseId, {
+      startedAt: utcWeekStart(Date.now()) + 12 * 3600_000,
+    })
+    const earned = (await user.query(api.profiles.getMine, {}))!.weekPoints
+
+    await t.run(async (ctx) => {
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      await ctx.db.patch(profile!._id, { pointsBalance: 0 })
+    })
+
+    const after = (await user.query(api.profiles.getMine, {}))!
+    expect(after.pointsBalance).toBe(0)
+    expect(after.weekPoints).toBe(earned)
   })
 })

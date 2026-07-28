@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
-import { beatsRecord, epley1rm, POINTS_PER_FINISHED_WORKOUT } from './fitness'
+import { beatsRecord, epley1rm, utcWeekIndex } from './fitness'
 import { assertRange, cleanName, LIMITS } from './validation'
-import { awardPoints } from './profiles'
+import { reconcileWeek } from './points'
 import { notify } from './notifications'
 
 // ---------- shared ownership helpers ----------
@@ -370,8 +370,27 @@ export const finish = mutation({
       return { discarded: true as const }
     }
 
-    await ctx.db.patch(args.workoutId, { endedAt: now })
-    await awardPoints(ctx, userId, POINTS_PER_FINISHED_WORKOUT)
+    // Stamp the scoring fields before anything reads them back — reconcileWeek
+    // below re-reads this row through the index.
+    await ctx.db.patch(args.workoutId, {
+      endedAt: now,
+      volumeKg: totalVolumeKg,
+      setCount: completedSetCount,
+      prCount,
+    })
+
+    // Points are a property of the week the workout STARTED in, not of the
+    // moment it was finished: a session begun 23:50 on Sunday and finished
+    // 00:30 on Monday belongs to Sunday's week.
+    await reconcileWeek(ctx, userId, workout.startedAt)
+
+    // A workout that straddled the week boundary retroactively extends the
+    // streak feeding the CURRENT week's multiplier, so that week needs
+    // re-settling too. Rare, and one extra ranged read closes the only
+    // retroactivity hole in the model.
+    if (utcWeekIndex(workout.startedAt) !== utcWeekIndex(now)) {
+      await reconcileWeek(ctx, userId, now)
+    }
 
     try {
       const SIX_HOURS = 6 * 60 * 60 * 1000

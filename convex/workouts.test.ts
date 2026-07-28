@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { epley1rm, POINTS_PER_FINISHED_WORKOUT } from './fitness'
+import { DAY_MS, epley1rm, utcWeekStart, weeklyPoints } from './fitness'
 import {
   asUser,
   createBackend,
   createBuiltInExercise,
   createUser,
+  logWorkoutOn,
+  pointsOf,
 } from './test.helpers'
 
 async function oneUser() {
@@ -89,9 +91,61 @@ describe('finish', () => {
 
     const completed = await logWorkout(user, exerciseId, [[100, 5, true]])
     await user.mutation(api.workouts.finish, { workoutId: completed.workoutId })
+    // Compared against the pure function rather than a magic number, so a
+    // retune of the curve doesn't need this test edited.
     expect((await user.query(api.profiles.getMine, {}))!.pointsBalance).toBe(
-      POINTS_PER_FINISHED_WORKOUT,
+      weeklyPoints({ daysTrained: 1, volumeKg: 500, prCount: 1, streakWeeks: 1 }),
     )
+  })
+
+  it('gives a second workout on the same day no day-curve points', async () => {
+    // The exploit this rework closes: under the old flat award, ten empty
+    // workouts in an afternoon paid ten times.
+    const { t, user, exerciseId } = await oneUser()
+    const userId = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id)
+
+    await logWorkoutOn(t, user, exerciseId, { weightKg: 100, reps: 5 })
+    const afterFirst = await pointsOf(t, userId)
+
+    // Same weight and reps again: a tie is not a PR (beatsRecord needs
+    // strictly greater), so only the volume garnish can move.
+    await logWorkoutOn(t, user, exerciseId, { weightKg: 100, reps: 5 })
+    const afterSecond = await pointsOf(t, userId)
+
+    expect(afterSecond - afterFirst).toBeLessThan(10)
+    expect(afterSecond).toBe(
+      weeklyPoints({ daysTrained: 1, volumeKg: 1000, prCount: 1, streakWeeks: 1 }),
+    )
+  })
+
+  it('gives a second workout on a different day the escalating award', async () => {
+    const { t, user, exerciseId } = await oneUser()
+    const userId = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id)
+
+    // Both inside one Mon-Sun week, so the week's curve is what's measured.
+    const monday = utcWeekStart(Date.now()) + 12 * 3600_000
+    await logWorkoutOn(t, user, exerciseId, { startedAt: monday, weightKg: 100, reps: 5 })
+    const afterDay1 = await pointsOf(t, userId)
+    await logWorkoutOn(t, user, exerciseId, { startedAt: monday + DAY_MS, weightKg: 100, reps: 5 })
+    const afterDay2 = await pointsOf(t, userId)
+
+    expect(afterDay2 - afterDay1).toBeGreaterThanOrEqual(15)
+  })
+
+  it('credits the week the workout STARTED in, not the week it finished in', async () => {
+    const { t, user, exerciseId } = await oneUser()
+    const userId = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id)
+
+    // 23:50 on the Sunday that just closed.
+    const lastSunday = utcWeekStart(Date.now()) - 10 * 60_000
+    await logWorkoutOn(t, user, exerciseId, { startedAt: lastSunday })
+
+    const balance = await pointsOf(t, userId)
+    expect(balance).toBeGreaterThan(0)
+
+    // ...and it lands in last week's bucket, not this week's.
+    const mine = (await user.query(api.profiles.getMine, {}))!
+    expect(mine.weekPoints).toBe(0)
   })
 
   it('cannot finish twice or edit a finished workout', async () => {

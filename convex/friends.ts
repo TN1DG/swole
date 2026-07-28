@@ -1,9 +1,24 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { getWorkoutExercises, summarizeWorkout } from './history'
-import { consistencyStreakWeeks, consistencyTier, leaderboardScore, weeksAgo } from './fitness'
+import {
+  consistencyTier,
+  displayStreakWeeks,
+  utcMonthEnd,
+  utcMonthStart,
+  utcWeekEnd,
+  utcWeekIndex,
+  utcWeekStart,
+  WEEK_MS,
+} from './fitness'
+import {
+  finishedWorkoutsBetween,
+  SCORING_LOOKBACK_WEEKS,
+  summarizePeriod,
+  trainedWeekSet,
+} from './points'
 import { cleanUsername, LIMITS } from './validation'
 import { rateLimiter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
@@ -57,20 +72,17 @@ async function profileForWithAvatar(ctx: QueryCtx, userId: Id<'users'>) {
 }
 
 
-// Streak/tier for one specific owner — leaderboard computes this inline for
-// a whole friends-batch (and needs the same workouts for volume too, so it
-// isn't worth sharing this fetch there); this is for a single arbitrary
-// owner, e.g. showing "whose workout is this" on a friend's workout detail.
+// Streak/tier for one specific owner, e.g. showing "whose workout is this" on
+// a friend's workout detail. Bounded to the scoring lookback rather than
+// reading their whole history — a streak longer than that renders as capped.
 async function ownerConsistency(ctx: QueryCtx, ownerId: Id<'users'>, now: number) {
-  const workouts = await ctx.db
-    .query('workouts')
-    .withIndex('by_owner', (q) => q.eq('ownerId', ownerId))
-    .filter((q) => q.neq(q.field('endedAt'), undefined))
-    .collect()
-  const streakWeeks = consistencyStreakWeeks(
-    workouts.map((w) => w.startedAt),
-    now,
+  const history = await finishedWorkoutsBetween(
+    ctx,
+    ownerId,
+    utcWeekStart(now) - SCORING_LOOKBACK_WEEKS * WEEK_MS,
+    utcWeekEnd(now),
   )
+  const streakWeeks = displayStreakWeeks(trainedWeekSet(history), utcWeekIndex(now))
   return { streakWeeks, tier: consistencyTier(streakWeeks) }
 }
 
@@ -148,52 +160,84 @@ export const myFriends = query({
   },
 })
 
-// You + every accepted friend, ranked by this week's volume with a
-// consistency-streak bonus baked in. Not paginated — friend counts are small.
+// You + every accepted friend, ranked by Swole Points EARNED in the period.
+// Not paginated — friend counts are small.
+//
+// Ranking on earned rather than on balance is deliberate: spending points on
+// a challenge wager must not drop your rank, and winning one must not raise
+// it. The board measures training, the balance measures currency.
 export const leaderboard = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    period: v.union(v.literal('week'), v.literal('month')),
+    // The UTC period start the client is looking at, passed in rather than
+    // derived from Date.now() in here. A Convex query is not re-run merely
+    // because time passed, so reading the clock server-side would keep
+    // serving last week's board after Sunday midnight. It's also constant for
+    // the whole period, so every friend's client shares one cache entry.
+    periodStartMs: v.number(),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (userId === null) return []
+
+    // A client must not be able to invent an arbitrary scoring window.
+    const canonicalStart =
+      args.period === 'week' ? utcWeekStart(args.periodStartMs) : utcMonthStart(args.periodStartMs)
+    if (args.periodStartMs !== canonicalStart) {
+      throw new ConvexError('Not a valid period start')
+    }
+    if (args.periodStartMs > Date.now()) throw new ConvexError('Period is in the future')
+
+    const periodStart = args.periodStartMs
+    const periodEnd =
+      args.period === 'week' ? utcWeekEnd(periodStart) : utcMonthEnd(periodStart)
 
     const friendships = await ctx.db
       .query('friendships')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .collect()
     const memberIds = [userId, ...friendships.map((f) => f.friendId)]
-    const now = Date.now()
+
+    // One ranged read per member covers both the period being scored and the
+    // streak shown beside it. The old version collected every workout ever
+    // logged by every friend, then re-walked each one's sets for volume.
+    const lookbackStart = Math.min(
+      periodStart,
+      utcWeekStart(periodEnd - 1) - SCORING_LOOKBACK_WEEKS * WEEK_MS,
+    )
 
     const entries = await Promise.all(
       memberIds.map(async (id) => {
-        const [info, workouts] = await Promise.all([
+        const [info, history] = await Promise.all([
           profileForWithAvatar(ctx, id),
-          ctx.db
-            .query('workouts')
-            .withIndex('by_owner', (q) => q.eq('ownerId', id))
-            .filter((q) => q.neq(q.field('endedAt'), undefined))
-            .collect(),
+          finishedWorkoutsBetween(ctx, id, lookbackStart, periodEnd),
         ])
 
-        const streakWeeks = consistencyStreakWeeks(
-          workouts.map((w) => w.startedAt),
-          now,
+        const streakWeeks = displayStreakWeeks(
+          trainedWeekSet(history),
+          utcWeekIndex(periodEnd - 1),
         )
-        const thisWeek = workouts.filter((w) => weeksAgo(w.startedAt, now) === 0)
-        const summaries = await Promise.all(thisWeek.map((w) => summarizeWorkout(ctx, w)))
-        const weekVolumeKg = summaries.reduce((sum, w) => sum + w.totalVolumeKg, 0)
+        const inPeriod = history.filter((w) => w.startedAt >= periodStart)
 
         return {
           ...info,
           isMe: id === userId,
-          weekVolumeKg,
+          ...summarizePeriod(inPeriod),
           streakWeeks,
+          // A streak longer than the lookback can't be measured from this
+          // read; the UI renders it as "12+" rather than lying with a number.
+          streakCapped: streakWeeks >= SCORING_LOOKBACK_WEEKS,
           tier: consistencyTier(streakWeeks),
-          score: leaderboardScore(weekVolumeKg, streakWeeks),
         }
       }),
     )
 
-    return entries.sort((a, b) => b.score - a.score)
+    // Ties broken by days trained, then volume — both are "who did more of
+    // the thing the score rewards", so neither can flip the intended ordering.
+    return entries.sort(
+      (a, b) =>
+        b.points - a.points || b.daysTrained - a.daysTrained || b.volumeKg - a.volumeKg,
+    )
   },
 })
 

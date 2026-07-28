@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
+import { DAY_MS, utcMonthStart, utcWeekStart, WEEK_MS } from './fitness'
 import {
   asUser,
   createBackend,
   createBuiltInExercise,
+  logWorkoutOn,
   twoFriends,
   userWithUsername,
   type T,
@@ -277,40 +279,128 @@ describe('getFriendWorkoutDetail', () => {
 })
 
 describe('leaderboard', () => {
-  it('includes you and your friends, ranked by this-week score', async () => {
+  // Wednesday of the current week, so a test can place workouts on earlier
+  // days of the same Mon-Sun week without spilling into the previous one.
+  const thisWeek = (dayOffset: number) => utcWeekStart(Date.now()) + dayOffset * DAY_MS + 12 * 3600_000
+  const weekArgs = () => ({ period: 'week' as const, periodStartMs: utcWeekStart(Date.now()) })
+
+  it('ranks three modest days above one huge day', async () => {
+    // The assertion that proves the rework landed. Under the old formula this
+    // was inverted: the score was raw kilograms, so Alice won comfortably and
+    // the test said so in as many words.
     const t = createBackend()
     const exerciseId = await createBuiltInExercise(t)
     const { alice, bob } = await twoFriends(t)
 
-    // Alice: one big workout this week, nothing before.
-    await logWorkout(t, alice.user, exerciseId, 0, 200)
-    // Bob: smaller this week, but logged every week for the last 3 -> streak bonus.
-    await logWorkout(t, bob.user, exerciseId, 0, 50)
-    await logWorkout(t, bob.user, exerciseId, 8, 50)
-    await logWorkout(t, bob.user, exerciseId, 15, 50)
+    // Alice: one enormous session, nothing else.
+    await logWorkoutOn(t, alice.user, exerciseId, { startedAt: thisWeek(0), weightKg: 200, reps: 20 })
+    // Bob: three ordinary sessions on three different days.
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(0), weightKg: 50 })
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(1), weightKg: 50 })
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(2), weightKg: 50 })
 
-    const board = await alice.user.query(api.friends.leaderboard, {})
+    const board = await alice.user.query(api.friends.leaderboard, weekArgs())
     expect(board).toHaveLength(2)
 
     const aliceEntry = board.find((e) => e.username === 'alice')!
     const bobEntry = board.find((e) => e.username === 'bob')!
-    expect(aliceEntry.weekVolumeKg).toBe(1000) // 200kg x 5 reps
-    expect(aliceEntry.streakWeeks).toBe(1)
-    expect(aliceEntry.tier).toBe('none')
+    expect(aliceEntry.daysTrained).toBe(1)
+    expect(bobEntry.daysTrained).toBe(3)
+    expect(bobEntry.points).toBeGreaterThan(aliceEntry.points)
+    expect(board[0].username).toBe('bob')
+  })
 
-    expect(bobEntry.weekVolumeKg).toBe(250) // 50kg x 5 reps
+  it('reports the streak and tier alongside the score', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice, bob } = await twoFriends(t)
+
+    // Bob trains this week and each of the two before it.
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(0) })
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(0) - WEEK_MS })
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(0) - 2 * WEEK_MS })
+
+    const board = await alice.user.query(api.friends.leaderboard, weekArgs())
+    const bobEntry = board.find((e) => e.username === 'bob')!
     expect(bobEntry.streakWeeks).toBe(3)
     expect(bobEntry.tier).toBe('consistent')
-    expect(bobEntry.score).toBe(Math.round(250 * 1.15)) // +5%/week x 3
+    expect(bobEntry.streakCapped).toBe(false)
+  })
 
-    // Alice's raw volume is much higher, so she still ranks first here.
-    expect(board[0].username).toBe('alice')
+  it('a points balance spent on a wager does not change the ranking', async () => {
+    // The board measures training; the balance measures currency. Ranking on
+    // earned rather than balance is what keeps those separate.
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice, bob } = await twoFriends(t)
+
+    await logWorkoutOn(t, bob.user, exerciseId, { startedAt: thisWeek(0) })
+    const before = (await alice.user.query(api.friends.leaderboard, weekArgs())).find(
+      (e) => e.username === 'bob',
+    )!.points
+
+    // Drain Bob's balance directly, as an escrow would.
+    await t.run(async (ctx) => {
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', bob.userId))
+        .unique()
+      await ctx.db.patch(profile!._id, { pointsBalance: 0 })
+    })
+
+    const after = (await alice.user.query(api.friends.leaderboard, weekArgs())).find(
+      (e) => e.username === 'bob',
+    )!.points
+    expect(after).toBe(before)
+  })
+
+  it('a month totals every week in it', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+
+    // Two workouts in the same calendar month but different weeks. Anchored
+    // to the 3rd and 17th so both always land inside one month.
+    const now = new Date()
+    const third = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 3, 12)
+    const seventeenth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 17, 12)
+    await logWorkoutOn(t, alice.user, exerciseId, { startedAt: third })
+    await logWorkoutOn(t, alice.user, exerciseId, { startedAt: seventeenth })
+
+    const board = await alice.user.query(api.friends.leaderboard, {
+      period: 'month',
+      periodStartMs: utcMonthStart(Date.now()),
+    })
+    expect(board[0].daysTrained).toBe(2)
+    expect(board[0].points).toBeGreaterThan(0)
+  })
+
+  it('rejects a period start that is not a real boundary', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    await expect(
+      alice.user.query(api.friends.leaderboard, {
+        period: 'week',
+        periodStartMs: utcWeekStart(Date.now()) + DAY_MS,
+      }),
+    ).rejects.toThrow(/valid period/i)
+  })
+
+  it('rejects a period start in the future', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    await expect(
+      alice.user.query(api.friends.leaderboard, {
+        period: 'week',
+        periodStartMs: utcWeekStart(Date.now() + 30 * DAY_MS),
+      }),
+    ).rejects.toThrow(/future/i)
   })
 
   it('a solo user (no friends yet) sees just themselves', async () => {
     const t = createBackend()
     const alice = await userWithUsername(t, 'alice')
-    const board = await alice.user.query(api.friends.leaderboard, {})
+    const board = await alice.user.query(api.friends.leaderboard, weekArgs())
     expect(board).toHaveLength(1)
     expect(board[0].isMe).toBe(true)
   })

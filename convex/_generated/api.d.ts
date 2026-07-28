@@ -27,6 +27,7 @@ import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
 import type * as pings from "../pings.js";
+import type * as points from "../points.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
 import type * as rateLimiter from "../rateLimiter.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   notifications: typeof notifications;
   pings: typeof pings;
+  points: typeof points;
   profiles: typeof profiles;
   prs: typeof prs;
   rateLimiter: typeof rateLimiter;

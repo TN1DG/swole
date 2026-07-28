@@ -3,8 +3,10 @@ import {
   beatsRecord,
   behindRecord,
   cmToFtIn,
-  consistencyStreakWeeks,
   consistencyTier,
+  dayCurvePoints,
+  displayStreakWeeks,
+  distinctTrainingDays,
   epley1rm,
   forwardStreakWeeks,
   formatDuration,
@@ -12,11 +14,20 @@ import {
   goalCalories,
   kgToLb,
   lbToKg,
-  leaderboardScore,
   macroTargets,
   mifflinStJeorBmr,
+  prBonus,
+  streakEndingAt,
+  streakMultiplier,
   tdee,
-  weeksAgo,
+  utcMonthEnd,
+  utcMonthStart,
+  utcWeekIndex,
+  utcWeekStart,
+  volumeBonus,
+  weeklyPoints,
+  weeklyPointsIncrements,
+  WEEKLY_DAY_POINTS,
 } from './fitness'
 
 describe('epley1rm', () => {
@@ -193,35 +204,6 @@ describe('macroTargets', () => {
 const DAY_MS = 24 * 60 * 60 * 1000
 const WEEK_MS = 7 * DAY_MS
 
-describe('weeksAgo', () => {
-  it('buckets into rolling 7-day windows from now', () => {
-    const now = Date.now()
-    expect(weeksAgo(now, now)).toBe(0)
-    expect(weeksAgo(now - 6 * DAY_MS, now)).toBe(0)
-    expect(weeksAgo(now - 8 * DAY_MS, now)).toBe(1)
-    expect(weeksAgo(now - 15 * DAY_MS, now)).toBe(2)
-  })
-})
-
-describe('consistencyStreakWeeks', () => {
-  it('counts consecutive weeks with a workout, stopping at the first gap', () => {
-    const now = Date.now()
-    const startedAts = [
-      now - 0.1 * WEEK_MS, // week 0
-      now - 1.5 * WEEK_MS, // week 1
-      now - 2.9 * WEEK_MS, // week 2
-      now - 4.2 * WEEK_MS, // week 4 — gap at week 3 stops the streak at 3
-    ]
-    expect(consistencyStreakWeeks(startedAts, now)).toBe(3)
-  })
-
-  it('is 0 if there was no workout this week, even with a long history', () => {
-    const now = Date.now()
-    const startedAts = [now - 1.2 * WEEK_MS, now - 2.2 * WEEK_MS, now - 3.2 * WEEK_MS]
-    expect(consistencyStreakWeeks(startedAts, now)).toBe(0)
-  })
-})
-
 describe('consistencyTier', () => {
   it('maps streak length to the right accolade', () => {
     expect(consistencyTier(0)).toBe('none')
@@ -232,6 +214,16 @@ describe('consistencyTier', () => {
     expect(consistencyTier(8)).toBe('relentless')
     expect(consistencyTier(12)).toBe('iron_will')
     expect(consistencyTier(100)).toBe('iron_will')
+  })
+
+  it('puts Iron Will exactly where the streak multiplier maxes out', () => {
+    // Past 10 weeks there is nothing further to earn, which is why the ring
+    // stops filling there instead of wrapping.
+    expect(consistencyTier(6)).toBe('dedicated')
+    expect(consistencyTier(7)).toBe('relentless')
+    expect(consistencyTier(9)).toBe('relentless')
+    expect(consistencyTier(10)).toBe('iron_will')
+    expect(streakMultiplier(10)).toBeCloseTo(1.5)
   })
 })
 
@@ -295,11 +287,233 @@ describe('forwardStreakWeeks', () => {
   })
 })
 
-describe('leaderboardScore', () => {
-  it('adds 5% per consecutive week, capped at +50%', () => {
-    expect(leaderboardScore(1000, 0)).toBe(1000)
-    expect(leaderboardScore(1000, 1)).toBe(1050)
-    expect(leaderboardScore(1000, 10)).toBe(1500)
-    expect(leaderboardScore(1000, 20)).toBe(1500) // capped, same as 10
+// ---------- Swole Points scoring ----------
+
+// 2026-01-05 is a Monday. Every calendar assertion below is anchored to it
+// rather than to Date.now(), so none of these tests change meaning with the
+// day they're run on.
+const MONDAY = Date.UTC(2026, 0, 5)
+
+describe('utcWeekStart / utcWeekIndex', () => {
+  it('a Monday is its own week start', () => {
+    expect(utcWeekStart(MONDAY)).toBe(MONDAY)
+    expect(utcWeekStart(MONDAY + 3 * DAY_MS + 5 * 3600_000)).toBe(MONDAY)
+  })
+
+  it('the Sunday before belongs to the previous week', () => {
+    expect(utcWeekStart(MONDAY - 1)).toBe(MONDAY - WEEK_MS)
+    expect(utcWeekIndex(MONDAY - 1)).toBe(utcWeekIndex(MONDAY) - 1)
+  })
+
+  it('the last millisecond of a week still belongs to it', () => {
+    expect(utcWeekStart(MONDAY + WEEK_MS - 1)).toBe(MONDAY)
+  })
+
+  it('lands on a Monday for pre-epoch timestamps too', () => {
+    // Guards the Math.floor-on-negatives trap: trunc would round the wrong
+    // way here and land the week start on a Thursday.
+    const preEpoch = Date.UTC(1969, 5, 15)
+    expect(new Date(utcWeekStart(preEpoch)).getUTCDay()).toBe(1)
+  })
+})
+
+describe('utcMonthStart / utcMonthEnd', () => {
+  it('bounds a month', () => {
+    const midJan = Date.UTC(2026, 0, 17, 13)
+    expect(utcMonthStart(midJan)).toBe(Date.UTC(2026, 0, 1))
+    expect(utcMonthEnd(midJan)).toBe(Date.UTC(2026, 1, 1))
+  })
+
+  it('rolls December into January of the next year', () => {
+    const dec = Date.UTC(2026, 11, 20)
+    expect(utcMonthEnd(dec)).toBe(Date.UTC(2027, 0, 1))
+  })
+})
+
+describe('distinctTrainingDays', () => {
+  it('counts three sessions in one day as one day', () => {
+    const d = Date.UTC(2026, 0, 6)
+    expect(distinctTrainingDays([d, d + 3600_000, d + 7 * 3600_000])).toBe(1)
+  })
+
+  it('splits either side of UTC midnight', () => {
+    const d = Date.UTC(2026, 0, 6)
+    expect(distinctTrainingDays([d + 23 * 3600_000 + 59 * 60_000, d + DAY_MS + 60_000])).toBe(2)
+  })
+
+  it('is 0 for no workouts', () => {
+    expect(distinctTrainingDays([])).toBe(0)
+  })
+})
+
+describe('dayCurvePoints', () => {
+  it('matches the published curve', () => {
+    WEEKLY_DAY_POINTS.forEach((points, days) => {
+      expect(dayCurvePoints(days)).toBe(points)
+    })
+  })
+
+  it('rewards the third day most, then flattens', () => {
+    const gain = (d: number) => dayCurvePoints(d) - dayCurvePoints(d - 1)
+    expect(gain(3)).toBeGreaterThan(gain(2))
+    expect(gain(3)).toBeGreaterThan(gain(4))
+    expect(gain(4)).toBeGreaterThanOrEqual(gain(7))
+  })
+
+  it('clamps beyond a full week and floors fractions', () => {
+    expect(dayCurvePoints(8)).toBe(dayCurvePoints(7))
+    expect(dayCurvePoints(-1)).toBe(0)
+    expect(dayCurvePoints(2.9)).toBe(dayCurvePoints(2))
+  })
+})
+
+describe('volumeBonus / prBonus', () => {
+  it('scales then stops', () => {
+    expect(volumeBonus(0)).toBe(0)
+    expect(volumeBonus(4500)).toBe(4)
+    expect(volumeBonus(20_000)).toBe(20)
+  })
+
+  it('caps volume no matter how much is lifted', () => {
+    expect(volumeBonus(1_000_000)).toBe(20)
+  })
+
+  it('caps PRs — this one is a security control, not a balance knob', () => {
+    // beatsRecord() returns true for any exercise with no record yet, and a
+    // user may create 300 custom exercises, so PRs are mintable. The cap is
+    // what bounds that exploit.
+    expect(prBonus(2)).toBe(10)
+    expect(prBonus(6)).toBe(30)
+    expect(prBonus(300)).toBe(30)
+  })
+})
+
+describe('streakEndingAt', () => {
+  it('counts back from the week being scored', () => {
+    expect(streakEndingAt(new Set([10, 9, 8, 6]), 10)).toBe(3)
+  })
+
+  it('is 0 when the scored week itself is empty', () => {
+    expect(streakEndingAt(new Set([9, 8, 7]), 10)).toBe(0)
+  })
+})
+
+describe('displayStreakWeeks', () => {
+  it('does not reset to zero just because the new week has not started yet', () => {
+    // The headline behaviour of the rework: an untrained Monday morning must
+    // not tell someone with a five-week run that their streak is gone.
+    const trained = new Set([9, 8, 7, 6, 5])
+    expect(displayStreakWeeks(trained, 10)).toBe(5)
+  })
+
+  it('includes the current week once it has a workout', () => {
+    expect(displayStreakWeeks(new Set([10, 9, 8]), 10)).toBe(3)
+  })
+
+  it('is still 0 after a genuine gap', () => {
+    expect(displayStreakWeeks(new Set([8, 7]), 10)).toBe(0)
+  })
+})
+
+describe('weeklyPoints', () => {
+  it('is driven by days trained', () => {
+    const base = { volumeKg: 0, prCount: 0, streakWeeks: 0 }
+    expect(weeklyPoints({ ...base, daysTrained: 1 })).toBe(10)
+    expect(weeklyPoints({ ...base, daysTrained: 3 })).toBe(45)
+    expect(weeklyPoints({ ...base, daysTrained: 5 })).toBe(65)
+  })
+
+  it('applies the streak multiplier to the whole base', () => {
+    expect(
+      weeklyPoints({ daysTrained: 4, volumeKg: 28_400, prCount: 2, streakWeeks: 7 }),
+    ).toBe(Math.round((55 + 20 + 10) * 1.35))
+  })
+
+  it('tops out at 195', () => {
+    const max = weeklyPoints({
+      daysTrained: 7,
+      volumeKg: 10_000_000,
+      prCount: 999,
+      streakWeeks: 999,
+    })
+    expect(max).toBe(195)
+  })
+
+  it('lets consistency beat volume — the whole point of the rework', () => {
+    const oneHugeDay = weeklyPoints({ daysTrained: 1, volumeKg: 40_000, prCount: 2, streakWeeks: 0 })
+    const threeModestDays = weeklyPoints({ daysTrained: 3, volumeKg: 3_000, prCount: 0, streakWeeks: 2 })
+    expect(threeModestDays).toBeGreaterThan(oneHugeDay)
+  })
+})
+
+describe('weeklyPointsIncrements', () => {
+  const day = (n: number) => Date.UTC(2026, 0, 5 + n)
+
+  it('telescopes — increments always sum to the week total', () => {
+    // This invariant is the entire basis for summing pointsAwarded over a
+    // date range to get a leaderboard score. If it breaks, the balance and
+    // the board silently disagree.
+    const workouts = [
+      { startedAt: day(0), volumeKg: 3000, prCount: 1 },
+      { startedAt: day(0) + 3600_000, volumeKg: 1200, prCount: 0 },
+      { startedAt: day(2), volumeKg: 5000, prCount: 2 },
+      { startedAt: day(4), volumeKg: 800, prCount: 0 },
+    ]
+    for (const streak of [0, 3, 20]) {
+      const total = weeklyPoints({
+        daysTrained: 3,
+        volumeKg: 10_000,
+        prCount: 3,
+        streakWeeks: streak,
+      })
+      const sum = weeklyPointsIncrements(workouts, streak).reduce((a, b) => a + b, 0)
+      expect(sum).toBe(total)
+    }
+  })
+
+  it('gives a second workout on the same day no day-curve points', () => {
+    const [first, second] = weeklyPointsIncrements(
+      [
+        { startedAt: day(0), volumeKg: 0, prCount: 0 },
+        { startedAt: day(0) + 4 * 3600_000, volumeKg: 0, prCount: 0 },
+      ],
+      0,
+    )
+    expect(first).toBe(10)
+    expect(second).toBe(0) // the anti-farming property, by construction
+  })
+
+  it('is order-independent — it sorts chronologically itself', () => {
+    const a = weeklyPointsIncrements(
+      [
+        { startedAt: day(3), volumeKg: 1000, prCount: 0 },
+        { startedAt: day(1), volumeKg: 2000, prCount: 0 },
+      ],
+      0,
+    )
+    expect(a.reduce((x, y) => x + y, 0)).toBe(
+      weeklyPoints({ daysTrained: 2, volumeKg: 3000, prCount: 0, streakWeeks: 0 }),
+    )
+  })
+
+  it('never awards a negative increment for an added workout', () => {
+    const increments = weeklyPointsIncrements(
+      [
+        { startedAt: day(0), volumeKg: 500, prCount: 0 },
+        { startedAt: day(1), volumeKg: 500, prCount: 0 },
+        { startedAt: day(2), volumeKg: 500, prCount: 0 },
+      ],
+      4,
+    )
+    for (const i of increments) expect(i).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('streakMultiplier', () => {
+  it('adds 5% per week, capped at +50%', () => {
+    expect(streakMultiplier(0)).toBe(1)
+    expect(streakMultiplier(1)).toBeCloseTo(1.05)
+    expect(streakMultiplier(10)).toBeCloseTo(1.5)
+    expect(streakMultiplier(40)).toBeCloseTo(1.5)
   })
 })

@@ -3,7 +3,16 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { assertRange, cleanName, cleanUsername, LIMITS } from './validation'
-import { consistencyStreakWeeks, consistencyTier } from './fitness'
+import {
+  consistencyTier,
+  displayStreakWeeks,
+  utcMonthEnd,
+  utcMonthStart,
+  utcWeekEnd,
+  utcWeekIndex,
+  utcWeekStart,
+  WEEK_MS,
+} from './fitness'
 import { rateLimiter } from './rateLimiter'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
@@ -39,6 +48,20 @@ export async function getOrCreateProfile(ctx: MutationCtx, userId: Id<'users'>) 
 export async function awardPoints(ctx: MutationCtx, userId: Id<'users'>, amount: number) {
   const profile = await getOrCreateProfile(ctx, userId)
   await ctx.db.patch(profile._id, { pointsBalance: (profile.pointsBalance ?? 0) + amount })
+}
+
+// Moves a balance by a signed amount, floored at zero.
+//
+// Unlike escrowPoints this never throws on insufficient funds, because its
+// caller is the workout-delete clawback (points.ts:reconcileWeek). The points
+// being clawed back may already be escrowed in a live challenge, and failing
+// somebody's delete because of that would be unexplainable — they just wanted
+// to remove a mis-logged session. Clawing back only as far as the balance
+// allows is the lesser evil.
+export async function adjustPoints(ctx: MutationCtx, userId: Id<'users'>, delta: number) {
+  const profile = await getOrCreateProfile(ctx, userId)
+  const next = Math.max(0, (profile.pointsBalance ?? 0) + delta)
+  await ctx.db.patch(profile._id, { pointsBalance: next })
 }
 
 // Debits a balance, throwing if it can't cover the amount — challenges.ts
@@ -82,11 +105,29 @@ export const getMine = query({
     ])
 
     const completedWorkouts = workouts.filter((w) => w.endedAt !== undefined)
-    const streakWeeks = consistencyStreakWeeks(
-      completedWorkouts.map((w) => w.startedAt),
-      Date.now(),
+
+    // Your own streak can afford a longer lookback than the leaderboard's —
+    // that's one user's rows, not one per friend — so a long streak shows a
+    // real number here rather than being capped.
+    const now = Date.now()
+    const OWN_LOOKBACK_WEEKS = 52
+    const trainedWeeks = new Set(
+      completedWorkouts
+        .filter((w) => w.startedAt >= utcWeekStart(now) - OWN_LOOKBACK_WEEKS * WEEK_MS)
+        .map((w) => utcWeekIndex(w.startedAt)),
     )
+    const streakWeeks = displayStreakWeeks(trainedWeeks, utcWeekIndex(now))
     const tier = consistencyTier(streakWeeks)
+
+    // Shown next to the balance. Without both numbers on screen, people read
+    // the coin count as their leaderboard rank — the board ranks on points
+    // EARNED in the period, the balance is what's left after wagers.
+    const sumAwarded = (from: number, to: number) =>
+      completedWorkouts
+        .filter((w) => w.startedAt >= from && w.startedAt < to)
+        .reduce((sum, w) => sum + (w.pointsAwarded ?? 0), 0)
+    const weekPoints = sumAwarded(utcWeekStart(now), utcWeekEnd(now))
+    const monthPoints = sumAwarded(utcMonthStart(now), utcMonthEnd(now))
 
     return {
       email: user?.email ?? null,
@@ -106,6 +147,8 @@ export const getMine = query({
       activityLevel: profile?.activityLevel ?? null,
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
+      weekPoints,
+      monthPoints,
       username: profile?.username ?? null,
       workoutsPublic: profile?.workoutsPublic ?? false,
       lastSeenRelease: profile?.lastSeenRelease ?? null,

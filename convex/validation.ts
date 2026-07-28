@@ -59,7 +59,11 @@ export const LIMITS = {
   releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"
   challengeMinWeeks: 1,
   challengeMaxWeeks: 8,
-  maxWagerPoints: 1000,
+  // Retuned from 1000 when points moved from a flat 10-per-workout award to
+  // the day-based curve: a committed user now earns roughly 65-100 a week, so
+  // a 1000-point wager was ten weeks of training and a 2000-point payout was
+  // most of a year's.
+  maxWagerPoints: 250,
 } as const
 
 // Trimmed, non-empty, length-capped free text (feature request body, etc.).

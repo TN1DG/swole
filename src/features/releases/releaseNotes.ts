@@ -21,6 +21,20 @@ export type Release = {
 
 // Newest first.
 export const RELEASES: Release[] = [
+  {
+    version: '1.3.0',
+    releasedAt: Date.UTC(2026, 6, 28),
+    summary:
+      'Points are rebuilt around how often you train, not how much you lift. Your number will look very different — that is the change, not a bug.',
+    changes: [
+      'You now earn points for each DAY you train, not each workout. Three sessions on a Tuesday counts once. The third day of the week is worth the most, so getting from two days to three is the big jump.',
+      'Lifting heavy still helps, but it is capped. Volume and PRs together can add at most 50 points against a possible 80 from turning up — so nobody out-lifts a more consistent friend any more.',
+      'Weeks now run Monday to Sunday, and the leaderboard has a This week / This month toggle. There is a real deadline instead of a window that slid around with you.',
+      'Points and your coin balance are the same thing now. Spending on a challenge no longer changes your leaderboard place — the board ranks what you earned, not what you have left.',
+      'Your scores will drop from the thousands to the tens. Old points were raw kilograms; these are actual points, and roughly 195 is a perfect week.',
+      'Your existing coin balance is untouched.',
+    ],
+  },
   // 1.1.0 was folded into this entry a couple of hours after it shipped,
   // rather than left as its own release — almost nobody had seen the popup
   // yet, and two notices back to back reads worse than one combined list.

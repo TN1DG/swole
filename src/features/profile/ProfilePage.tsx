@@ -204,8 +204,16 @@ export function ProfilePage() {
       </GlassCard>
 
       <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography sx={{ fontWeight: 600 }}>Points</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box>
+          <Typography sx={{ fontWeight: 600 }}>Points</Typography>
+          {/* Both numbers, deliberately. The leaderboard ranks on points
+              EARNED in the period; the balance is what's left after wagers.
+              With only the balance on screen people read it as their rank. */}
+          <Typography variant="body2" color="text.secondary">
+            +{profile!.weekPoints} this week · {profile!.monthPoints} this month
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
           <SwoleCoin size={28} />
           <Typography variant="h6" sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
             {profile!.pointsBalance}

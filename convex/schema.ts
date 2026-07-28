@@ -45,7 +45,14 @@ export default defineSchema({
     lastSeenRelease: v.optional(v.string()),
     // Single global target for the History calendar's daily rings.
     dailyVolumeGoalKg: v.optional(v.number()),
-    // Earned by finishing workouts, spent/won via challenges (convex/challenges.ts).
+    // Swole Points: earned per distinct training day (see convex/fitness.ts
+    // and convex/points.ts), spent and won via challenges.
+    //
+    // Invariant, holding from the scoring rework forward:
+    //   pointsBalance == sum(workouts.pointsAwarded) - challenge spend
+    // Balances predating that rework are grandfathered rather than
+    // re-derived — they may already be escrowed in a live challenge, and
+    // recalculating could take points off someone mid-wager.
     pointsBalance: v.optional(v.number()),
     // Uploaded + cropped on the client (see src/features/profile/
     // AvatarUploadDialog.tsx). Visible to the owner and their friends only.
@@ -117,7 +124,30 @@ export default defineSchema({
     startedAt: v.number(), // ms since epoch (Date.now())
     endedAt: v.optional(v.number()), // undefined = still in progress
     notes: v.optional(v.string()),
-  }).index('by_owner', ['ownerId']),
+
+    // Stamped by workouts.finish, which already walks every set to compute
+    // them. Denormalized so the scoring and leaderboard reads never have to
+    // re-walk workoutExercises -> sets: history.summarizeWorkout costs ~1+2N
+    // reads per workout, and the leaderboard was paying that for every
+    // workout of every friend on every render.
+    //
+    // Optional because rows finished before this shipped don't have them.
+    // convex/migrations.ts backfills recent ones; older rows read as 0 and
+    // nothing the UI shows ever sums them.
+    volumeKg: v.optional(v.number()),
+    setCount: v.optional(v.number()),
+    prCount: v.optional(v.number()),
+
+    // What this workout credited to profiles.pointsBalance. The unit of
+    // account for the whole points system: a week's leaderboard score is a
+    // SUM of this field over a date range, so a rank can never disagree with
+    // the balance it came from. Only points.ts:reconcileWeek may write it.
+    pointsAwarded: v.optional(v.number()),
+  })
+    .index('by_owner', ['ownerId'])
+    // Every scoring read is "this owner, this date range". Prefix-usable, so
+    // it also covers everything by_owner does.
+    .index('by_owner_startedAt', ['ownerId', 'startedAt']),
 
   // An exercise inside a workout, in order.
   workoutExercises: defineTable({

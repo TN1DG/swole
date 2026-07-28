@@ -89,6 +89,54 @@ export async function twoFriends(t: T) {
   return { alice, bob }
 }
 
+/**
+ * Logs one completed single-set workout, optionally dated in the past.
+ *
+ * The backdating happens BEFORE `finish`, and that ordering is load-bearing:
+ * points are bucketed by the calendar week a workout STARTED in, and finish()
+ * reads `startedAt` to decide which week to credit. The two near-identical
+ * copies of this helper that used to live in friends.test.ts and
+ * workouts.test.ts both backdated afterwards, which under day-based scoring
+ * credits the wrong week and leaves pointsAwarded inconsistent with the row's
+ * own date. Shared here so there is one correct copy.
+ */
+export async function logWorkoutOn(
+  t: T,
+  user: ReturnType<typeof asUser>,
+  exerciseId: Id<'exercises'>,
+  opts: { daysAgo?: number; startedAt?: number; weightKg?: number; reps?: number } = {},
+): Promise<Id<'workouts'>> {
+  const workoutId = await user.mutation(api.workouts.start, {})
+  await user.mutation(api.workouts.addExercise, { workoutId, exerciseId })
+
+  const startedAt =
+    opts.startedAt ?? Date.now() - (opts.daysAgo ?? 0) * 24 * 60 * 60 * 1000
+  await t.run(async (ctx) => {
+    await ctx.db.patch(workoutId, { startedAt })
+  })
+
+  const active = await user.query(api.workouts.getActive, {})
+  await user.mutation(api.workouts.updateSet, {
+    setId: active!.exercises[0].sets[0]._id,
+    weightKg: opts.weightKg ?? 100,
+    reps: opts.reps ?? 5,
+    completed: true,
+  })
+  await user.mutation(api.workouts.finish, { workoutId })
+  return workoutId
+}
+
+/** Current points balance, straight from the profile row. */
+export async function pointsOf(t: T, userId: Id<'users'>): Promise<number> {
+  return await t.run(async (ctx) => {
+    const profile = await ctx.db
+      .query('profiles')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique()
+    return profile?.pointsBalance ?? 0
+  })
+}
+
 // Tops up a points balance so challenge escrow has something to take.
 export async function givePoints(t: T, userId: Id<'users'>, amount: number) {
   await t.run(async (ctx) => {
