@@ -1,9 +1,46 @@
 import { tokens } from '../theme/tokens'
 
-// Horse head in profile, drawn to fit a 100x100 viewBox alongside the rim.
-// A silhouette rather than a lined illustration so it stays legible at the
-// 18px the leaderboard row gives it.
-const HORSE_PATH =
+// The coin carries TWO marks, picked by size.
+//
+// Full body at 64px and up: a horse at full gallop with a flowing gold mane
+// and tail. Below that it drops to the head, because the galloping figure's
+// legs are ~4 units wide in a 100-unit viewBox — at 32px they render as an
+// unreadable smudge (verified by rasterizing both). Simplifying a mark as it
+// shrinks is what coins and logos do; the alternative is a muddy blob in
+// every leaderboard row.
+
+// Galloping body, facing right. Muzzle -> jaw -> throat -> chest -> belly ->
+// flank -> croup -> back -> withers -> crest -> poll -> ear -> forehead.
+const GALLOP_BODY =
+  'M 86 34 C 87 37 86 39.5 83 40.5 C 80 41.5 77 41 74 39 ' +
+  'C 71.5 37.5 69.5 36 67.5 34 C 64 38 60 42 56.5 46 ' +
+  'C 54.5 49 53.5 52 53.5 55 C 52.5 58.5 48 60.5 43 61 ' +
+  'C 37 61.5 30 60.5 25 57.5 C 22 55.5 20.5 53 20.5 49.5 L 20.5 41.5 ' +
+  'C 24 39.5 29 39 34 40 C 40 41.5 45.5 42 49 40 C 51 37 54 33.5 58 29.5 ' +
+  'C 61.5 26 65.5 23 69.5 21.5 L 71.5 15 L 77 22 C 81 24.5 84 28.5 86 34 Z'
+
+// Stroked rather than outlined: four tapering legs in a splayed gallop are
+// far easier to place and tune as centre-lines than as one closed silhouette.
+const GALLOP_LEGS = [
+  'M 55 51 C 63 56 71 60 78 62', // leading foreleg, reaching forward
+  'M 51 53 C 55 61 54 68 49 71', // trailing foreleg, folded under
+  'M 25 53 C 19 59 13 64 7 67', // hind leg, driving back
+  'M 29 57 C 27 65 26 71 29 77', // hind leg, trailing
+]
+
+// Drapes over the crest from the poll and streams back past the withers.
+const GALLOP_MANE =
+  'M 70 21.5 C 65 23.5 60 27.5 56 32.5 C 52 36.5 48.5 39.5 45 41.5 ' +
+  'C 41 43.5 36 44 32 42.5 C 36 40.5 41 39 45 36.5 C 49 34 53 30 57 26 ' +
+  'C 61 22.5 65.5 20 70 21.5 Z'
+
+const GALLOP_TAIL =
+  'M 23.5 42 C 17 37.5 9 34.5 1 35 C 6.5 38.5 11 42.5 13.5 47 ' +
+  'C 8.5 48.5 3.5 52 0 57 C 5 53.5 11 50.5 17 49.5 C 21 48.8 24 46 23.5 42 Z'
+
+// Head in profile — one solid silhouette, which is what keeps it readable
+// down to 16px in a leaderboard row.
+const HEAD_PATH =
   'M 28 82 C 30 68 33 47 43 34 L 42 23 L 49 31 L 52 30 L 55 21 L 60 33 ' +
   'C 65 37 69 43 73 50 C 76 55 78 60 77 64 C 76 68 71 70 67 68 ' +
   'C 64 66 62 64 58 63 C 50 61 44 65 40 71 C 36 77 32 84 28 82 Z'
@@ -13,9 +50,11 @@ const HORSE_PATH =
 const TOP_LEGEND = "HUSTLERS DON'T STOP"
 const BOTTOM_LEGEND = 'THEY KEEP GOOOOOOOING'
 
-// Below this the legend is unreadable and just reads as noise on the rim, so
-// the coin drops to the medallion alone.
-const LEGEND_MIN_SIZE = 64
+// Below this the legend is unreadable and just reads as noise on the rim, and
+// the galloping figure's legs blur together — so the coin drops to the head
+// alone. Both thresholds are the same number because they fail at the same
+// scale; splitting them would mean a third, worse-looking intermediate state.
+const FULL_COIN_MIN_SIZE = 64
 
 // Rough advance widths relative to a capital. Without these, equal angular
 // slots leave a visible gap either side of narrow glyphs — "DON ' T".
@@ -89,9 +128,9 @@ function ringGlyphs(
  * which rendered as a different picture on every platform and could not be
  * coloured, sized or exported reliably.
  *
- * Two modes, chosen by `size`: at 64px and up the full coin with its legend;
- * below that just the medallion, because the legend is illegible at
- * leaderboard-row scale and only muddies the rim.
+ * At 64px and up: the full coin — a galloping horse with a gold mane and
+ * tail, ringed by the legend. Below that: the horse head alone. See
+ * FULL_COIN_MIN_SIZE for why it degrades rather than just scaling down.
  */
 export function SwoleCoin({
   size = 20,
@@ -101,9 +140,7 @@ export function SwoleCoin({
   /** Sets an accessible name. Omit to leave the coin decorative. */
   title?: string
 }) {
-  const withLegend = size >= LEGEND_MIN_SIZE
-  // Shrink the horse to clear the legend when it's shown.
-  const scale = withLegend ? 0.62 : 0.94
+  const full = size >= FULL_COIN_MIN_SIZE
 
   return (
     <svg
@@ -116,16 +153,35 @@ export function SwoleCoin({
       style={{ display: 'block', flexShrink: 0 }}
     >
       <circle cx="50" cy="50" r="48" fill={tokens.surface} stroke={tokens.pr} strokeWidth={3} />
-      {withLegend && (
+
+      {full ? (
         <>
           <circle cx="50" cy="50" r="34" fill="none" stroke={tokens.pr} strokeWidth={1.1} opacity={0.5} />
           {ringGlyphs(TOP_LEGEND, { radius: 41, fontSize: 7.5, spread: 168, bottom: false })}
           {ringGlyphs(BOTTOM_LEGEND, { radius: 41, fontSize: 7.5, spread: 176, bottom: true })}
+          {/* Scaled to sit inside the legend ring, then nudged to centre the
+              figure — the tail streams well left of the body's own midpoint. */}
+          <g transform="translate(50 50) scale(0.62) translate(-44 -46)">
+            <path d={GALLOP_TAIL} fill={tokens.pr} />
+            {GALLOP_LEGS.map((d) => (
+              <path
+                key={d}
+                d={d}
+                fill="none"
+                stroke={tokens.accent}
+                strokeWidth={4.5}
+                strokeLinecap="round"
+              />
+            ))}
+            <path d={GALLOP_BODY} fill={tokens.accent} />
+            <path d={GALLOP_MANE} fill={tokens.pr} />
+          </g>
         </>
+      ) : (
+        <g transform="translate(50 50) scale(0.94) translate(-53 -52)">
+          <path d={HEAD_PATH} fill={tokens.accent} />
+        </g>
       )}
-      <g transform={`translate(50 50) scale(${scale}) translate(-53 -52)`}>
-        <path d={HORSE_PATH} fill={tokens.accent} />
-      </g>
     </svg>
   )
 }

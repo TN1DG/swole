@@ -31,7 +31,7 @@ export const RELEASES: Release[] = [
       'Share your workout with no background, a proper Swole coin, and a batch of phone fixes.',
     changes: [
       'Share images can now be transparent. Pick "Transparent" on the share screen and you get just the stats with no card behind them — drop it straight onto any photo.',
-      'The points coin is now an actual coin: a horse, with "Hustlers don\'t stop they keep goooooooing" around the rim. It replaces the emoji that looked different on every phone.',
+      'The points coin is now an actual coin: a horse at full gallop with a gold mane and tail, and "Hustlers don\'t stop they keep goooooooing" around the rim. It replaces the emoji that looked different on every phone.',
       'Profile pictures work. If you uploaded one and only ever saw your initial, it should appear now — no need to upload it again.',
       'In chat, Ping and Challenge moved above the message box, and the message box no longer hides behind the tab bar when you scroll.',
       'Logging sets on a phone is less fiddly: the weight and reps boxes are wider, and long exercise names no longer push the screen sideways.',
