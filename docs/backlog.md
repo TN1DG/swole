@@ -200,7 +200,20 @@ npm run deploy              # convex prod + vercel prod
   locally and 100% reproducible once deployed. This shipped a broken feature
   once: `img-src` was missing `https://*.convex.cloud`, so every avatar in
   production silently rendered as the fallback initial while uploads, storage
-  and `getUrl()` all worked perfectly. `vercel-headers.test.ts` now pins the
-  directives that matter. Anything loaded from a new origin — fonts, an
-  analytics script, remote images — needs a CSP entry *and* a check that the
+  and `getUrl()` all worked perfectly (CSP failures are console-only — nothing
+  in the UI says "blocked", and MUI's `Avatar` treats a blocked image exactly
+  like an absent one).
+- **A header-only change cannot reach an installed PWA.** The service worker
+  precaches `index.html`, and a navigation served from the Cache API carries
+  the headers it was cached with. Workbox only re-fetches a precached entry
+  when its *content* hash changes — so fixing the CSP in `vercel.json` alone
+  changed nothing for existing clients, because `index.html` was byte-identical
+  and its precache revision never moved. The fix: `vite.config.ts` now mirrors
+  the policy into a build-only `<meta http-equiv>` tag (`cspMetaTag`), so the
+  policy travels with the shell it applies to. `vercel.json` stays the single
+  source of truth; `vercel-headers.test.ts` pins both copies and asserts they
+  agree. Build-only because Vite's dev server injects an inline React Refresh
+  script that `script-src 'self'` would block.
+- Anything loaded from a new origin — fonts, an analytics script, remote
+  images — needs a CSP entry, a rebuilt `index.html`, *and* a check that the
   live `curl -sI` response actually carries it.

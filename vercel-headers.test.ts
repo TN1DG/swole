@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { metaCspFrom, productionCspHeader } from './vite.config.ts'
 
 /**
  * Guards the production Content-Security-Policy in vercel.json.
@@ -54,6 +55,20 @@ describe('production CSP', () => {
     expect(directive('connect-src')).toEqual(
       expect.arrayContaining(['https://*.convex.cloud', 'wss://*.convex.cloud']),
     )
+  })
+
+  it('is mirrored into index.html, minus the directives meta cannot express', () => {
+    // The <meta> copy is what actually reaches an installed PWA, because a
+    // precached navigation response keeps its original headers forever. If
+    // these two ever drift, the browser enforces the intersection and the
+    // stricter one wins silently.
+    const meta = metaCspFrom(productionCspHeader())
+    expect(meta).toContain("img-src 'self' blob: data: https://*.convex.cloud")
+    expect(meta).toContain('connect-src')
+    // meta-delivered CSP ignores frame-ancestors and warns about it, so it
+    // must live only in the real header.
+    expect(meta).not.toContain('frame-ancestors')
+    expect(csp()).toContain('frame-ancestors')
   })
 
   it('keeps the directives that make the policy worth having', () => {
