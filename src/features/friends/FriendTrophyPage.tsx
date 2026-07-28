@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
-import { domToBlob } from 'modern-screenshot'
 import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { FriendTrophyCard } from './FriendTrophyCard'
-
-const EXPORT_WIDTH = 1080
+import { useCardExport } from '../share/useCardExport'
+import { CHECKERBOARD_SX, type CardVariant } from '../share/cardVariant'
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 // A friend's download of someone else's workout — stats only, no photo step
 // (the friend wasn't there), so this skips straight to the exportable card.
@@ -17,54 +17,8 @@ export function FriendTrophyPage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const frameRef = useRef<HTMLDivElement>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function makePng(): Promise<Blob | null> {
-    const node = frameRef.current
-    if (!node) return null
-    return domToBlob(node, {
-      scale: EXPORT_WIDTH / node.clientWidth,
-      type: 'image/png',
-    })
-  }
-
-  async function handleShare() {
-    setBusy(true)
-    try {
-      const blob = await makePng()
-      if (!blob) return
-      const file = new File([blob], 'workout.png', { type: 'image/png' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] })
-      } else {
-        downloadBlob(blob) // desktop browsers: just save it
-      }
-    } catch {
-      // user closed the share sheet — not an error
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleDownload() {
-    setBusy(true)
-    try {
-      const blob = await makePng()
-      if (blob) downloadBlob(blob)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function downloadBlob(blob: Blob) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'workout.png'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  const { frameRef, busy, share, download } = useCardExport()
+  const [variant, setVariant] = useState<CardVariant>('card')
 
   if (detail === undefined)
     return (
@@ -91,15 +45,35 @@ export function FriendTrophyPage() {
         Download Trophy
       </Typography>
 
-      <Box sx={{ mt: 2, overflow: 'hidden', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
-        <FriendTrophyCard ref={frameRef} detail={detail} />
+      <Box sx={{ mt: 1.5 }}>
+        <SegmentedControl
+          value={variant}
+          onChange={setVariant}
+          options={[
+            { value: 'card', label: 'Card' },
+            { value: 'transparent', label: 'Transparent' },
+          ]}
+        />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 1.5,
+          overflow: 'hidden',
+          borderRadius: '12px',
+          border: '1px solid',
+          borderColor: 'divider',
+          ...(variant === 'transparent' ? CHECKERBOARD_SX : null),
+        }}
+      >
+        <FriendTrophyCard ref={frameRef} detail={detail} variant={variant} />
       </Box>
 
       <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-        <Button variant="contained" fullWidth disabled={busy} onClick={handleShare}>
+        <Button variant="contained" fullWidth disabled={busy} onClick={() => void share()}>
           {busy ? 'Rendering…' : 'Share'}
         </Button>
-        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={handleDownload}>
+        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={() => void download()}>
           Save Image
         </Button>
       </Box>

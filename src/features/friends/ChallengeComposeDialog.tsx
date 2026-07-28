@@ -13,6 +13,7 @@ import {
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { errorMessage } from '../../lib/errors'
+import { SwoleCoin } from '../../components/SwoleCoin'
 
 // The propose form, lifted out of what used to be a card pinned above the
 // ping thread (see FriendChatPage). It's a dialog now so the thread itself
@@ -73,8 +74,12 @@ export function ChallengeComposeDialog({
               />
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">
-                Wager (pts)
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+              >
+                Wager <SwoleCoin size={14} title="points" />
               </Typography>
               <TextField
                 value={wager}

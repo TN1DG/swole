@@ -12,6 +12,7 @@ import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { Avatar } from '../../components/Avatar'
+import { SwoleCoin } from '../../components/SwoleCoin'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
@@ -198,7 +199,13 @@ function LeaderboardTab() {
                   )}
                 </Box>
                 <Box sx={{ flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                  <Typography sx={{ fontWeight: 'bold' }}>{entry.score} pts</Typography>
+                  {/* The coin stands in for the word "pts" rather than sitting
+                      beside it — this row already fits five things across a
+                      360px phone (see docs/mobile-responsiveness.md). */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                    <SwoleCoin size={16} title="points" />
+                    <Typography sx={{ fontWeight: 'bold' }}>{entry.score}</Typography>
+                  </Box>
                   <Typography variant="caption" color="text.secondary">
                     {formatKg(entry.weekVolumeKg)} kg
                   </Typography>

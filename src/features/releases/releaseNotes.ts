@@ -21,12 +21,17 @@ export type Release = {
 
 // Newest first.
 export const RELEASES: Release[] = [
+  // 1.1.0 was folded into this entry a couple of hours after it shipped,
+  // rather than left as its own release — almost nobody had seen the popup
+  // yet, and two notices back to back reads worse than one combined list.
   {
-    version: '1.1.0',
+    version: '1.2.0',
     releasedAt: Date.UTC(2026, 6, 28),
     summary:
-      'Mostly a phone-comfort update — plus profile pictures actually show up now.',
+      'Share your workout with no background, a proper Swole coin, and a batch of phone fixes.',
     changes: [
+      'Share images can now be transparent. Pick "Transparent" on the share screen and you get just the stats with no card behind them — drop it straight onto any photo.',
+      'The points coin is now an actual coin: a horse, with "Hustlers don\'t stop they keep goooooooing" around the rim. It replaces the emoji that looked different on every phone.',
       'Profile pictures work. If you uploaded one and only ever saw your initial, it should appear now — no need to upload it again.',
       'In chat, Ping and Challenge moved above the message box, and the message box no longer hides behind the tab bar when you scroll.',
       'Logging sets on a phone is less fiddly: the weight and reps boxes are wider, and long exercise names no longer push the screen sideways.',

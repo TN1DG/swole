@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
-import { domToBlob } from 'modern-screenshot'
 import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ShareCard } from './ShareCard'
+import { useCardExport } from './useCardExport'
+import { CHECKERBOARD_SX, type CardVariant } from './cardVariant'
 import { GlassTile } from '../../components/GlassTile'
-
-const EXPORT_WIDTH = 1080 // Instagram-story sized PNG (1080x1920)
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 export function SharePage() {
   const { workoutId } = useParams()
@@ -16,12 +16,12 @@ export function SharePage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const frameRef = useRef<HTMLDivElement>(null)
+  const { frameRef, busy, share, download } = useCardExport()
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [variant, setVariant] = useState<CardVariant>('card')
 
   // Release the previous photo's memory when replaced / on unmount.
   useEffect(() => {
@@ -35,53 +35,6 @@ export function SharePage() {
     if (!file) return
     setPhotoUrl(URL.createObjectURL(file))
     e.target.value = '' // allow re-picking the same file
-  }
-
-  // Render the preview DOM node to a PNG blob at export resolution.
-  async function makePng(): Promise<Blob | null> {
-    const node = frameRef.current
-    if (!node) return null
-    return domToBlob(node, {
-      scale: EXPORT_WIDTH / node.clientWidth,
-      type: 'image/png',
-    })
-  }
-
-  async function handleShare() {
-    setBusy(true)
-    try {
-      const blob = await makePng()
-      if (!blob) return
-      const file = new File([blob], 'workout.png', { type: 'image/png' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] })
-      } else {
-        downloadBlob(blob) // desktop browsers: just save it
-      }
-    } catch {
-      // user closed the share sheet — not an error
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleDownload() {
-    setBusy(true)
-    try {
-      const blob = await makePng()
-      if (blob) downloadBlob(blob)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  function downloadBlob(blob: Blob) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'workout.png'
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   if (detail === undefined)
@@ -138,16 +91,44 @@ export function SharePage() {
         </GlassTile>
       </Box>
 
-      {/* The exportable preview */}
-      <Box sx={{ mt: 2, overflow: 'hidden', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
-        <ShareCard ref={frameRef} detail={detail} photoUrl={photoUrl} />
+      <Box sx={{ mt: 1.5 }}>
+        <SegmentedControl
+          value={variant}
+          onChange={setVariant}
+          options={[
+            { value: 'card', label: 'Card' },
+            { value: 'transparent', label: 'Transparent' },
+          ]}
+        />
+      </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+        {variant === 'card'
+          ? 'A solid card, ready to post as-is.'
+          : 'No background — drop it straight onto another photo.'}
+      </Typography>
+
+      {/* The exportable preview. The checkerboard is on this wrapper, which
+          sits OUTSIDE frameRef and so never reaches the PNG — without it a
+          transparent card looks identical to a solid one against the app's
+          own dark page. */}
+      <Box
+        sx={{
+          mt: 1.5,
+          overflow: 'hidden',
+          borderRadius: '12px',
+          border: '1px solid',
+          borderColor: 'divider',
+          ...(variant === 'transparent' ? CHECKERBOARD_SX : null),
+        }}
+      >
+        <ShareCard ref={frameRef} detail={detail} photoUrl={photoUrl} variant={variant} />
       </Box>
 
       <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-        <Button variant="contained" fullWidth disabled={busy} onClick={handleShare}>
+        <Button variant="contained" fullWidth disabled={busy} onClick={() => void share()}>
           {busy ? 'Rendering…' : 'Share'}
         </Button>
-        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={handleDownload}>
+        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={() => void download()}>
           Save Image
         </Button>
       </Box>

@@ -20,6 +20,7 @@ import { GlassCard } from '../../components/GlassCard'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Avatar } from '../../components/Avatar'
+import { SwoleCoin } from '../../components/SwoleCoin'
 import { AvatarUploadDialog } from './AvatarUploadDialog'
 import { useAvatarPicker } from './useAvatarPicker'
 import { WhatsNewDialog } from '../releases/WhatsNewDialog'
@@ -204,9 +205,12 @@ export function ProfilePage() {
 
       <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography sx={{ fontWeight: 600 }}>Points</Typography>
-        <Typography variant="h6" sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
-          🪙 {profile!.pointsBalance}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SwoleCoin size={28} />
+          <Typography variant="h6" sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+            {profile!.pointsBalance}
+          </Typography>
+        </Box>
       </GlassCard>
 
       <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 1.5 }}>

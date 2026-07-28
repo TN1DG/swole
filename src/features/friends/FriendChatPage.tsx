@@ -10,6 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { ProgressRing } from '../../components/ProgressRing'
 import { GlassTile } from '../../components/GlassTile'
 import { Avatar } from '../../components/Avatar'
+import { SwoleCoin } from '../../components/SwoleCoin'
 import { ChallengeComposeDialog } from './ChallengeComposeDialog'
 import { tokens } from '../../theme/tokens'
 
@@ -364,8 +365,12 @@ function ChallengeCard({
   }
 
   const header = (
-    <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
-      Challenge · {challenge.wagerPoints} pts · {challenge.weeks}w
+    <Typography
+      variant="overline"
+      color="text.secondary"
+      sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+    >
+      Challenge · {challenge.wagerPoints} <SwoleCoin size={13} title="points" /> · {challenge.weeks}w
     </Typography>
   )
 
@@ -449,16 +454,24 @@ function ChallengeCard({
   return (
     <GlassTile sx={{ p: 2 }}>
       {header}
-      <Typography variant="body2" color="text.secondary">
-        {challenge.status === 'declined'
-          ? 'Challenge declined.'
-          : challenge.status === 'cancelled'
-            ? 'Challenge cancelled.'
-            : challenge.winnerId === undefined
-              ? 'Tied — points returned.'
-              : challenge.isMine === (challenge.winnerId === challenge.challengerId)
-                ? `You won! +${challenge.wagerPoints} pts`
-                : `${friendName} won.`}
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+      >
+        {challenge.status === 'declined' ? (
+          'Challenge declined.'
+        ) : challenge.status === 'cancelled' ? (
+          'Challenge cancelled.'
+        ) : challenge.winnerId === undefined ? (
+          'Tied — points returned.'
+        ) : challenge.isMine === (challenge.winnerId === challenge.challengerId) ? (
+          <>
+            You won! +{challenge.wagerPoints} <SwoleCoin size={14} title="points" />
+          </>
+        ) : (
+          `${friendName} won.`
+        )}
       </Typography>
     </GlassTile>
   )
