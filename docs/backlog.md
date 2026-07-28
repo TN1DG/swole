@@ -124,9 +124,9 @@ for that pattern).
    `myIncomingRequests`/`myOutgoingRequests` use plain `profileFor`. Swapping
    them to `profileForWithAvatar` is a one-line change each — it was held back
    only to match the agreed "self and friends" scope.
-7. **No notifications inbox.** The banner stack shows at most 3 and there's no
-   page; beyond that they queue until earlier ones clear. A `/notifications`
-   route reading `notifications.listUnread` is the natural v2.
+7. ~~**No notifications inbox.**~~ Shipped 2026-07-28 with the feed —
+   `/notifications` reads `notifications.listRecent` (read + unread,
+   paginated), and the banner links to it once more than 3 are waiting.
 
 ---
 
