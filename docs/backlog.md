@@ -14,12 +14,29 @@ this file is the *what's left*.
 > nothing will warn you if another writer breaks it.
 > `migrations:backfillScoring` has been run on dev and prod.
 >
-> **Still open before Wave 3 (social feed) can start** — both were planned as
-> prerequisites and are NOT yet done:
-> - The `deleteAccount` P1 bug below (`gymPings`/`challenges`). Fix it before
->   adding five more tables to that function.
-> - Extracting `convex/identity.ts` so feed code can't reach `profileFor`,
->   which falls back to the user's **email address**.
+> **2026-07-28, social feed (Wave 3).** `convex/feed.ts` + five tables. Both
+> prerequisites are now done: the `deleteAccount` P1 bug below is **fixed**
+> (with the escrow refund), and `convex/identity.ts` exists.
+>
+> Three rules that must not be quietly relaxed:
+> - **Never import `friends.ts:profileFor` into feed code** — it falls back to
+>   the user's **email address**. Use `convex/identity.ts`. A test asserts no
+>   feed author name contains `@`.
+> - **Friends-only posts cannot be reposted.** Enforced at write *and* at read
+>   (an original can be deleted afterwards), and `posts.visibility` is
+>   immutable so a "let users change their mind" feature can't reopen it. The
+>   middle ground of "allow it but force the repost friends-only" still leaks:
+>   your friends are not the author's friends.
+> - **`LIMITS.feedMaxAuthors` is 40** but `friendsPerUser` is 200. Past the cap
+>   the Friends feed omits authors and returns `truncated: true`. If that
+>   starts firing for real users, move that stream to a fan-out inbox table —
+>   the merge is behind one helper so the swap is local.
+>
+> Known limits, deliberately: `deleteAccount` now touches ~28 tables in one
+> mutation and will eventually need the post cleanup extracted into a
+> scheduled step; comment authors on a public post are visible to strangers
+> (the composer says so); reports have no moderator UI and are read from the
+> Convex dashboard, like `featureRequests`.
 
 > **2026-07-28, mobile pass.** A responsiveness sweep landed after the above;
 > see `docs/mobile-responsiveness.md` for what changed and what it means for
@@ -34,7 +51,14 @@ fix involves. Nothing below is blocking the live app except P1.
 
 ## P1 — Real bugs
 
-### 1. `deleteAccount` leaves `gymPings` and `challenges` behind
+### 1. ~~`deleteAccount` leaves `gymPings` and `challenges` behind~~ — FIXED 2026-07-28
+
+Fixed as a prerequisite for the social feed, including the escrow refund.
+Covered by tests in `convex/account.test.ts`. Original write-up kept below
+because the reasoning about escrow still applies to any future table added
+to that function.
+
+<details><summary>Original</summary>
 
 `convex/account.ts` cleans 20 tables but **not** `gymPings` or `challenges`.
 Confirmed by comparing its queries against `convex/schema.ts`. This predates
@@ -62,6 +86,8 @@ Fix sketch, in `deleteAccount`:
   be deleted.
 - Add a test alongside the existing cleanup tests in
   `convex/friendThread.test.ts` / `convex/notifications.test.ts`.
+
+</details>
 
 ---
 
@@ -159,10 +185,10 @@ they are not oversights.
     field today (`convex/schema.ts`), and `seedData.ts` has no image data —
     this needs a schema field plus slots in `ExercisesPage`/`ExerciseDetail`/
     `ExercisePicker`.
-17. **Public social feed.** You chose *public across all app users*, not
-    friends-only — that's a genuine privacy/model shift from today's
-    friends-gated visibility (`workoutsPublic` is currently the only opt-in),
-    so it deserves its own design pass rather than being bolted on.
+17. ~~**Public social feed.**~~ Shipped 2026-07-28 with *per-post* visibility
+    (author picks public or friends-only, defaulting to friends-only) rather
+    than the account-wide switch originally sketched. See the note at the top
+    of this file for the rules it depends on.
 18. **Real push notifications.** The app has zero push infra: no service-worker
     push handler, no permission flow, no subscription table (`vite-plugin-pwa`
     is asset-caching only). The `notifications` table was deliberately designed
