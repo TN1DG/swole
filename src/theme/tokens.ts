@@ -6,7 +6,7 @@
 // access to the MUI theme via React context, so they keep reading real CSS
 // vars instead.
 export const tokens = {
-  bg: '#131210',
+  bg: '#0a0908',
   surface: '#1e1c19',
   surface2: '#292522',
   border: '#453d35',

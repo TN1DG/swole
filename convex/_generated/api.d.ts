@@ -36,6 +36,7 @@ import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seedData from "../seedData.js";
 import type * as validation from "../validation.js";
+import type * as workoutFeedback from "../workoutFeedback.js";
 import type * as workouts from "../workouts.js";
 
 import type {
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   routines: typeof routines;
   seedData: typeof seedData;
   validation: typeof validation;
+  workoutFeedback: typeof workoutFeedback;
   workouts: typeof workouts;
 }>;
 

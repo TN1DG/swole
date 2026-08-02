@@ -16,7 +16,7 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
   return userId
 }
 
-async function getOwnedWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
+export async function getOwnedWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
   const userId = await requireUserId(ctx)
   const workout = await ctx.db.get(workoutId)
   if (!workout || workout.ownerId !== userId) throw new Error('Workout not found')

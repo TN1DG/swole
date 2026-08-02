@@ -43,6 +43,11 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // caps lifetime total; this caps how fast they can arrive.
   featureRequestSubmit: { kind: 'token bucket', rate: 5, period: MINUTE, capacity: 3 },
 
+  // Post-workout feedback submissions, keyed by caller userId. The "one row
+  // per workout" uniqueness check already caps this at one per finish; this
+  // just stops a script from hammering the mutation.
+  workoutFeedbackSubmit: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
+
   // Chat messages, keyed by sender. Deliberately looser than pings and
   // challenges: those are one-off events, whereas a real back-and-forth
   // conversation fires several messages a minute and shouldn't feel throttled.

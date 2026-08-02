@@ -10,6 +10,7 @@ import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { GlassCard } from '../../components/GlassCard'
 import { GlassTile } from '../../components/GlassTile'
 import { ActiveWorkout, type FinishSummary } from './ActiveWorkout'
+import { WorkoutFeedbackPrompt } from './WorkoutFeedbackPrompt'
 
 export function WorkoutsPage() {
   const active = useQuery(api.workouts.getActive)
@@ -57,15 +58,18 @@ export function WorkoutsPage() {
             </>
           )}
           {!summary.discarded && (
-            <Button
-              component={Link}
-              to={`/share/${summary.workoutId}`}
-              variant="contained"
-              fullWidth
-              sx={{ mt: 2 }}
-            >
-              Share as Photo 📸
-            </Button>
+            <>
+              <Button
+                component={Link}
+                to={`/share/${summary.workoutId}`}
+                variant="contained"
+                fullWidth
+                sx={{ mt: 2 }}
+              >
+                Share as Photo 📸
+              </Button>
+              <WorkoutFeedbackPrompt workoutId={summary.workoutId} />
+            </>
           )}
           <Button variant="outlined" color="inherit" fullWidth sx={{ mt: 1.5 }} onClick={() => setSummary(null)}>
             Close
