@@ -25,3 +25,12 @@ Default five canonical triage labels (`needs-triage`, `needs-info`, `ready-for-a
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root (created lazily by `/domain-modeling`). See `docs/agents/domain.md`.
+
+### Branch workflow
+
+This repo promotes through `dev` → `staging` → `main`, each hop via a reviewed
+pull request. `main` is protected (no direct pushes) and is what's live in
+production, with its own Convex deployment; `staging` gets a real Vercel
+preview build against its own Convex preview deployment. **Commit new work to
+`dev`, not `main`** — including backlog/feature work from manual or scheduled
+sessions.
