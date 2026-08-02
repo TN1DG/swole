@@ -22,7 +22,8 @@ export const submit = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await getOwnedWorkout(ctx, args.workoutId)
+    const { userId, workout } = await getOwnedWorkout(ctx, args.workoutId)
+    if (workout.endedAt === undefined) throw new ConvexError('Workout is not finished yet')
     await rateLimiter.limit(ctx, 'workoutFeedbackSubmit', { key: userId, throws: true })
 
     const existing = await ctx.db

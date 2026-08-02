@@ -97,6 +97,16 @@ describe('submit', () => {
     ).rejects.toThrow(/already submitted/i)
   })
 
+  it('rejects feedback on a workout that is not finished yet', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const workoutId = await user.mutation(api.workouts.start, {})
+
+    await expect(
+      user.mutation(api.workoutFeedback.submit, { workoutId, reasons: ['More energy'] }),
+    ).rejects.toThrow(/not finished/i)
+  })
+
   it("rejects feedback on someone else's workout", async () => {
     const t = createBackend()
     const { workoutId } = await finishedWorkout(t)
