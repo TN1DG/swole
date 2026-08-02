@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
+    "vercel-build": "node scripts/vercel-build.js",
     "deploy": "convex deploy -y --cmd \"npm run build\" && node -e \"require('fs').copyFileSync('vercel.json','dist/vercel.json')\" && vercel link --yes --project swole --cwd dist --scope tn1dgs-projects && vercel deploy --prod --yes --cwd dist --scope tn1dgs-projects"
   },
   "dependencies": {
