@@ -291,6 +291,16 @@ export default defineSchema({
     text: v.string(),
   }).index('by_user', ['userId']),
 
+  // One reflection per finished workout: what would have helped.
+  workoutFeedback: defineTable({
+    workoutId: v.id('workouts'),
+    userId: v.id('users'),
+    reasons: v.array(v.string()), // subset of REASON_OPTIONS, validated server-side
+    note: v.optional(v.string()),
+  })
+    .index('by_workout', ['workoutId'])
+    .index('by_user', ['userId']),
+
   // Free-text chat between friends. Same shape/index style as gymPings —
   // both are one-directional events between a friend pair, and the chat
   // thread reads them the same way (both directions, merged).

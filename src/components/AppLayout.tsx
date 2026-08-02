@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { WhatsNewGate } from '../features/releases/WhatsNewDialog'
 import { PeopleIcon } from './icons'
 import { tokens } from '../theme/tokens'
+import { GlassCard } from './GlassCard'
 
 // Each tab: route path, label, and a simple inline SVG icon.
 const tabs = [
@@ -147,9 +148,15 @@ export function AppLayout() {
         <Outlet />
       </Box>
 
-      {/* Bottom tab bar — same z-index tier as the header, both below any
-          Dialog/Drawer (MUI's modal z-index is always higher) so sheets and
-          confirm dialogs still cover it. */}
+      {/* Bottom tab bar — floating pill, inset from the screen edges, same
+          z-index tier as the header, both below any Dialog/Drawer (MUI's
+          modal z-index is always higher) so sheets and confirm dialogs still
+          cover it. This outer element is a pure positioning wrapper (ref'd
+          for useChromeHeights, so --app-nav-h covers the pill plus its
+          floating margin — other screens reading that var, e.g.
+          FriendChatPage's composer, then clear the pill with room to spare
+          rather than sitting flush against it); the pill look lives on the
+          GlassCard nested inside. */}
       <Box
         component="nav"
         ref={navRef}
@@ -158,53 +165,74 @@ export function AppLayout() {
           insetInline: 0,
           bottom: 0,
           zIndex: (t) => t.zIndex.appBar,
-          borderTop: `1px solid ${tokens.borderGlass}`,
-          bgcolor: tokens.surfaceGlass,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          pl: 'env(safe-area-inset-left)',
-          pr: 'env(safe-area-inset-right)',
+          pl: 'var(--app-gutter-left)',
+          pr: 'var(--app-gutter-right)',
+          pb: 'max(1rem, env(safe-area-inset-bottom))',
         }}
       >
-        <Box sx={{ mx: 'auto', display: 'flex', maxWidth: '32rem' }}>
+        <GlassCard
+          sx={{
+            mx: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            maxWidth: '32rem',
+            borderRadius: '9999px',
+            p: 1,
+          }}
+        >
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
-              style={({ isActive }) => ({
-                display: 'flex',
-                minWidth: 0,
-                flex: 1,
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 2,
-                padding: '8px 2px',
-                paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
-                fontSize: 10,
-                lineHeight: 1.2,
-                color: isActive ? activeColor : mutedColor,
-                textDecoration: 'none',
-              })}
+              style={{ display: 'flex', flex: 1, minWidth: 0, textDecoration: 'none' }}
             >
-              <Box sx={{ '& svg': { width: 20, height: 20 } }}>
-                <Icon />
-              </Box>
-              <Box
-                component="span"
-                sx={{
-                  width: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'center',
-                }}
-              >
-                {label}
-              </Box>
+              {({ isActive }) => (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    width: '100%',
+                    minWidth: 0,
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    borderRadius: '12px',
+                    px: 0.5,
+                    py: 1,
+                    fontSize: 10,
+                    lineHeight: 1.2,
+                    color: isActive ? activeColor : mutedColor,
+                    // Mirrors GlassTile's Tier B look (a nested, unblurred
+                    // tile) for just the active tab, rather than importing
+                    // the component here — GlassTile can't take the isActive
+                    // ternary and still compose inside NavLink's function-
+                    // as-children render prop as cleanly as an inline sx.
+                    ...(isActive && {
+                      bgcolor: tokens.surface2Glass,
+                      border: '1px solid rgb(69 61 53 / 0.3)',
+                    }),
+                  }}
+                >
+                  <Box sx={{ '& svg': { width: 20, height: 20 } }}>
+                    <Icon />
+                  </Box>
+                  <Box
+                    component="span"
+                    sx={{
+                      width: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {label}
+                  </Box>
+                </Box>
+              )}
             </NavLink>
           ))}
-        </Box>
+        </GlassCard>
       </Box>
     </Box>
   )

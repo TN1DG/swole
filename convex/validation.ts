@@ -77,6 +77,7 @@ export const LIMITS = {
   // a 1000-point wager was ten weeks of training and a 2000-point payout was
   // most of a year's.
   maxWagerPoints: 250,
+  workoutFeedbackNoteMaxLength: 300,
 } as const
 
 // Trimmed, non-empty, length-capped free text (feature request body, etc.).
