@@ -35,14 +35,25 @@ export function AppLayout() {
     // resize the *visible* viewport live as the address bar shows/hides on
     // scroll, and a `position: fixed` element tracks that live viewport, so
     // a short (non-scrolling) page and a long (scrolling) page ended up
-    // pinning the nav at genuinely different pixel heights. svh (not dvh) —
-    // the smallest possible viewport, so the shell never exceeds what's
-    // visible even with the address bar fully expanded.
+    // pinning the nav at genuinely different pixel heights.
+    //
+    // dvh (not svh) — svh is pinned to the *smallest* the chrome could ever
+    // make the viewport, so as soon as the address bar auto-collapses (which
+    // it does even when `main` is the only scrolling element, not the
+    // document), the real viewport grows past the shell and leaves a gap
+    // below the nav showing raw body underneath. dvh tracks the live
+    // viewport instead, so the shell always fills it exactly. This doesn't
+    // reintroduce the old per-page jump: that bug came from the nav being
+    // independently `position: fixed` while page content scrolled the
+    // document separately, so the two disagreed on which chrome state was
+    // current. Here the whole shell (header+content+nav) is one non-fixed
+    // flow block sized off the same live value, so there's nothing for the
+    // nav to disagree with — it just rides along as the shell resizes.
     <Box
       sx={{
         mx: 'auto',
         display: 'flex',
-        height: '100svh',
+        height: '100dvh',
         maxWidth: '32rem',
         flexDirection: 'column',
         overflow: 'hidden',
