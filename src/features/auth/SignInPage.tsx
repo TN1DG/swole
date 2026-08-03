@@ -29,11 +29,11 @@ export function SignInPage() {
     formData.set('flow', flow)
     try {
       await signIn('password', formData)
-    } catch {
+    } catch (err) {
       setError(
         flow === 'signIn'
           ? 'Wrong email or password. New here? Tap "Sign up" below.'
-          : 'Could not create the account. Password must be at least 8 characters.',
+          : errorMessage(err, 'Could not create the account. Password must be at least 8 characters.'),
       )
     } finally {
       setSubmitting(false)
