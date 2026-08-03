@@ -41,6 +41,13 @@ export const globalStyles: CSSObject = {
     // Stops iOS Safari inflating body text when the phone is rotated to
     // landscape, which otherwise reflows every list row mid-workout.
     WebkitTextSizeAdjust: '100%',
+    // Reserves the scrollbar's width permanently, whether or not the current
+    // page actually scrolls. Without this, the floating bottom nav (centered
+    // via `mx: auto` inside a fixed, viewport-wide bar) re-centers a few
+    // pixels differently between a tall page (scrollbar present) and a short
+    // one (no scrollbar) — the "nav jumps between pages" bug. No effect on
+    // mobile, where scrollbars already overlay content at zero width.
+    scrollbarGutter: 'stable',
   },
   body: {
     margin: 0,

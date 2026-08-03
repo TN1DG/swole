@@ -3,17 +3,7 @@ import { mutation } from './_generated/server'
 import { getOwnedWorkout } from './workouts'
 import { cleanText, LIMITS } from './validation'
 import { rateLimiter } from './rateLimiter'
-
-// Client and server must agree on valid chip labels — co-located here rather
-// than in validation.ts since this list is specific to this one feature.
-export const REASON_OPTIONS = [
-  'More energy',
-  'Better sleep',
-  'A workout partner',
-  'Clearer plan',
-  'More time',
-  'Better music/mood',
-] as const
+import { REASON_OPTIONS } from './constants'
 
 export const submit = mutation({
   args: {

@@ -196,24 +196,39 @@ export function AppLayout() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 0.5,
-                    borderRadius: '12px',
-                    px: 0.5,
-                    py: 1,
+                    py: 0.5,
                     fontSize: 10,
                     lineHeight: 1.2,
                     color: isActive ? activeColor : mutedColor,
-                    // Mirrors GlassTile's Tier B look (a nested, unblurred
-                    // tile) for just the active tab, rather than importing
-                    // the component here — GlassTile can't take the isActive
-                    // ternary and still compose inside NavLink's function-
-                    // as-children render prop as cleanly as an inline sx.
-                    ...(isActive && {
-                      bgcolor: tokens.surface2Glass,
-                      border: '1px solid rgb(69 61 53 / 0.3)',
-                    }),
+                    transition: 'color 0.15s ease',
                   }}
                 >
-                  <Box sx={{ '& svg': { width: 20, height: 20 } }}>
+                  {/* Oval "pill" hugging just the icon — sized by its own
+                      padding rather than the column's full width, so it
+                      doesn't stretch into a rectangle sized by the widest
+                      label (e.g. "Exercises"). Mirrors GlassTile's Tier B
+                      look (a nested, unblurred tile) for just the active
+                      tab, rather than importing the component here —
+                      GlassTile can't take the isActive ternary and still
+                      compose inside NavLink's function-as-children render
+                      prop as cleanly as an inline sx. */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: '999px',
+                      border: '1px solid transparent',
+                      transition: 'background-color 0.15s ease, border-color 0.15s ease',
+                      '& svg': { width: 20, height: 20 },
+                      ...(isActive && {
+                        bgcolor: tokens.surface2Glass,
+                        borderColor: 'rgb(69 61 53 / 0.3)',
+                      }),
+                    }}
+                  >
                     <Icon />
                   </Box>
                   <Box
