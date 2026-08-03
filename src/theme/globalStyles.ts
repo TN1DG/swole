@@ -32,13 +32,18 @@ export const globalStyles: CSSObject = {
     minHeight: '100svh',
   },
   'html, body': {
-    // The app shell itself is a fixed-height, overflow:hidden box (see
-    // AppLayout) so it can never move — but html/body still allow native
-    // overscroll, so iOS Safari's rubber-band bounce was dragging the whole
-    // shell and exposing raw (unstyled) browser background underneath.
-    // `overscroll-behavior: none` stops the bounce; the matching bg color is
-    // a belt-and-braces fallback for the sliver that's visible mid-bounce on
-    // browsers that still rubber-band despite this (Safari's own chrome).
+    // The app shell (see AppLayout) is `position: fixed; inset: 0` — out of
+    // document flow entirely, so it never contributes to body's scrollable
+    // height. `overflow: hidden` here is the backstop that guarantees the
+    // document has zero scrollable range regardless: previously, with the
+    // shell sized by a flow-height viewport unit (dvh/svh), any moment where
+    // the real viewport was a hair shorter than that computed height gave
+    // the document genuine (non-bounce) scroll overflow, which dragged the
+    // whole shell up and exposed raw body underneath. `overscroll-behavior:
+    // none` additionally kills rubber-band bounce past a scroll boundary;
+    // the matching bg color is a last-resort fallback for any sliver still
+    // visible through Safari's own chrome during that bounce.
+    overflow: 'hidden',
     overscrollBehavior: 'none',
     backgroundColor: tokens.bg,
   },
