@@ -31,6 +31,17 @@ export const globalStyles: CSSObject = {
   'html, body, #root': {
     minHeight: '100svh',
   },
+  'html, body': {
+    // The app shell itself is a fixed-height, overflow:hidden box (see
+    // AppLayout) so it can never move — but html/body still allow native
+    // overscroll, so iOS Safari's rubber-band bounce was dragging the whole
+    // shell and exposing raw (unstyled) browser background underneath.
+    // `overscroll-behavior: none` stops the bounce; the matching bg color is
+    // a belt-and-braces fallback for the sliver that's visible mid-bounce on
+    // browsers that still rubber-band despite this (Safari's own chrome).
+    overscrollBehavior: 'none',
+    backgroundColor: tokens.bg,
+  },
   html: {
     // Stops iOS Safari inflating body text when the phone is rotated to
     // landscape, which otherwise reflows every list row mid-workout.
