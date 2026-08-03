@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { Box, useTheme } from '@mui/material'
@@ -20,48 +19,35 @@ const tabs = [
   { to: '/exercises', label: 'Exercises', icon: BookIcon },
 ]
 
-// Publishes the *measured* height of the sticky header and the fixed tab bar
-// as CSS custom properties on <html>, so anything that has to sit below one
-// or above the other can just say `top: var(--app-header-h)`.
-//
-// Measured rather than hardcoded because both heights are genuinely variable
-// per device: the header grows by the status-bar safe-area inset (which is 0
-// on Android, 47px+ on a notched iPhone) and both grow with the user's OS
-// font-size setting. A magic number would be wrong on most real phones.
-function useChromeHeights() {
-  const headerRef = useRef<HTMLElement>(null)
-  const navRef = useRef<HTMLElement>(null)
-
-  useEffect(() => {
-    const root = document.documentElement
-    const targets: [HTMLElement | null, string][] = [
-      [headerRef.current, '--app-header-h'],
-      [navRef.current, '--app-nav-h'],
-    ]
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const varName = targets.find(([el]) => el === entry.target)?.[1]
-        if (varName) root.style.setProperty(varName, `${entry.target.getBoundingClientRect().height}px`)
-      }
-    })
-    for (const [el] of targets) if (el) observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  return { headerRef, navRef }
-}
-
 export function AppLayout() {
   const theme = useTheme()
   const activeColor = theme.palette.primary.main
   const mutedColor = theme.palette.text.secondary
-  const { headerRef, navRef } = useChromeHeights()
   // Already subscribed to on most screens, so this is a cache hit rather
   // than an extra round trip.
   const profile = useQuery(api.profiles.getMine)
 
   return (
-    <Box sx={{ mx: 'auto', display: 'flex', minHeight: '100svh', maxWidth: '32rem', flexDirection: 'column' }}>
+    // Fixed-height app shell (not minHeight) — the header and nav are plain
+    // flex children that can never reposition, and `main` below is the only
+    // scrolling region. This replaces an earlier fixed/sticky-based layout
+    // where the nav visibly moved vertically between pages: mobile browsers
+    // resize the *visible* viewport live as the address bar shows/hides on
+    // scroll, and a `position: fixed` element tracks that live viewport, so
+    // a short (non-scrolling) page and a long (scrolling) page ended up
+    // pinning the nav at genuinely different pixel heights. svh (not dvh) —
+    // the smallest possible viewport, so the shell never exceeds what's
+    // visible even with the address bar fully expanded.
+    <Box
+      sx={{
+        mx: 'auto',
+        display: 'flex',
+        height: '100svh',
+        maxWidth: '32rem',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
       {/* Top bar. iOS status bar is translucent (viewport-fit=cover), so this
           needs its own safe-area padding or it renders under the notch/clock.
           Sticky (not fixed) — the page itself is the scroll container, so this
@@ -69,11 +55,8 @@ export function AppLayout() {
           safe-area-variable height. */}
       <Box
         component="header"
-        ref={headerRef}
         sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: (t) => t.zIndex.appBar,
+          flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -136,10 +119,11 @@ export function AppLayout() {
         component="main"
         sx={{
           flex: 1,
+          overflowY: 'auto',
           pl: 'var(--app-gutter-left)',
           pr: 'var(--app-gutter-right)',
           pt: 2,
-          pb: 'calc(var(--app-nav-h) + 1rem)',
+          pb: 2,
         }}
       >
         <PingAckBanner />
@@ -148,26 +132,19 @@ export function AppLayout() {
         <Outlet />
       </Box>
 
-      {/* Bottom tab bar — floating pill, inset from the screen edges, same
-          z-index tier as the header, both below any Dialog/Drawer (MUI's
-          modal z-index is always higher) so sheets and confirm dialogs still
-          cover it. This outer element is a pure positioning wrapper (ref'd
-          for useChromeHeights, so --app-nav-h covers the pill plus its
-          floating margin — other screens reading that var, e.g.
-          FriendChatPage's composer, then clear the pill with room to spare
-          rather than sitting flush against it); the pill look lives on the
-          GlassCard nested inside. */}
+      {/* Bottom tab bar — floating pill, inset from the screen edges. A
+          plain (non-positioned) flex child of the shell now, not fixed —
+          see the shell comment above for why. This outer element is a pure
+          padding wrapper for the horizontal gutter + bottom safe-area inset;
+          the pill look lives on the GlassCard nested inside. */}
       <Box
         component="nav"
-        ref={navRef}
         sx={{
-          position: 'fixed',
-          insetInline: 0,
-          bottom: 0,
-          zIndex: (t) => t.zIndex.appBar,
+          flexShrink: 0,
           pl: 'var(--app-gutter-left)',
           pr: 'var(--app-gutter-right)',
           pb: 'max(1rem, env(safe-area-inset-bottom))',
+          pt: 1,
         }}
       >
         <GlassCard

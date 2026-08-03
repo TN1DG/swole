@@ -16,12 +16,6 @@ export const globalStyles: CSSObject = {
     // shared value rather than a hardcoded 16px in each place.
     '--app-gutter-left': 'max(1rem, env(safe-area-inset-left))',
     '--app-gutter-right': 'max(1rem, env(safe-area-inset-right))',
-    // Fallbacks only — AppLayout measures the real header/nav and overwrites
-    // these on the root element (see useChromeHeights there). Sticky elements
-    // that need to sit below the header or above the tab bar read them, so a
-    // sane default matters for the first paint before measurement lands.
-    '--app-header-h': '61px',
-    '--app-nav-h': '76px',
     '--color-bg': tokens.bg,
     '--color-surface': tokens.surface,
     '--color-surface-2': tokens.surface2,
