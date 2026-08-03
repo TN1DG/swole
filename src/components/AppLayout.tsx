@@ -28,21 +28,31 @@ export function AppLayout() {
   const profile = useQuery(api.profiles.getMine)
 
   return (
-    // Fixed-height app shell (not minHeight) — the header and nav are plain
-    // flex children that can never reposition, and `main` below is the only
-    // scrolling region. This replaces an earlier fixed/sticky-based layout
-    // where the nav visibly moved vertically between pages: mobile browsers
-    // resize the *visible* viewport live as the address bar shows/hides on
-    // scroll, and a `position: fixed` element tracks that live viewport, so
-    // a short (non-scrolling) page and a long (scrolling) page ended up
-    // pinning the nav at genuinely different pixel heights. svh (not dvh) —
-    // the smallest possible viewport, so the shell never exceeds what's
-    // visible even with the address bar fully expanded.
+    // App shell pinned directly to the viewport via `position: fixed; inset:
+    // 0` — taken out of document flow entirely, rather than a flow block
+    // sized to some viewport-unit height. A flow block can still end up
+    // marginally taller than what's actually visible (dvh/svh don't perfectly
+    // track the live viewport through every scroll/momentum frame), and any
+    // such mismatch gives the document genuine scrollable overflow — which is
+    // what was dragging the whole shell (header+content+nav together) up
+    // with it. Taking the shell out of flow means it never contributes to
+    // body's scrollHeight at all, so there's nothing for the document to
+    // scroll regardless of any viewport-unit rounding; `main` below stays the
+    // only scrolling region.
+    //
+    // This doesn't reintroduce the earlier per-page nav jump: that bug came
+    // from the nav being independently `position: fixed` while page content
+    // scrolled the document separately, so the two disagreed on which chrome
+    // state was current. Here the whole shell is the one fixed element, so
+    // header/nav never disagree with content — they're just flex children
+    // riding along as the shell (and `inset: 0` with it) tracks the live
+    // viewport.
     <Box
       sx={{
+        position: 'fixed',
+        inset: 0,
         mx: 'auto',
         display: 'flex',
-        height: '100svh',
         maxWidth: '32rem',
         flexDirection: 'column',
         overflow: 'hidden',

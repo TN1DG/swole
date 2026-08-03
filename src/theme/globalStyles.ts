@@ -31,6 +31,22 @@ export const globalStyles: CSSObject = {
   'html, body, #root': {
     minHeight: '100svh',
   },
+  'html, body': {
+    // NOT `overflow: hidden` — pre-auth/onboarding screens (SignInPage,
+    // WelcomeCarousel) render outside AppLayout as plain document-flow pages
+    // with just a `minHeight`, and rely on the document itself being
+    // scrollable when their content (e.g. the stats form with the keyboard
+    // open) is taller than one viewport. The app shell (see AppLayout) is
+    // `position: fixed; inset: 0` instead — out of document flow entirely,
+    // so it never contributes to body's scrollable height, meaning there's
+    // nothing for the document to scroll *while the shell is mounted*
+    // without needing to ban document scrolling globally.
+    // `overscroll-behavior: none` kills rubber-band bounce past a scroll
+    // boundary; the matching bg color is a last-resort fallback for any
+    // sliver still visible through Safari's own chrome during that bounce.
+    overscrollBehavior: 'none',
+    backgroundColor: tokens.bg,
+  },
   html: {
     // Stops iOS Safari inflating body text when the phone is rotated to
     // landscape, which otherwise reflows every list row mid-workout.
