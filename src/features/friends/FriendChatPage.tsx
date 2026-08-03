@@ -84,10 +84,10 @@ export function FriendChatPage() {
 
   return (
     <Box>
-      {/* Sticks *below* the app header, not at the viewport top — at top: 0
-          it slid underneath the (higher z-index) app bar and vanished the
-          moment you scrolled. --app-header-h is the app bar's measured
-          height; see useChromeHeights in AppLayout. */}
+      {/* Sticks to the top of the page's own scroll region — AppLayout's
+          `main` is the scrolling element (the app header/nav are fixed
+          layout chrome outside it), so `top: 0` here means flush against
+          the top of the visible content area, not the viewport. */}
       <Box
         sx={{
           display: 'flex',
@@ -102,7 +102,7 @@ export function FriendChatPage() {
           borderBottom: '1px solid',
           borderColor: 'divider',
           position: 'sticky',
-          top: 'var(--app-header-h)',
+          top: 0,
           zIndex: (t) => t.zIndex.appBar - 1,
           bgcolor: 'rgb(30 28 25 / 0.9)',
           backdropFilter: 'blur(4px)',
@@ -169,14 +169,16 @@ export function FriendChatPage() {
           the message box sits closest to the thumb, where the thing you do
           most often belongs.
 
-          Pinned above the tab bar rather than at bottom: 0, where the fixed
-          nav covered it whenever the thread was scrolled mid-way. Full-bleed
-          (negative gutter margins) so the blur covers the whole strip instead
-          of leaving message text visible in the side gutters. */}
+          Sticks to the bottom of the page's own scroll region (see the
+          header comment above — `main` is what scrolls, the nav is fixed
+          layout chrome outside it, so `bottom: 0` is flush against the
+          content area, not the viewport). Full-bleed (negative gutter
+          margins) so the blur covers the whole strip instead of leaving
+          message text visible in the side gutters. */}
       <Box
         sx={{
           position: 'sticky',
-          bottom: 'var(--app-nav-h)',
+          bottom: 0,
           ml: 'calc(-1 * var(--app-gutter-left))',
           mr: 'calc(-1 * var(--app-gutter-right))',
           pl: 'var(--app-gutter-left)',

@@ -104,12 +104,15 @@ export function PostDetailPage() {
         </Typography>
       )}
 
+      {/* Sticks to the bottom of the page's own scroll region — AppLayout's
+          `main` is the scrolling element (the nav is fixed layout chrome
+          outside it), so `bottom: 0` is flush against the content area. */}
       <Box
         component="form"
         onSubmit={handleSubmit}
         sx={{
           position: 'sticky',
-          bottom: 'var(--app-nav-h)',
+          bottom: 0,
           ml: 'calc(-1 * var(--app-gutter-left))',
           mr: 'calc(-1 * var(--app-gutter-right))',
           pl: 'var(--app-gutter-left)',
