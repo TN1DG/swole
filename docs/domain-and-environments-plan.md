@@ -34,10 +34,16 @@ seeded by hand. Production's Convex deployment was seeded previously (existing
 users already see the library fine), so this has no user-facing impact on
 `main` — nothing needs to be fixed or shipped there.
 
-**Optional backlog item, not urgent:** auto-run the seed mutation after
-`convex deploy --preview-create` in `scripts/vercel-build.js` so new
-preview/staging/dev deployments aren't confusingly empty during manual
-testing. Low priority — didn't implement, just flagging it.
+**DONE 2026-08-03 (later session).** `scripts/vercel-build.js` now passes
+`--preview-run exercises:seed` to `convex deploy`. Convex has a purpose-built
+flag for exactly this: it runs the named function after the schema push and is
+**ignored on production deployments**, so the production path is untouched.
+Safe on every rebuild of a reused preview deployment because `exercises:seed`
+short-circuits with "Already seeded — skipped." Verified two things by hand
+rather than assuming: the Convex CLI *can* invoke an `internalMutation` (it
+holds an admin/deploy key), and the idempotency guard really fires — running
+`npx convex run exercises:seed` against the dev deployment returned
+"Already seeded — skipped."
 
 ## Would buying a domain make the dev/staging/main flow better?
 
@@ -45,11 +51,29 @@ Short answer: yes, but for usability of the existing pipeline, not for the
 git-promotion mechanics themselves (dev → staging → main via PRs stays exactly
 as-is either way).
 
-**What's true today:** every Preview build (dev branch, staging branch, any
-PR) gets a random, rotating URL like `swole-<hash>-tn1dgs-projects.vercel.app`,
-and it sits behind Vercel's deployment-protection auth wall (that's the 302
-you'd see hitting it directly). Finding "the current staging URL" means
-digging through `vercel ls` or the dashboard every time.
+**CORRECTION 2026-08-03 (later session).** The paragraph below overstated the
+problem, and the correction weakens the case for buying a domain — record it
+before deciding. Vercel *already* maintains a permanent alias per git branch,
+for free, with no custom domain involved. Both were confirmed live:
+
+- `https://swole-git-staging-tn1dgs-projects.vercel.app` → latest `staging`
+- `https://swole-git-dev-tn1dgs-projects.vercel.app` → latest `dev`
+
+They're bookmarkable and always track the newest build on that branch, so
+hunting through `vercel ls` for a hash was never actually necessary. Both still
+sit behind deployment protection (they return 302 to `curl`, and load normally
+in a browser signed into Vercel), so a domain does **not** change QA access
+either — that's controlled by the Deployment Protection setting, separately.
+
+What a domain still genuinely buys: a real production URL you'd be willing to
+put in front of users, and stable OAuth callback URLs later. Neither is urgent.
+
+**What's true today (as originally written):** every Preview build (dev branch,
+staging branch, any PR) gets a random, rotating URL like
+`swole-<hash>-tn1dgs-projects.vercel.app`, and it sits behind Vercel's
+deployment-protection auth wall (that's the 302 you'd see hitting it directly).
+Finding "the current staging URL" means digging through `vercel ls` or the
+dashboard every time.
 
 **What a custom domain buys you:** in Vercel → Project Settings → Domains you
 can add a domain and assign subdomains to specific git branches ("Git Branch
@@ -86,11 +110,38 @@ urgency — this is a "nice to have, plan it, don't rush it" item.
    `staging` domain now that it's a stable, memorable URL, or be relaxed for
    easier QA access.
 
-## Decisions needed from you when you're back
+## Candidate names — availability checked 2026-08-03
 
-- [ ] Verify the fix on the new `staging` preview build, then say go/no-go
+Checked via RDAP (`rdap.org/domain/<name>`; 404 = unregistered, 200 = taken).
+RDAP tells you a name is *unregistered* — it does **not** tell you the price, so
+any of these may still be priced as a registry premium. Confirm cost at the
+registrar before committing.
+
+| Domain | Status | Notes |
+| --- | --- | --- |
+| `swole.io` | **available** | Exact-match name; `.io` reads as tech/product more than fitness, and renewals are pricey. |
+| `swole.gg` | **available** | Exact match, strong with a gamified app (points, challenges, leaderboards). `.gg` skews gaming. |
+| `swole.co` | **available** | Exact match, closest feel to a `.com`. |
+| `swole.run` | **available** | Exact match and fitness-flavoured, though this app is lifting, not running. |
+| `swole.team` | **available** | Exact match; fits the social/friends side. |
+| `goswole.app` | **available** | `.app` forces HTTPS, which suits a PWA. Needs the "go" prefix. |
+| `swole.app` | taken | |
+| `swole.fit` | taken | The most on-brand TLD, unfortunately gone. |
+| `swole.club` / `swole.life` / `swole.zone` / `swole.pro` / `swole.xyz` | taken | |
+| `getswole.app` / `swoleapp.com` / `swolehq.com` | taken | |
+
+Worth knowing before you pick: the domain is **not** load-bearing for anything
+today. Nothing in the codebase hardcodes an origin — `vercel.json`'s CSP uses
+`https://*.convex.cloud` for `connect-src`, so it keeps working on any frontend
+origin. Changing your mind later costs a DNS change, not a code change.
+
+## Decisions needed from you
+
+- [ ] Verify the fix on the `staging` build — now at the stable alias
+      `https://swole-git-staging-tn1dgs-projects.vercel.app` — then say go/no-go
       on opening the `staging → main` PR.
-- [ ] Domain name + registrar (buy through Vercel, or bring your own).
+- [ ] Pick from the candidate table above, plus registrar (buy through Vercel,
+      or bring your own).
 - [ ] Confirm subdomain scheme (`staging.<domain>` etc., or something else).
-- [ ] Whether to bother auto-seeding preview Convex deployments with
-      exercises (low priority, easy fix in `scripts/vercel-build.js`).
+- [x] ~~Whether to bother auto-seeding preview Convex deployments with
+      exercises.~~ Done — see the seeding section above.
