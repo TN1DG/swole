@@ -49,6 +49,50 @@ Then confirmed live on a real preview build (`dev` @ `d77f373`): the build log
 shows `--preview-run exercises:seed` firing after the index push and returning
 `"Seeded 70 exercises."` on the fresh deployment.
 
+## "Could not create account, password must be at least 8 characters" on a preview — NOT a password problem
+
+Hit on the `staging` preview 2026-08-03 while verifying the viewport fixes.
+The message is a **lie**, in two layers:
+
+1. **The real cause was zero env vars.** `convex env list --preview-name
+   staging` returned *nothing* on `rightful-trout-304`. A preview deployment
+   created by `--preview-create` starts with no environment variables, so
+   Convex Auth had no `JWT_PRIVATE_KEY`/`JWKS` and could not mint a token —
+   every sign-up failed. `scripts/setup-auth-env.mjs` already warned about
+   this in its header comment; it's the same trap the `--deployment` flag was
+   added for.
+2. **The UI asserted a cause it never checked.** `SignInPage.tsx` passed that
+   sentence as the *fallback* to `errorMessage(err, fallback)`, which returns
+   the fallback for anything that isn't a `ConvexError` — network failures,
+   misconfigured deployments, genuine bugs. Worse, the password input already
+   carries `minLength: 8`, so the browser blocks a short password from ever
+   being submitted: the stated cause was close to impossible. Now a neutral
+   message.
+
+**So: after creating any new preview deployment, set its auth env vars**, or
+sign-up will fail with a misleading error:
+
+```
+node scripts/setup-auth-env.mjs --deployment=<name> --site-url=https://<branch-alias>
+npx convex run exercises:seed --preview-name <branch>   # only for deployments
+                                                        # built before the
+                                                        # auto-seed change
+```
+
+Note the script parses `--deployment=<name>` (equals form), even though its
+usage comment writes it as `--deployment <name>`.
+
+`RESEND_API_KEY` is deliberately **not** set on previews — it's only needed for
+password-reset/magic-link email, and pointing a disposable preview at the live
+email-sending account isn't worth it. Password reset won't work on previews.
+
+**Open follow-up:** this is now the second thing a fresh preview needs done by
+hand (seeding was the first, now automated). `scripts/vercel-build.js` could
+set the auth vars too — `VERCEL_BRANCH_URL` gives the stable alias for
+`SITE_URL`. It must **only set them when absent**, though: regenerating
+`JWT_PRIVATE_KEY` on every build would sign everyone out of that preview on
+every push. Not done — decide before implementing.
+
 ## Would buying a domain make the dev/staging/main flow better?
 
 Short answer: yes, but for usability of the existing pipeline, not for the
