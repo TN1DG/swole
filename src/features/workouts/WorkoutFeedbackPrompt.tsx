@@ -3,7 +3,7 @@ import { useMutation } from 'convex/react'
 import { Box, Button, Chip, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { REASON_OPTIONS } from '../../../convex/workoutFeedback'
+import { REASON_OPTIONS } from '../../../convex/constants'
 import { errorMessage } from '../../lib/errors'
 import { GlassCard } from '../../components/GlassCard'
 

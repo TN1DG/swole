@@ -24,3 +24,12 @@ export const EQUIPMENT_TYPES = [
 ] as const
 
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number]
+
+export const REASON_OPTIONS = [
+  'More energy',
+  'Better sleep',
+  'A workout partner',
+  'Clearer plan',
+  'More time',
+  'Better music/mood',
+] as const
