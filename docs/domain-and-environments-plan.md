@@ -23,7 +23,7 @@ Written 2026-08-03, ~18:00 UTC, right before a 4-5hr break. Pick up here.
 
 `convex/exercises.ts:list` returns built-in exercises (`ownerId: undefined`)
 plus the signed-in user's custom ones. The built-in library
-(`BUILT_IN_EXERCISES` in `convex/seedData.ts`, 71 entries) only exists in a
+(`BUILT_IN_EXERCISES` in `convex/seedData.ts`, 70 entries) only exists in a
 deployment's database once someone has manually run the one-time mutation
 `npx convex run exercises:seed` **against that specific deployment**.
 
@@ -44,6 +44,10 @@ rather than assuming: the Convex CLI *can* invoke an `internalMutation` (it
 holds an admin/deploy key), and the idempotency guard really fires — running
 `npx convex run exercises:seed` against the dev deployment returned
 "Already seeded — skipped."
+
+Then confirmed live on a real preview build (`dev` @ `d77f373`): the build log
+shows `--preview-run exercises:seed` firing after the index push and returning
+`"Seeded 70 exercises."` on the fresh deployment.
 
 ## Would buying a domain make the dev/staging/main flow better?
 
