@@ -331,9 +331,12 @@ function FriendsTab({
           <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
             {incoming.map((r) => (
               <GlassTile key={r.requestId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1.5 }}>
-                <Typography noWrap sx={{ minWidth: 0, fontWeight: 500 }}>
-                  {r.from.displayName}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
+                  <Avatar src={r.from.avatarUrl} name={r.from.displayName} size={36} />
+                  <Typography noWrap sx={{ minWidth: 0, fontWeight: 500 }}>
+                    {r.from.displayName}
+                  </Typography>
+                </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                   <Button variant="contained" size="small" onClick={() => runAction(() => acceptFriendRequest({ requestId: r.requestId }))}>
                     Accept

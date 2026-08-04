@@ -1,5 +1,6 @@
 import { internalMutation } from './_generated/server'
 import type { Id } from './_generated/dataModel'
+import type { GenericId } from 'convex/values'
 import { utcWeekStart, WEEK_MS } from './fitness'
 import { reconcileWeek } from './points'
 
@@ -119,5 +120,37 @@ export const backfillScoring = internalMutation({
     }
 
     return { workouts: workouts.length, weeksReconciled: weeks.size }
+  },
+})
+
+// One-off cleanup for a table that outlived its schema entry.
+//   npx convex run migrations:dropOrphanedEmailSendAttempts [--prod]
+//
+// `emailSendAttempts` was a hand-rolled send counter, replaced during the
+// rate-limiting work by the `@convex-dev/rate-limiter` component (see the note
+// in convex/rateLimiter.ts). It was dropped from convex/schema.ts, but removing
+// a table from the schema does not remove its rows — and those rows contain
+// real user email addresses. No code has read them since.
+//
+// Because the table is no longer in the schema it has no generated type, hence
+// the cast: the generated `DataModel` only knows about tables the schema still
+// declares. Deleting rows from an undeclared table is allowed — schema
+// validation governs writes to *declared* tables, which is exactly why these
+// rows survived in the first place.
+//
+// Idempotent: once the rows are gone this returns { deleted: 0 } forever.
+export const dropOrphanedEmailSendAttempts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const db = ctx.db as unknown as {
+      query: (table: string) => { collect: () => Promise<Array<{ _id: GenericId<string> }>> }
+      delete: (id: GenericId<string>) => Promise<void>
+    }
+
+    const rows = await db.query('emailSendAttempts').collect()
+    for (const row of rows) {
+      await db.delete(row._id)
+    }
+    return { deleted: rows.length }
   },
 })
