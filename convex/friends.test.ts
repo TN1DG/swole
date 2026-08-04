@@ -58,6 +58,23 @@ describe('resolveUsername', () => {
       await bob.user.query(api.friends.resolveUsername, { username: 'nobody' }),
     ).toBeNull()
   })
+
+  // Regression: `displayName` used to fall back to the user's email address.
+  // Anyone can call resolveUsername against any username, so that published
+  // the email of every account that had a username but no display name — a
+  // state `setUsername` can produce on its own, since it doesn't set one.
+  it('never exposes the email address of a user who has no display name', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const bob = await userWithUsername(t, 'bob')
+
+    const found = await bob.user.query(api.friends.resolveUsername, { username: 'alice' })
+    expect(found).not.toBeNull()
+    expect(found!.displayName).not.toContain('@')
+    expect(found!.displayName).toBe('alice')
+    expect(JSON.stringify(found)).not.toContain('test.local')
+    expect(alice.userId).toBeTruthy()
+  })
 })
 
 describe('sendFriendRequest', () => {
@@ -238,7 +255,10 @@ describe('getFriendWorkoutDetail', () => {
 
     const detail = await bob.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
     expect(detail).not.toBeNull()
-    expect(detail!.owner.displayName).toBe('alice@test.local')
+    // Falls back to the username, never the email. This previously asserted
+    // 'alice@test.local' — the test was pinning an email leak in place.
+    expect(detail!.owner.displayName).toBe('alice')
+    expect(detail!.owner.displayName).not.toContain('@')
     expect(detail!.exercises).toHaveLength(1)
     expect(detail!.exercises[0].sets[0]).toMatchObject({ weightKg: 120, reps: 5 })
     expect(detail!.consistency).toMatchObject({ streakWeeks: 1, tier: 'none' })
@@ -256,7 +276,11 @@ describe('getFriendWorkoutDetail', () => {
     await alice.user.mutation(api.profiles.setWorkoutsPublic, { workoutsPublic: true })
     const detail = await eve.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
     expect(detail).not.toBeNull()
-    expect(detail!.owner.displayName).toBe('alice@test.local')
+    // Eve is a stranger here — a public opt-in shares the *workout*, not the
+    // owner's email. This asserted 'alice@test.local' before, i.e. it pinned
+    // "strangers can read your email address" as the expected behaviour.
+    expect(detail!.owner.displayName).toBe('alice')
+    expect(detail!.owner.displayName).not.toContain('@')
   })
 
   it('returns null for an in-progress (unfinished) workout', async () => {
