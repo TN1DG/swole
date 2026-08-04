@@ -196,6 +196,16 @@ about incoming and wrong about outgoing.
     deployment logs `"Seeded 70 exercises."`. Seeded state is correct either
     way; the first-deploy path is the one that matters for a new branch. Look
     here if a new branch ever comes up with an empty exercise library.
+22. **There is at least one flaky test.** Observed 2026-08-04: one run reported
+    `1 failed | 311 passed` on a tree where the only change since a fully green
+    run was a Markdown file. Five subsequent runs all passed 312/312, so it did
+    not reproduce and vitest's summary never named it. Roughly 1 failure in 6
+    runs. Unidentified — the suspicion is something time-dependent (the scoring
+    and streak code is full of `Date.now()` and UTC week boundaries, and
+    challenge expiry is time-driven), but that is a guess, not a diagnosis.
+    If a CI run ever fails for no apparent reason, this is why. To catch it:
+    `npx vitest run --reporter=verbose` in a loop until it trips, then pin the
+    clock in whichever test it turns out to be.
 
 ---
 
