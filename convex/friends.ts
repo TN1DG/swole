@@ -1,6 +1,6 @@
 import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { mutation, query, type QueryCtx } from './_generated/server'
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { getWorkoutExercises, summarizeWorkout } from './history'
 import {
@@ -20,34 +20,41 @@ import {
   trainedWeekSet,
 } from './points'
 import { cleanUsername, LIMITS } from './validation'
-import { rateLimiter } from './rateLimiter'
+import { rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
 import { areFriends } from './friendships'
 
-async function requireUserId(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
+// Mutation-only: every write in this module goes through here, so it is the
+// single place to charge the per-user write budget. Queries in this file call
+// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
+async function requireUserId(ctx: MutationCtx) {
+  return await requireWriter(ctx)
 }
 
-// The user document plus their profile row. Both public identity helpers
-// below build on this so the pair is only ever read once per user — the
-// leaderboard and friends list call them once per friend, so a duplicated
-// read here is a duplicated read across the whole list.
+// The profile row behind a user's public identity. The leaderboard and
+// friends list call this once per friend, so anything read here is read
+// once per row of those lists.
+//
+// It deliberately does NOT read the `users` document. It used to, for a
+// `?? user.email` fallback on displayName — which leaked email addresses:
+// `resolveUsername` lets anyone look up any username, and `myOutgoingRequests`
+// covers people who are not friends and never accepted anything. A profile
+// with a username but no display name is reachable (`setUsername` is its own
+// public mutation and doesn't set one), so that fallback published the
+// account's email to a stranger. An email is never a display name — falling
+// back to the username, then a neutral placeholder, is both safe and better
+// UX. Dropping the read also removes one database round-trip per friend.
 async function identityOf(ctx: QueryCtx, userId: Id<'users'>) {
-  const [user, profile] = await Promise.all([
-    ctx.db.get(userId),
-    ctx.db
-      .query('profiles')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique(),
-  ])
+  const profile = await ctx.db
+    .query('profiles')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .unique()
   return {
     profile,
     info: {
       userId,
       username: profile?.username ?? null,
-      displayName: profile?.displayName ?? user?.email ?? '?',
+      displayName: profile?.displayName ?? profile?.username ?? 'Someone',
     },
   }
 }

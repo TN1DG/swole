@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
 import { reconcileWeek } from './points'
@@ -184,11 +185,23 @@ export const exerciseHistory = query({
 
     // Newest-first, capped scan — old history beyond the cap simply falls
     // off the chart rather than blowing up the query.
+    //
+    // `.take()`, not `.collect()` then slice: the cap has to apply to what the
+    // database *reads*, not to what survives filtering afterwards. Collecting
+    // first meant every workout the account had ever logged was loaded to show
+    // a 200-point chart, so this query grew without bound and would eventually
+    // trip Convex's per-transaction read limit and fail outright.
+    //
+    // +1 because at most one workout can be unfinished — `start` returns the
+    // existing active one instead of creating a second, and `cancel` deletes
+    // rather than marking. So one extra row is enough to still yield
+    // HISTORY_SCAN_LIMIT finished ones. `by_owner_startedAt` orders by the
+    // field this actually means by "newest", and is prefix-usable for owner.
     const workouts = await ctx.db
       .query('workouts')
-      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .withIndex('by_owner_startedAt', (q) => q.eq('ownerId', userId))
       .order('desc')
-      .collect()
+      .take(HISTORY_SCAN_LIMIT + 1)
 
     const sessions: {
       workoutId: Id<'workouts'>
@@ -324,8 +337,7 @@ async function recomputeRecord(
 export const deleteWorkout = mutation({
   args: { workoutId: v.id('workouts') },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const workout = await ctx.db.get(args.workoutId)
     if (!workout || workout.ownerId !== userId) throw new Error('Workout not found')
@@ -360,6 +372,19 @@ export const deleteWorkout = mutation({
     // unaffected either way; it re-derives the current streak on every read.
     if (workout.endedAt !== undefined) {
       await reconcileWeek(ctx, userId, workout.startedAt, workout.pointsAwarded ?? 0)
+
+      // Mirror of the increment in workouts.finish. Only completed workouts
+      // were ever counted, so only completed ones are subtracted. Floored at
+      // zero so a profile that predates the backfill can't go negative.
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      if (profile) {
+        await ctx.db.patch(profile._id, {
+          workoutsCompleted: Math.max(0, (profile.workoutsCompleted ?? 0) - 1),
+        })
+      }
     }
 
     // Any feed post about this workout is UNLINKED, not deleted. The post

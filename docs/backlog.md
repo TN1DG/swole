@@ -47,29 +47,27 @@ one-tap ping acknowledge, and the deep-link to a friend's workout
 (`/friends/:userId/:workoutId`). Component: `src/components/NotificationsBanner.tsx`.
 Now that staging keeps its data between pushes, this is much easier to test.
 
-### 2. Orphaned `emailSendAttempts` rows in production
-The table was dropped from the schema during the rate-limiting work, but
-removing a table from the schema does **not** remove its rows — and these hold
-real user email addresses (~4 rows). Nothing reads them; the only remaining
-reference is a comment in `convex/rateLimiter.ts`.
+### 2. ~~Orphaned `emailSendAttempts` rows in production~~ — DONE 2026-08-04
+`migrations:dropOrphanedEmailSendAttempts` was run against production and
+deleted **6 rows** (this file previously estimated ~4 — the estimate was low).
+The table is now empty, verified with `npx convex data emailSendAttempts
+--prod`, and a second run returned `{deleted: 0}`, confirming idempotency.
+Production served HTTP 200 throughout.
 
-`migrations:dropOrphanedEmailSendAttempts` now exists and is idempotent. It has
-been run on **dev** (returned `{deleted: 0}` — dev's copy was already empty,
-which confirmed Convex will query a table the schema no longer declares).
+The empty table itself still appears in the table listing. That's harmless —
+it holds no documents, and the privacy concern was the rows.
 
-**Still needs running against production — but not until the function is
-deployed there.** Production runs the code on `main`, so `--prod` fails with
-"Could not find function" while the migration is still only on `dev`:
+Two things worth keeping from the exercise:
 
-```
-# 1. promote dev -> staging -> main (the merge to main deploys production)
-# 2. then, and only then:
-npx convex run migrations:dropOrphanedEmailSendAttempts --prod
-```
-
-Do **not** shortcut this with `npm run deploy`. That would push whatever is
-currently on `dev` straight to production, bypassing both PR gates, just to
-make a cleanup command work.
+- **Removing a table from `convex/schema.ts` does not remove its rows.** They
+  simply stop being validated, and stop being visible to typed queries. Reaching
+  them again needs a cast, because the generated `DataModel` no longer declares
+  the table. Anything dropped from the schema in future leaves its data behind
+  the same way.
+- **A migration can only run where it's deployed.** `--prod` failed with "Could
+  not find function" until the promotion reached `main`, because production runs
+  `main`'s code. The shortcut — `npm run deploy` — would have worked by pushing
+  all of `dev` straight to production and bypassing both PR gates. Don't.
 
 ---
 
@@ -196,16 +194,27 @@ about incoming and wrong about outgoing.
     deployment logs `"Seeded 70 exercises."`. Seeded state is correct either
     way; the first-deploy path is the one that matters for a new branch. Look
     here if a new branch ever comes up with an empty exercise library.
-22. **There is at least one flaky test.** Observed 2026-08-04: one run reported
-    `1 failed | 311 passed` on a tree where the only change since a fully green
-    run was a Markdown file. Five subsequent runs all passed 312/312, so it did
-    not reproduce and vitest's summary never named it. Roughly 1 failure in 6
-    runs. Unidentified — the suspicion is something time-dependent (the scoring
-    and streak code is full of `Date.now()` and UTC week boundaries, and
-    challenge expiry is time-driven), but that is a guess, not a diagnosis.
-    If a CI run ever fails for no apparent reason, this is why. To catch it:
-    `npx vitest run --reporter=verbose` in a loop until it trips, then pin the
-    clock in whichever test it turns out to be.
+22. ~~**There is at least one flaky test.**~~ — **FOUND AND FIXED 2026-08-04.**
+    It was `convex/emailAuth.test.ts > sign up > throttles a flood of
+    new-account creation app-wide`, and it was **a timeout, not a logic bug** —
+    which is why the summary said "1 failed" with no assertion error and no
+    test name.
+
+    The test must create 21 accounts to trip a limit of 20, and each sign-up
+    runs a real password hash. Measured across five runs it takes
+    **3993–4848ms**, against vitest's **5000ms** default. Routinely within 3–20%
+    of the ceiling, so any load spike tips it over. It first appeared while
+    several `npx` commands were running concurrently.
+
+    Fixed with an explicit `{ timeout: 30_000 }` on that one test. Deliberately
+    *not* a raised global timeout: every other test finishes in under 700ms, and
+    a 5s default is what catches a genuinely hung one.
+
+    **Method worth reusing.** Brute repetition was the wrong tool — 26 runs,
+    including shuffled ones, never reproduced it. What found it in one run was
+    `npx vitest run --reporter=verbose` and sorting by duration: the culprit was
+    the only test in the suite anywhere near the limit. If another mystery flake
+    appears, check durations against the timeout before hunting for a race.
 
 ---
 

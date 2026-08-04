@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { internalMutation, mutation, query } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from './constants'
 import { BUILT_IN_EXERCISES } from './seedData'
 import { cleanName, LIMITS } from './validation'
@@ -52,8 +53,7 @@ export const create = mutation({
     equipment: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const fields = validateExerciseFields(args)
 
@@ -82,8 +82,7 @@ export const update = mutation({
     equipment: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const exercise = await ctx.db.get(args.id)
     if (!exercise || exercise.ownerId !== userId) {

@@ -416,3 +416,57 @@ describe('getMine points fields', () => {
     expect(after.weekPoints).toBe(earned)
   })
 })
+
+describe('getMine: lifetime workout count', () => {
+  // getMine reads only the last 52 weeks of workouts now — everything it
+  // derives (streak, week/month points) needs no more than that, and reading a
+  // lifetime made the query grow without bound. The lifetime total therefore
+  // comes from profiles.workoutsCompleted, maintained by finish/deleteWorkout.
+  // These tests pin the counter to the thing it replaced.
+  async function setup() {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+    return { t, user, userId, exerciseId }
+  }
+
+  it('counts finished workouts and stops counting deleted ones', async () => {
+    const { t, user, exerciseId } = await setup()
+
+    await logWorkoutOn(t, user, exerciseId, { daysAgo: 1 })
+    const second = await logWorkoutOn(t, user, exerciseId, { daysAgo: 2 })
+    expect((await user.query(api.profiles.getMine, {}))!.workoutCount).toBe(2)
+
+    await user.mutation(api.history.deleteWorkout, { workoutId: second })
+    expect((await user.query(api.profiles.getMine, {}))!.workoutCount).toBe(1)
+  })
+
+  it('does not count a workout that was discarded for having no completed sets', async () => {
+    const { user, exerciseId } = await setup()
+
+    // finish() deletes a workout with nothing completed rather than storing
+    // it, so it never becomes a completed workout and must not be counted.
+    const workoutId = await user.mutation(api.workouts.start, {})
+    await user.mutation(api.workouts.addExercise, { workoutId, exerciseId })
+    const result = await user.mutation(api.workouts.finish, { workoutId })
+    expect(result).toMatchObject({ discarded: true })
+
+    expect((await user.query(api.profiles.getMine, {}))!.workoutCount).toBe(0)
+  })
+
+  // The regression the counter exists to prevent: a workout older than the
+  // 52-week read window still belongs in the lifetime total. Counting the rows
+  // getMine actually reads would silently drop it.
+  it('still counts workouts older than the 52-week read window', async () => {
+    const { t, user, exerciseId } = await setup()
+
+    await logWorkoutOn(t, user, exerciseId, { daysAgo: 500 })
+    await logWorkoutOn(t, user, exerciseId, { daysAgo: 1 })
+
+    const profile = await user.query(api.profiles.getMine, {})
+    expect(profile!.workoutCount).toBe(2)
+    // ...while the streak, which only looks back a year, sees just the recent one.
+    expect(profile!.streakWeeks).toBe(1)
+  })
+})

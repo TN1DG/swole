@@ -5,16 +5,17 @@ import type { Doc, Id } from './_generated/dataModel'
 import { publicIdentityMap } from './identity'
 import { areFriends } from './friendships'
 import { notify } from './notifications'
-import { rateLimiter } from './rateLimiter'
+import { rateLimiter, requireWriter } from './rateLimiter'
 import { cleanText, LIMITS } from './validation'
 
 // Bigger than an avatar: feed photos are 4:5 at up to 1440px.
 const MAX_POST_PHOTO_BYTES = 8 * 1024 * 1024
 
-async function requireUserId(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
+// Mutation-only: every write in this module goes through here, so it is the
+// single place to charge the per-user write budget. Queries in this file call
+// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
+async function requireUserId(ctx: MutationCtx) {
+  return await requireWriter(ctx)
 }
 
 /** Everyone this user has blocked, for filtering both feed streams. */
