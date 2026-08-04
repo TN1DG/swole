@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -7,6 +7,7 @@ import { assertRange, cleanName, LIMITS } from './validation'
 import { reconcileWeek } from './points'
 import { notify } from './notifications'
 import { requireWriter } from './rateLimiter'
+import { getOrCreateProfile } from './profiles'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -112,6 +113,18 @@ export const start = mutation({
       .filter((q) => q.eq(q.field('endedAt'), undefined))
       .first()
     if (existing) return existing._id
+
+    // Ration lifetime workout creation. The rate limiter caps how *fast* an
+    // account can write; this caps how much it can ever accumulate, which is
+    // what actually costs storage. Checked only when a row is really about to
+    // be inserted — the early return above means re-opening an active workout
+    // is free.
+    const profile = await getOrCreateProfile(ctx, userId)
+    const startedCount = profile.workoutsStarted ?? 0
+    if (startedCount >= LIMITS.workoutsPerUser) {
+      throw new ConvexError('Workout limit reached for this account')
+    }
+    await ctx.db.patch(profile._id, { workoutsStarted: startedCount + 1 })
 
     const hour =
       args.localHour !== undefined

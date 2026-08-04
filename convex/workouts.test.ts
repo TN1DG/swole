@@ -8,7 +8,10 @@ import {
   createUser,
   logWorkoutOn,
   pointsOf,
+  type T,
 } from './test.helpers'
+import type { Id } from './_generated/dataModel'
+import { LIMITS } from './validation'
 
 async function oneUser() {
   const t = createBackend()
@@ -242,6 +245,51 @@ describe('personal records', () => {
 
     const [record] = await user.query(api.prs.listMine, {})
     expect(record.bestWeightKg).toBe(100)
+  })
+})
+
+describe('lifetime workout cap', () => {
+  // Workouts were the one user-owned table with no ceiling, so `start`/`finish`
+  // in a loop grew the database without bound. The counter is seeded here
+  // rather than by creating 20k workouts, which is the whole point of storing
+  // a count instead of doing a COUNT(*) on every start.
+  async function seedStartedCount(t: T, userId: Id<'users'>, count: number) {
+    await t.run(async (ctx) => {
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      if (profile) await ctx.db.patch(profile._id, { workoutsStarted: count })
+      else await ctx.db.insert('profiles', { userId, unitPreference: 'kg', workoutsStarted: count })
+    })
+  }
+
+  it('counts each started workout, and re-opening an active one is free', async () => {
+    const t = createBackend()
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    const first = await user.mutation(api.workouts.start, {})
+    // Already active — returns the same row without spending another slot.
+    expect(await user.mutation(api.workouts.start, {})).toBe(first)
+
+    const started = await t.run(async (ctx) => {
+      const p = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      return p?.workoutsStarted
+    })
+    expect(started).toBe(1)
+  })
+
+  it('refuses to start once the lifetime cap is reached', async () => {
+    const t = createBackend()
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    await seedStartedCount(t, userId, LIMITS.workoutsPerUser)
+    await expect(user.mutation(api.workouts.start, {})).rejects.toThrow(/limit/i)
   })
 })
 

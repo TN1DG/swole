@@ -184,11 +184,23 @@ export const exerciseHistory = query({
 
     // Newest-first, capped scan — old history beyond the cap simply falls
     // off the chart rather than blowing up the query.
+    //
+    // `.take()`, not `.collect()` then slice: the cap has to apply to what the
+    // database *reads*, not to what survives filtering afterwards. Collecting
+    // first meant every workout the account had ever logged was loaded to show
+    // a 200-point chart, so this query grew without bound and would eventually
+    // trip Convex's per-transaction read limit and fail outright.
+    //
+    // +1 because at most one workout can be unfinished — `start` returns the
+    // existing active one instead of creating a second, and `cancel` deletes
+    // rather than marking. So one extra row is enough to still yield
+    // HISTORY_SCAN_LIMIT finished ones. `by_owner_startedAt` orders by the
+    // field this actually means by "newest", and is prefix-usable for owner.
     const workouts = await ctx.db
       .query('workouts')
-      .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+      .withIndex('by_owner_startedAt', (q) => q.eq('ownerId', userId))
       .order('desc')
-      .collect()
+      .take(HISTORY_SCAN_LIMIT + 1)
 
     const sessions: {
       workoutId: Id<'workouts'>

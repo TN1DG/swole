@@ -31,6 +31,18 @@ export default defineSchema({
     username: v.optional(v.string()),
     // Opt-in: anyone (not just accepted friends) can view your workout history.
     workoutsPublic: v.optional(v.boolean()),
+
+    // Lifetime count of workouts this account has STARTED, checked against
+    // LIMITS.workoutsPerUser in workouts.ts:start. A counter rather than a
+    // COUNT(*): the check runs on every start, and counting rows would mean
+    // reading up to the cap each time — more expensive than the abuse it
+    // guards against.
+    //
+    // Deliberately never decremented. It measures rows this account has caused
+    // to exist, which is what's being rationed; refunding on delete would hand
+    // back an unlimited create/delete cycle. Optional, so accounts predating it
+    // start at 0 and get the full allowance.
+    workoutsStarted: v.optional(v.number()),
     // Set once the welcome carousel is completed (or backfilled for pre-existing
     // accounts) — gates whether OnboardingGate shows the carousel or the app.
     onboardedAt: v.optional(v.number()),
