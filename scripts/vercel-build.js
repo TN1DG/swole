@@ -6,13 +6,22 @@ import { execSync } from 'node:child_process'
 const isProduction = process.env.VERCEL_ENV === 'production'
 const branch = process.env.VERCEL_GIT_COMMIT_REF ?? 'preview'
 
-// Every preview deployment starts with an empty database, so the built-in
-// exercise library is missing until it's seeded. `--preview-run` runs after the
-// schema push and is ignored on production, and `exercises:seed` is a no-op
-// once seeded, so it's safe on every rebuild of a reused preview deployment.
+// `--preview-name` reuses the branch's existing preview deployment. It is
+// deliberately NOT `--preview-create`, which *deletes and recreates* the
+// deployment on every push: that wiped the database and every environment
+// variable each time, so test accounts vanished on each merge and the
+// `--if-absent` guard below could never find anything to skip.
+//
+// Reusing also rehearses production more honestly. Production carries
+// persistent data, so a schema change that can't cope with existing rows now
+// fails here first, rather than sailing through a clean slate.
+//
+// A preview deployment still starts empty the *first* time, so the built-in
+// exercise library needs seeding. `--preview-run` runs after the schema push,
+// is ignored on production, and `exercises:seed` is a no-op once seeded.
 const cmd = isProduction
   ? `npx convex deploy --cmd "npm run build"`
-  : `npx convex deploy --cmd "npm run build" --preview-create "${branch}" --preview-run exercises:seed`
+  : `npx convex deploy --cmd "npm run build" --preview-name "${branch}" --preview-run exercises:seed`
 
 console.log(`[vercel-build] VERCEL_ENV=${process.env.VERCEL_ENV ?? 'unset'} -> ${cmd}`)
 execSync(cmd, { stdio: 'inherit' })
