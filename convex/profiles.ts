@@ -83,6 +83,18 @@ export const getMine = query({
     const userId = await getAuthUserId(ctx)
     if (userId === null) return null
 
+    // Everything derived from workouts below — the streak, and this week's and
+    // month's points — only looks back a year. So read a year, not a lifetime.
+    //
+    // This used to `.collect()` the whole by_owner index, so opening your own
+    // profile got more expensive with every workout you ever logged and would
+    // eventually trip Convex's per-transaction read limit. The lifetime total
+    // is the one thing that genuinely needed all the rows, and it now comes
+    // from a counter (profiles.workoutsCompleted) instead of a scan.
+    const now = Date.now()
+    const OWN_LOOKBACK_WEEKS = 52
+    const lookbackStart = utcWeekStart(now) - OWN_LOOKBACK_WEEKS * WEEK_MS
+
     // Five independent reads — run them together instead of one at a time.
     const [user, profile, workouts, prs, favorites] = await Promise.all([
       ctx.db.get(userId),
@@ -92,7 +104,9 @@ export const getMine = query({
         .unique(),
       ctx.db
         .query('workouts')
-        .withIndex('by_owner', (q) => q.eq('ownerId', userId))
+        .withIndex('by_owner_startedAt', (q) =>
+          q.eq('ownerId', userId).gte('startedAt', lookbackStart),
+        )
         .collect(),
       ctx.db
         .query('personalRecords')
@@ -108,14 +122,9 @@ export const getMine = query({
 
     // Your own streak can afford a longer lookback than the leaderboard's —
     // that's one user's rows, not one per friend — so a long streak shows a
-    // real number here rather than being capped.
-    const now = Date.now()
-    const OWN_LOOKBACK_WEEKS = 52
-    const trainedWeeks = new Set(
-      completedWorkouts
-        .filter((w) => w.startedAt >= utcWeekStart(now) - OWN_LOOKBACK_WEEKS * WEEK_MS)
-        .map((w) => utcWeekIndex(w.startedAt)),
-    )
+    // real number here rather than being capped. The lookback is applied by the
+    // indexed read above now, so there's nothing left to filter out here.
+    const trainedWeeks = new Set(completedWorkouts.map((w) => utcWeekIndex(w.startedAt)))
     const streakWeeks = displayStreakWeeks(trainedWeeks, utcWeekIndex(now))
     const tier = consistencyTier(streakWeeks)
 
@@ -137,7 +146,9 @@ export const getMine = query({
       displayName: profile?.displayName ?? null,
       unitPreference: profile?.unitPreference ?? 'kg',
       memberSince: user?._creationTime ?? Date.now(),
-      workoutCount: completedWorkouts.length,
+      // Lifetime, from the counter — `completedWorkouts` above is only the
+      // last year and would silently under-report it.
+      workoutCount: profile?.workoutsCompleted ?? 0,
       prCount: prs.length,
       favoriteCount: favorites.length,
       heightCm: profile?.heightCm ?? null,

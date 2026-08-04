@@ -43,6 +43,17 @@ export default defineSchema({
     // back an unlimited create/delete cycle. Optional, so accounts predating it
     // start at 0 and get the full allowance.
     workoutsStarted: v.optional(v.number()),
+
+    // Count of *completed* workouts, maintained by workouts.finish and
+    // history.deleteWorkout. Distinct from workoutsStarted above, which is an
+    // abuse ration and never decrements — this one is a user-facing stat and
+    // has to track deletions.
+    //
+    // It exists so profiles.getMine can show a lifetime total without reading
+    // every workout row to count them, which is what it used to do and what
+    // made that query grow without bound. Backfilled by
+    // migrations:backfillWorkoutCounts.
+    workoutsCompleted: v.optional(v.number()),
     // Set once the welcome carousel is completed (or backfilled for pre-existing
     // accounts) — gates whether OnboardingGate shows the carousel or the app.
     onboardedAt: v.optional(v.number()),

@@ -392,6 +392,15 @@ export const finish = mutation({
       prCount,
     })
 
+    // This is the moment a workout becomes "completed", so it's the one place
+    // the lifetime counter behind profiles.getMine goes up. The
+    // exerciseCount === 0 path above returns before here, having deleted the
+    // workout outright — a discarded session must not count.
+    const ownerProfile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(ownerProfile._id, {
+      workoutsCompleted: (ownerProfile.workoutsCompleted ?? 0) + 1,
+    })
+
     // Points are a property of the week the workout STARTED in, not of the
     // moment it was finished: a session begun 23:50 on Sunday and finished
     // 00:30 on Monday belongs to Sunday's week.

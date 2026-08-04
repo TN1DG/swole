@@ -372,6 +372,19 @@ export const deleteWorkout = mutation({
     // unaffected either way; it re-derives the current streak on every read.
     if (workout.endedAt !== undefined) {
       await reconcileWeek(ctx, userId, workout.startedAt, workout.pointsAwarded ?? 0)
+
+      // Mirror of the increment in workouts.finish. Only completed workouts
+      // were ever counted, so only completed ones are subtracted. Floored at
+      // zero so a profile that predates the backfill can't go negative.
+      const profile = await ctx.db
+        .query('profiles')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique()
+      if (profile) {
+        await ctx.db.patch(profile._id, {
+          workoutsCompleted: Math.max(0, (profile.workoutsCompleted ?? 0) - 1),
+        })
+      }
     }
 
     // Any feed post about this workout is UNLINKED, not deleted. The post

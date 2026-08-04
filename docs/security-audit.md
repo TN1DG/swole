@@ -125,11 +125,25 @@ limited.** The audit's first pass counted it as limited because the file
 *mentioned* `rateLimiter` — that was the `otpSend` reset. Good enough to fool a
 grep, not an attacker. It now has its own limit.
 
-### B. `profiles.getMine` collects a user's whole workout history
-Same shape as #4 above but on the profile screen. It also collects all
-`personalRecords` and `favorites`, but those are capped (300 each); workouts are
-the unbounded one. Bound it the same way — the stats it derives only need a
-scoring-window slice.
+### ~~B. `profiles.getMine` collects a user's whole workout history~~ — FIXED 2026-08-04
+Opening your own profile got more expensive with every workout you had ever
+logged. Now reads a 52-week window off `by_owner_startedAt`, which is all the
+streak and the week/month point totals ever needed.
+
+The lifetime "workouts completed" stat was the one thing that genuinely
+required every row, so it moved to a counter (`profiles.workoutsCompleted`)
+maintained by `workouts.finish` and `history.deleteWorkout`. Unlike
+`workoutsStarted`, this one *does* decrement — it's a user-facing number, not
+an abuse ration.
+
+**`migrations:backfillWorkoutCounts` must be run on each deployment.** Without
+it, every established user's profile reads 0 workouts, which looks like data
+loss. Idempotent (recomputes rather than increments); verified on dev, where a
+second run patched 0.
+
+A test pins the case the counter exists for: a workout from 500 days ago is
+outside the read window but still counts toward the lifetime total, while the
+streak correctly ignores it.
 
 ### C. `resolveUsername` enumeration is still unthrottled
 A reactive query, and the limiter needs write access, so throttling means
