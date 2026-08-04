@@ -47,29 +47,27 @@ one-tap ping acknowledge, and the deep-link to a friend's workout
 (`/friends/:userId/:workoutId`). Component: `src/components/NotificationsBanner.tsx`.
 Now that staging keeps its data between pushes, this is much easier to test.
 
-### 2. Orphaned `emailSendAttempts` rows in production
-The table was dropped from the schema during the rate-limiting work, but
-removing a table from the schema does **not** remove its rows — and these hold
-real user email addresses (~4 rows). Nothing reads them; the only remaining
-reference is a comment in `convex/rateLimiter.ts`.
+### 2. ~~Orphaned `emailSendAttempts` rows in production~~ — DONE 2026-08-04
+`migrations:dropOrphanedEmailSendAttempts` was run against production and
+deleted **6 rows** (this file previously estimated ~4 — the estimate was low).
+The table is now empty, verified with `npx convex data emailSendAttempts
+--prod`, and a second run returned `{deleted: 0}`, confirming idempotency.
+Production served HTTP 200 throughout.
 
-`migrations:dropOrphanedEmailSendAttempts` now exists and is idempotent. It has
-been run on **dev** (returned `{deleted: 0}` — dev's copy was already empty,
-which confirmed Convex will query a table the schema no longer declares).
+The empty table itself still appears in the table listing. That's harmless —
+it holds no documents, and the privacy concern was the rows.
 
-**Still needs running against production — but not until the function is
-deployed there.** Production runs the code on `main`, so `--prod` fails with
-"Could not find function" while the migration is still only on `dev`:
+Two things worth keeping from the exercise:
 
-```
-# 1. promote dev -> staging -> main (the merge to main deploys production)
-# 2. then, and only then:
-npx convex run migrations:dropOrphanedEmailSendAttempts --prod
-```
-
-Do **not** shortcut this with `npm run deploy`. That would push whatever is
-currently on `dev` straight to production, bypassing both PR gates, just to
-make a cleanup command work.
+- **Removing a table from `convex/schema.ts` does not remove its rows.** They
+  simply stop being validated, and stop being visible to typed queries. Reaching
+  them again needs a cast, because the generated `DataModel` no longer declares
+  the table. Anything dropped from the schema in future leaves its data behind
+  the same way.
+- **A migration can only run where it's deployed.** `--prod` failed with "Could
+  not find function" until the promotion reached `main`, because production runs
+  `main`'s code. The shortcut — `npm run deploy` — would have worked by pushing
+  all of `dev` straight to production and bypassing both PR gates. Don't.
 
 ---
 
