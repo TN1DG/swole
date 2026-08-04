@@ -101,14 +101,29 @@ directly off `by_owner_startedAt`.
 
 ## Still open, in priority order
 
-### A. `deleteAccount` will fail for a heavy account (highest remaining)
-`convex/account.ts` performs **31 `.collect()` calls across ~28 tables in one
-mutation**. Convex transactions have read/write ceilings; an account with
-thousands of workouts and up to 2000 posts can exceed them, and because a
-mutation is all-or-nothing the deletion fails *entirely* — a user who asked to
-be deleted stays. Already flagged in `docs/backlog.md` as needing the post
-cleanup extracted into a scheduled step. **This is now the top scaling risk**,
-and it has a compliance edge that the others don't.
+### ~~A. `deleteAccount` will fail for a heavy account~~ — FIXED 2026-08-04
+Split into a synchronous half that revokes every credential (and drops the
+profile and avatar blob) and a scheduled `purgeAccountData` that deletes the
+bulk in ~400-document batches, rescheduling itself until done. The account is
+unusable the instant the first half commits; the rest drains behind it.
+
+Two bugs the tests caught during the rewrite, both created by the split itself:
+
+- **The purge wasn't idempotent.** Convex can retry a scheduled function, and
+  `ctx.db.delete` on an already-deleted document throws — so a duplicate run
+  turned into a permanently failing job. The final `users` delete is now
+  guarded.
+- **Refunds could resurrect a deleted user.** Two purges can now interleave,
+  where one transaction could not. Refunding a challenge to a "survivor" who is
+  themselves mid-deletion goes through `awardPoints` → `getOrCreateProfile`,
+  which *inserts* a profile row pointing at a user document being torn down —
+  recreating exactly the orphan this cleanup exists to prevent. Refunds now
+  check the survivor still exists.
+
+Also found while wiring it up: **`deleteAccount` was never actually rate
+limited.** The audit's first pass counted it as limited because the file
+*mentioned* `rateLimiter` — that was the `otpSend` reset. Good enough to fool a
+grep, not an attacker. It now has its own limit.
 
 ### B. `profiles.getMine` collects a user's whole workout history
 Same shape as #4 above but on the profile screen. It also collects all

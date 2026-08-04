@@ -10,6 +10,7 @@ import {
   twoFriends,
   userWithUsername,
   type T,
+  deleteAccountAndPurge,
 } from './test.helpers'
 
 type Visibility = 'public' | 'friends'
@@ -395,7 +396,7 @@ describe('account deletion', () => {
     await bob.user.mutation(api.feed.toggleLike, { postId: alicePost })
     await bob.user.mutation(api.feed.addComment, { postId: alicePost, text: 'hi' })
 
-    await bob.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, bob.user)
 
     const detail = (await alice.user.query(api.feed.getPost, { postId: alicePost }))!
     expect(detail.post.likeCount).toBe(0)

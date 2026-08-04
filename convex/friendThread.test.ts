@@ -6,6 +6,7 @@ import {
   twoFriends,
   userWithUsername,
   type T,
+  deleteAccountAndPurge,
 } from './test.helpers'
 
 describe('messages.send', () => {
@@ -187,7 +188,7 @@ describe('account deletion', () => {
     await bob.user.mutation(api.messages.send, { toUserId: alice.userId, text: 'theirs' })
     await alice.user.mutation(api.friendThread.markRead, { friendUserId: bob.userId })
 
-    await alice.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, alice.user)
 
     const remaining = await t.run(async (ctx) => ({
       messages: await ctx.db.query('messages').collect(),

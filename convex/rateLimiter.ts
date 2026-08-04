@@ -33,6 +33,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // 60 burst is 4-6x headroom for a human and still refuses a script.
   userWrite: { kind: 'token bucket', rate: 120, period: MINUTE, capacity: 60 },
 
+  // Account deletion, keyed by caller userId. It was never actually limited
+  // before — the file *mentioned* `rateLimiter` (for the otpSend reset), which
+  // is enough to fool a grep but not an attacker. Each call now tears down
+  // auth and schedules a batched purge, so a repeat caller could otherwise
+  // queue purge work faster than it drains. A human deletes their account
+  // once, so this is deliberately tight.
+  deleteAccount: { kind: 'token bucket', rate: 3, period: 60 * MINUTE, capacity: 2 },
+
   // New account creation, app-wide (not per-key: there's no per-signup
   // identifier to key on yet, and an IP isn't available to a Convex action).
   // Deters a scripted flood of throwaway accounts without touching normal
