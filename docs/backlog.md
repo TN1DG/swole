@@ -56,11 +56,20 @@ reference is a comment in `convex/rateLimiter.ts`.
 `migrations:dropOrphanedEmailSendAttempts` now exists and is idempotent. It has
 been run on **dev** (returned `{deleted: 0}` — dev's copy was already empty,
 which confirmed Convex will query a table the schema no longer declares).
-**Still needs running against production:**
+
+**Still needs running against production — but not until the function is
+deployed there.** Production runs the code on `main`, so `--prod` fails with
+"Could not find function" while the migration is still only on `dev`:
 
 ```
+# 1. promote dev -> staging -> main (the merge to main deploys production)
+# 2. then, and only then:
 npx convex run migrations:dropOrphanedEmailSendAttempts --prod
 ```
+
+Do **not** shortcut this with `npm run deploy`. That would push whatever is
+currently on `dev` straight to production, bypassing both PR gates, just to
+make a cleanup command work.
 
 ---
 
