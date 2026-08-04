@@ -33,7 +33,15 @@ export function SignInPage() {
       setError(
         flow === 'signIn'
           ? 'Wrong email or password. New here? Tap "Sign up" below.'
-          : errorMessage(err, 'Could not create the account. Password must be at least 8 characters.'),
+          : // Don't name a cause this branch hasn't verified. `errorMessage`
+            // returns this fallback for anything that isn't a ConvexError —
+            // including a misconfigured deployment — and the password length
+            // is already enforced by `minLength: 8` on the input below, so it
+            // can't realistically be what failed here.
+            errorMessage(
+              err,
+              'Could not create the account. Please try again, or sign in if you already have one.',
+            ),
       )
     } finally {
       setSubmitting(false)
