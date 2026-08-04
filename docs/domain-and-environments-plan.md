@@ -1,8 +1,21 @@
 # Domain & environments plan
 
-Written 2026-08-03, ~18:00 UTC, right before a 4-5hr break. Pick up here.
+Written 2026-08-03, ~18:00 UTC, right before a 4-5hr break. Updated 2026-08-04.
+Pick up here.
 
 ## Where the pipeline stands right now
+
+**Updated 2026-08-04.** The viewport work is shipped and the domain is bought.
+
+- **The app is live at <https://swole.day>.** Bought and wired up 2026-08-04 —
+  see the "DONE" section below for hosts, prices and what had to change.
+- **PR #7 (staging → main) is merged**, so the four viewport/scroll-freeze
+  fixes are in production. `main` is at `f42c9df`.
+- **`dev` is ahead of `staging` by three commits** that have *not* been
+  promoted: the sign-up error-message fix, preview auto-seeding, and the
+  preview auth-env automation. Next hop is a `dev → staging` PR.
+
+<details><summary>Original status, 2026-08-03 (both items now done)</summary>
 
 - **PR #6 (dev → staging) is merged.** `staging` is now at `c1b59c4`, identical
   to `dev`. It carries the four viewport/scroll-freeze fixes, most recently
@@ -18,6 +31,8 @@ Written 2026-08-03, ~18:00 UTC, right before a 4-5hr break. Pick up here.
   empty Convex backend). That build didn't exist when you tested, so re-check
   the fix there before promoting to `main`/production. Once it looks good:
   `gh pr create --repo TN1DG/swole --base main --head staging`.
+
+</details>
 
 ## "No exercises on a new account" — investigated, not a bug
 
@@ -158,38 +173,88 @@ urgency — this is a "nice to have, plan it, don't rush it" item.
    `staging` domain now that it's a stable, memorable URL, or be relaxed for
    easier QA access.
 
-## Candidate names — availability checked 2026-08-03
+## DONE 2026-08-04 — the domain is `swole.day`
 
-Checked via RDAP (`rdap.org/domain/<name>`; 404 = unregistered, 200 = taken).
-RDAP tells you a name is *unregistered* — it does **not** tell you the price, so
-any of these may still be priced as a registry premium. Confirm cost at the
-registrar before committing.
+Bought through Vercel (registrar: Vercel/name.com), $14.99 first year,
+**auto-renews at $11.24/yr**, expires 2027-08-04. WHOIS privacy is on by
+default — `.day` supports it. Vercel runs the nameservers, so there are no DNS
+records to maintain.
 
-| Domain | Status | Notes |
+| Host | Points at | Notes |
 | --- | --- | --- |
-| `swole.io` | **available** | Exact-match name; `.io` reads as tech/product more than fitness, and renewals are pricey. |
-| `swole.gg` | **available** | Exact match, strong with a gamified app (points, challenges, leaderboards). `.gg` skews gaming. |
-| `swole.co` | **available** | Exact match, closest feel to a `.com`. |
-| `swole.run` | **available** | Exact match and fitness-flavoured, though this app is lifting, not running. |
-| `swole.team` | **available** | Exact match; fits the social/friends side. |
-| `goswole.app` | **available** | `.app` forces HTTPS, which suits a PWA. Needs the "go" prefix. |
-| `swole.app` | taken | |
-| `swole.fit` | taken | The most on-brand TLD, unfortunately gone. |
-| `swole.club` / `swole.life` / `swole.zone` / `swole.pro` / `swole.xyz` | taken | |
-| `getswole.app` / `swoleapp.com` / `swolehq.com` | taken | |
+| `swole.day` | `main` (production) | Live, HTTP 200, valid SSL |
+| `www.swole.day` | → `swole.day` | 307 redirect |
+| `staging.swole.day` | `staging` branch | 302s to Vercel SSO — deployment protection is still on, so it loads in a browser signed into Vercel |
 
-Worth knowing before you pick: the domain is **not** load-bearing for anything
-today. Nothing in the codebase hardcodes an origin — `vercel.json`'s CSP uses
-`https://*.convex.cloud` for `connect-src`, so it keeps working on any frontend
-origin. Changing your mind later costs a DNS change, not a code change.
+Also changed: production Convex `SITE_URL` went from `https://swole-six.vercel.app`
+to `https://swole.day`. **That mattered** — `SITE_URL` is what password-reset and
+magic-link emails build their links from, so leaving it stale would have sent
+users to the old origin. It's a runtime env var, so no redeploy was needed.
+
+No CSP change was required, and this was *verified* rather than assumed:
+`curl -sI https://swole.day` shows `connect-src 'self' https://*.convex.cloud
+wss://*.convex.cloud`, which is origin-independent. HSTS, `X-Content-Type-Options`,
+`Referrer-Policy` and `Permissions-Policy` all arrive on the new host too.
+
+### Method note: don't trust RDAP for availability
+
+An earlier pass in this doc listed `swole.io`, `swole.gg` and `swole.co` as
+available, based on `rdap.org` returning 404. **All three are registered** —
+`swole.io` is parked on Afternic, i.e. for sale on the aftermarket. Several
+ccTLDs simply don't publish RDAP, so a 404 means "no data", not "unregistered".
+Vercel's registrar API queries the real registry and got it right; a
+`dns.google/resolve` NS lookup confirmed it independently. Use the registrar
+API, or at minimum corroborate with NS records.
+
+### Prices found while shopping (2026-08-04, Vercel at-cost)
+
+Useful if a second domain is ever wanted. Renewal is the number that matters.
+
+| Domain | First yr | Renewal/yr |
+| --- | --- | --- |
+| `swole.day` | $14.99 | **$11.24** ← bought |
+| `*.app` (`swoleclub`, `swolehq`, `trainswole`, `justswole`, `swoleup`, `swolecoin`, `swoler`) | $9.99 | $15 |
+| `swole.rocks` | $5.99 | $19 |
+| `swole.run` | $6.99 | $22 |
+| `swole.live` | $3.99 | $28 |
+| `swole.team` | $7.99 | $31 |
+| `swole.fitness` | $9.99 | $33 |
+
+Taken: every `swolemate.*`, `swole.com/.app/.fit/.io/.gg/.co/.club/.social/.one/.studio`,
+`getswole.*`, `trainswole.com`, `swolecoin.com`. `swole.win` is a $385 registry premium.
+
+## When the mobile app arrives
+
+The domain is now load-bearing for deep linking, which it wasn't before:
+
+- iOS Universal Links need `https://swole.day/.well-known/apple-app-site-association`
+  served as `application/json`, with **no redirect** — note `www` 307s to the
+  apex, so publish against the apex.
+- Android App Links need `https://swole.day/.well-known/assetlinks.json`.
+- Both are static files served from `public/`. `vercel.json` *does* carry a
+  catch-all rewrite (`/(.*)` → `/index.html`), but Vercel only applies rewrites
+  when nothing matches on the filesystem, so a real file in `dist/.well-known/`
+  wins over the SPA fallback. The thing actually worth checking is whether Vite
+  copies a **dot-directory** out of `public/` into `dist/` — verify
+  `dist/.well-known/` exists after a build before wiring up either platform,
+  because a silently-missing file returns `index.html` with a 200 and looks like
+  a platform bug rather than a build one.
+- If social login is ever added, its redirect URIs should use `swole.day` now
+  that a stable origin exists. That was the main argument for owning a domain.
 
 ## Decisions needed from you
 
-- [ ] Verify the fix on the `staging` build — now at the stable alias
-      `https://swole-git-staging-tn1dgs-projects.vercel.app` — then say go/no-go
-      on opening the `staging → main` PR.
-- [ ] Pick from the candidate table above, plus registrar (buy through Vercel,
-      or bring your own).
-- [ ] Confirm subdomain scheme (`staging.<domain>` etc., or something else).
+- [x] ~~Verify the `staging` build, then go/no-go on `staging → main`.~~ Verified;
+      PR #7 merged 2026-08-03, production deployed.
+- [x] ~~Pick a name + registrar.~~ `swole.day`, bought through Vercel.
+- [x] ~~Confirm subdomain scheme.~~ Apex for production, `staging.swole.day` for
+      the staging branch, `www` redirecting to the apex. `dev` deliberately has
+      no public alias — it's the most volatile branch and the free
+      `swole-git-dev-…vercel.app` alias covers it.
 - [x] ~~Whether to bother auto-seeding preview Convex deployments with
       exercises.~~ Done — see the seeding section above.
+- [ ] Decide whether Vercel Deployment Protection should stay on for
+      `staging.swole.day`. It's a stable URL now, but still behind the SSO wall,
+      so anyone testing needs Vercel access.
+- [ ] Promote the outstanding `dev` work (sign-up error message, preview
+      auto-seed, auth automation) via a `dev → staging` PR.
