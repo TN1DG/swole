@@ -11,15 +11,16 @@ import type { Doc, Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
 import { forwardStreakWeeks } from './fitness'
 import { awardPoints, escrowPoints } from './profiles'
-import { rateLimiter } from './rateLimiter'
+import { rateLimiter, requireWriter } from './rateLimiter'
 import { areFriends } from './friendships'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-async function requireUserId(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
+// Mutation-only: every write in this module goes through here, so it is the
+// single place to charge the per-user write budget. Queries in this file call
+// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
+async function requireUserId(ctx: MutationCtx) {
+  return await requireWriter(ctx)
 }
 
 

@@ -6,18 +6,16 @@ import { beatsRecord, epley1rm, utcWeekIndex } from './fitness'
 import { assertRange, cleanName, LIMITS } from './validation'
 import { reconcileWeek } from './points'
 import { notify } from './notifications'
+import { requireWriter } from './rateLimiter'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
 
-async function requireUserId(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
-}
-
+// Every write in this module funnels through here (directly, or via the
+// getOwned* helpers below), so `requireWriter` charges the per-user write
+// budget once for each of them without each handler having to remember to.
 export async function getOwnedWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
-  const userId = await requireUserId(ctx)
+  const userId = await requireWriter(ctx)
   const workout = await ctx.db.get(workoutId)
   if (!workout || workout.ownerId !== userId) throw new Error('Workout not found')
   return { userId, workout }
@@ -104,7 +102,9 @@ export const getActive = query({
 export const start = mutation({
   args: { localHour: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    // `start` is the one write here that has no existing row to own, so it
+    // charges the budget itself rather than via getOwnedWorkout.
+    const userId = await requireWriter(ctx)
 
     const existing = await ctx.db
       .query('workouts')

@@ -1,6 +1,6 @@
 import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { mutation, query, type QueryCtx } from './_generated/server'
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { getWorkoutExercises, summarizeWorkout } from './history'
 import {
@@ -20,14 +20,15 @@ import {
   trainedWeekSet,
 } from './points'
 import { cleanUsername, LIMITS } from './validation'
-import { rateLimiter } from './rateLimiter'
+import { rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
 import { areFriends } from './friendships'
 
-async function requireUserId(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
+// Mutation-only: every write in this module goes through here, so it is the
+// single place to charge the per-user write budget. Queries in this file call
+// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
+async function requireUserId(ctx: MutationCtx) {
+  return await requireWriter(ctx)
 }
 
 // The profile row behind a user's public identity. The leaderboard and
