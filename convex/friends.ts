@@ -121,7 +121,11 @@ export const myIncomingRequests = query({
     return Promise.all(
       requests.map(async (r) => ({
         requestId: r._id,
-        from: await profileFor(ctx, r.fromUserId),
+        // Avatar is fine here: the sender chose to reveal themselves by
+        // requesting you, and you need to recognise who's asking. Note the
+        // asymmetry with myOutgoingRequests below — do not "make them
+        // consistent" without reading that comment.
+        from: await profileForWithAvatar(ctx, r.fromUserId),
       })),
     )
   },
@@ -140,6 +144,12 @@ export const myOutgoingRequests = query({
     return Promise.all(
       requests.map(async (r) => ({
         requestId: r._id,
+        // Deliberately plain `profileFor` — NOT the avatar variant. The
+        // recipient here has not consented to anything: usernames are
+        // resolvable by anyone (`resolveUsername`), so if this returned an
+        // avatar, you could harvest any user's photo just by looking them up
+        // and firing off a request they never accept. That's precisely the
+        // leak `profileForWithAvatar`'s own comment warns about.
         to: await profileFor(ctx, r.toUserId),
       })),
     )
