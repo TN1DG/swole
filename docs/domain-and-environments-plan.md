@@ -42,19 +42,23 @@ plus the signed-in user's custom ones. The built-in library
 deployment's database once someone has manually run the one-time mutation
 `npx convex run exercises:seed` **against that specific deployment**.
 
-Because `scripts/vercel-build.js` spins up a brand-new, empty Convex preview
-deployment for every non-production branch (`convex deploy --preview-create
-"<branch>"`), *every* preview/dev build starts with zero exercises until it's
-seeded by hand. Production's Convex deployment was seeded previously (existing
-users already see the library fine), so this has no user-facing impact on
-`main` — nothing needs to be fixed or shipped there.
+Because `scripts/vercel-build.js` gives every non-production branch its own
+Convex preview deployment, a preview starts with zero exercises until it's
+seeded. (At the time this was written the script used `--preview-create`, which
+made it worse than described — it wiped and rebuilt the deployment on *every*
+push, not just the first. See the `--preview-create` section below; it's
+`--preview-name` now.) Production's Convex deployment was seeded previously
+(existing users already see the library fine), so this has no user-facing
+impact on `main` — nothing needs to be fixed or shipped there.
 
 **DONE 2026-08-03 (later session).** `scripts/vercel-build.js` now passes
 `--preview-run exercises:seed` to `convex deploy`. Convex has a purpose-built
 flag for exactly this: it runs the named function after the schema push and is
 **ignored on production deployments**, so the production path is untouched.
-Safe on every rebuild of a reused preview deployment because `exercises:seed`
-short-circuits with "Already seeded — skipped." Verified two things by hand
+Safe on every rebuild because `exercises:seed` short-circuits with "Already
+seeded — skipped." (That short-circuit only actually gets exercised now that
+the script uses `--preview-name` — under `--preview-create` the database was
+new every time, so it always did a full seed.) Verified two things by hand
 rather than assuming: the Convex CLI *can* invoke an `internalMutation` (it
 holds an admin/deploy key), and the idempotency guard really fires — running
 `npx convex run exercises:seed` against the dev deployment returned
@@ -101,12 +105,36 @@ usage comment writes it as `--deployment <name>`.
 password-reset/magic-link email, and pointing a disposable preview at the live
 email-sending account isn't worth it. Password reset won't work on previews.
 
-**Open follow-up:** this is now the second thing a fresh preview needs done by
-hand (seeding was the first, now automated). `scripts/vercel-build.js` could
-set the auth vars too — `VERCEL_BRANCH_URL` gives the stable alias for
-`SITE_URL`. It must **only set them when absent**, though: regenerating
-`JWT_PRIVATE_KEY` on every build would sign everyone out of that preview on
-every push. Not done — decide before implementing.
+**DONE 2026-08-04.** `scripts/vercel-build.js` now runs the script after
+deploying a preview, with `--if-absent` and `VERCEL_BRANCH_URL` as `SITE_URL`.
+
+### `--preview-create` was deleting the deployment on every push
+
+Found straight after PR #8 merged, because the `staging` rebuild logged
+`"Seeded 70 exercises."` and *set* the auth keys — on a deployment that had
+already been seeded and configured by hand an hour earlier.
+
+The cause was in the flag, not the new code. Per `npx convex deploy --help`:
+
+> `--preview-create <name>` — Like `--preview-name`, but **deletes and
+> recreates** an existing preview deployment with the same name.
+
+So every push to a non-production branch was destroying that branch's Convex
+deployment and building a new one: empty database, zero environment variables,
+every test account gone. Two things follow:
+
+- The seeding/auth automation isn't a convenience. Without it, *every* push
+  would leave that preview with no exercises and broken sign-up.
+- The `--if-absent` guard was unreachable — there was never an existing
+  deployment for it to find. The session loss it was written to prevent was
+  happening anyway, by a different route.
+
+Now `--preview-name`, which reuses the deployment. Test data and accounts
+survive pushes, and `--if-absent` does its job. It also rehearses production
+more honestly: production has persistent data, so a schema change that can't
+cope with existing rows fails on a preview first instead of sailing through a
+clean slate. The trade-off given up is the guaranteed clean-slate/first-install
+test — run `--preview-create` by hand if that's ever specifically wanted.
 
 ## Would buying a domain make the dev/staging/main flow better?
 
