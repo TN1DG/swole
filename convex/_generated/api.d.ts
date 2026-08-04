@@ -35,6 +35,7 @@ import type * as prs from "../prs.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seedData from "../seedData.js";
+import type * as turnstile from "../turnstile.js";
 import type * as validation from "../validation.js";
 import type * as workoutFeedback from "../workoutFeedback.js";
 import type * as workouts from "../workouts.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   rateLimiter: typeof rateLimiter;
   routines: typeof routines;
   seedData: typeof seedData;
+  turnstile: typeof turnstile;
   validation: typeof validation;
   workoutFeedback: typeof workoutFeedback;
   workouts: typeof workouts;

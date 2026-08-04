@@ -73,10 +73,30 @@ describe('production CSP', () => {
 
   it('keeps the directives that make the policy worth having', () => {
     // A regression here would mean the policy stopped constraining scripts —
-    // the part that actually mitigates XSS.
-    expect(directive('script-src')).toEqual(["'self'"])
+    // the part that actually mitigates XSS. Turnstile is the ONLY third-party
+    // script origin; anything else appearing here should be challenged.
+    expect(directive('script-src')).toEqual(["'self'", 'https://challenges.cloudflare.com'])
     expect(directive('default-src')).toEqual(["'self'"])
     expect(directive('frame-ancestors')).toEqual(["'none'"])
     expect(directive('base-uri')).toEqual(["'self'"])
+  })
+
+  it('lets Cloudflare Turnstile load its script and its widget iframe', () => {
+    // The widget is an iframe, and `frame-src` is NOT covered by the
+    // `script-src` entry — without it the script loads and the challenge box
+    // silently never appears, which reads as "sign-up is broken" rather than
+    // "a CSP directive is missing". `default-src 'self'` would otherwise block
+    // it, since frame-src falls back to default-src.
+    expect(directive('script-src')).toContain('https://challenges.cloudflare.com')
+    expect(directive('frame-src')).toEqual(['https://challenges.cloudflare.com'])
+  })
+
+  it('carries the Turnstile origins into the meta copy too', () => {
+    // Same trap as the avatar CSP bug: the header alone never reaches an
+    // installed PWA, so a Turnstile origin missing from the meta copy would
+    // break sign-up for exactly the users who already have the app.
+    const meta = metaCspFrom(productionCspHeader())
+    expect(meta).toContain('https://challenges.cloudflare.com')
+    expect(meta).toContain('frame-src https://challenges.cloudflare.com')
   })
 })
