@@ -136,6 +136,18 @@ cope with existing rows fails on a preview first instead of sailing through a
 clean slate. The trade-off given up is the guaranteed clean-slate/first-install
 test — run `--preview-create` by hand if that's ever specifically wanted.
 
+Confirmed on the next `dev` build: the log shows `--preview-name "dev"` and
+`[setup-auth-env] JWT_PRIVATE_KEY already set (preview: dev) — leaving it
+alone.` — the first time that skip path had ever run in CI. `npx convex run
+exercises:seed --preview-name dev` afterwards returned "Already seeded —
+skipped.", i.e. the database survived the build.
+
+One observation not chased down: on that reuse build, `--preview-run` produced
+no output in the log, where a fresh deployment logs `"Seeded 70 exercises."`.
+The seeded state is correct either way, and the case that matters — a brand-new
+branch getting its library — is the first-deploy path, which is the one that
+has been seen working. Worth a glance if a new branch ever comes up empty.
+
 ## Would buying a domain make the dev/staging/main flow better?
 
 Short answer: yes, but for usability of the existing pipeline, not for the
