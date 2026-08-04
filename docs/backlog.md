@@ -194,16 +194,27 @@ about incoming and wrong about outgoing.
     deployment logs `"Seeded 70 exercises."`. Seeded state is correct either
     way; the first-deploy path is the one that matters for a new branch. Look
     here if a new branch ever comes up with an empty exercise library.
-22. **There is at least one flaky test.** Observed 2026-08-04: one run reported
-    `1 failed | 311 passed` on a tree where the only change since a fully green
-    run was a Markdown file. Five subsequent runs all passed 312/312, so it did
-    not reproduce and vitest's summary never named it. Roughly 1 failure in 6
-    runs. Unidentified — the suspicion is something time-dependent (the scoring
-    and streak code is full of `Date.now()` and UTC week boundaries, and
-    challenge expiry is time-driven), but that is a guess, not a diagnosis.
-    If a CI run ever fails for no apparent reason, this is why. To catch it:
-    `npx vitest run --reporter=verbose` in a loop until it trips, then pin the
-    clock in whichever test it turns out to be.
+22. ~~**There is at least one flaky test.**~~ — **FOUND AND FIXED 2026-08-04.**
+    It was `convex/emailAuth.test.ts > sign up > throttles a flood of
+    new-account creation app-wide`, and it was **a timeout, not a logic bug** —
+    which is why the summary said "1 failed" with no assertion error and no
+    test name.
+
+    The test must create 21 accounts to trip a limit of 20, and each sign-up
+    runs a real password hash. Measured across five runs it takes
+    **3993–4848ms**, against vitest's **5000ms** default. Routinely within 3–20%
+    of the ceiling, so any load spike tips it over. It first appeared while
+    several `npx` commands were running concurrently.
+
+    Fixed with an explicit `{ timeout: 30_000 }` on that one test. Deliberately
+    *not* a raised global timeout: every other test finishes in under 700ms, and
+    a 5s default is what catches a genuinely hung one.
+
+    **Method worth reusing.** Brute repetition was the wrong tool — 26 runs,
+    including shuffled ones, never reproduced it. What found it in one run was
+    `npx vitest run --reporter=verbose` and sorting by duration: the culprit was
+    the only test in the suite anywhere near the limit. If another mystery flake
+    appears, check durations against the timeout before hunting for a race.
 
 ---
 
