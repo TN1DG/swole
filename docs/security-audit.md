@@ -136,10 +136,20 @@ maintained by `workouts.finish` and `history.deleteWorkout`. Unlike
 `workoutsStarted`, this one *does* decrement — it's a user-facing number, not
 an abuse ration.
 
-**`migrations:backfillWorkoutCounts` must be run on each deployment.** Without
-it, every established user's profile reads 0 workouts, which looks like data
-loss. Idempotent (recomputes rather than increments); verified on dev, where a
-second run patched 0.
+**`migrations:backfillWorkoutCounts` — RUN ON PRODUCTION 2026-08-04.** Result:
+`{ profiles: 15, patched: 15 }`, and a second run returned `patched: 0`,
+confirming idempotency. Also run on dev and on the staging preview, idempotent
+both times.
+
+Note "15 of 15" does not mean fifteen users had workouts — a profile with none
+is still patched, because `undefined` → `0` is a change. What was verified
+directly: the migration completed, is idempotent, and production serves 200 with
+its CSP intact. What was *not* verified from the CLI is the per-profile value,
+which would have needed a read function deployed to production out-of-band;
+the logic is covered by tests and was exercised end-to-end on staging first.
+
+Without this backfill, every established user's profile reads 0 workouts, which
+looks like data loss.
 
 A test pins the case the counter exists for: a workout from 500 days ago is
 outside the read window but still counts toward the lifetime total, while the
