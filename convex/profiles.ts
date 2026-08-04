@@ -13,7 +13,7 @@ import {
   utcWeekStart,
   WEEK_MS,
 } from './fitness'
-import { rateLimiter } from './rateLimiter'
+import { rateLimiter, requireWriter } from './rateLimiter'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
 // tab, generous headroom for future tabs without growing unbounded.
@@ -164,8 +164,7 @@ export const getMine = query({
 export const setUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const username = cleanUsername(args.username)
 
@@ -189,8 +188,7 @@ export const setUsername = mutation({
 export const saveOnboardingIdentity = mutation({
   args: { username: v.string(), displayName: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const username = cleanUsername(args.username)
     const displayName = cleanName(args.displayName, 40, 'Display name')
@@ -213,8 +211,7 @@ export const saveOnboardingIdentity = mutation({
 export const finishOnboarding = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { onboardedAt: Date.now() })
@@ -238,8 +235,7 @@ export const getSeenTips = query({
 export const markTipSeen = mutation({
   args: { tip: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
     const seen = profile.seenTips ?? []
@@ -259,8 +255,7 @@ export const markTipSeen = mutation({
 export const markReleaseSeen = mutation({
   args: { version: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const version = cleanName(args.version, LIMITS.releaseVersionMaxLength, 'Version')
     const profile = await getOrCreateProfile(ctx, userId)
@@ -272,8 +267,7 @@ export const markReleaseSeen = mutation({
 export const setWorkoutsPublic = mutation({
   args: { workoutsPublic: v.boolean() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { workoutsPublic: args.workoutsPublic })
@@ -291,8 +285,7 @@ const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 export const generateAvatarUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'avatarUploadUrl', { key: userId, throws: true })
     return await ctx.storage.generateUploadUrl()
   },
@@ -313,8 +306,7 @@ export const setAvatar = mutation({
     ctx,
     args,
   ): Promise<{ ok: true } | { ok: false; error: string }> => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const metadata = await ctx.db.system.get('_storage', args.storageId)
     if (!metadata) return { ok: false, error: 'Upload not found — try again' }
@@ -345,8 +337,7 @@ export const setAvatar = mutation({
 export const removeAvatar = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
     if (!profile.avatarStorageId) return
@@ -361,8 +352,7 @@ export const removeAvatar = mutation({
 export const setUnitPreference = mutation({
   args: { unitPreference: v.union(v.literal('kg'), v.literal('lb')) },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { unitPreference: args.unitPreference })
@@ -386,8 +376,7 @@ export const updateBodyStats = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const heightCm = assertRange(args.heightCm, ...STATS_BOUNDS.heightCm, 'Height')
     const weightKg = assertRange(args.weightKg, ...STATS_BOUNDS.weightKg, 'Weight')
@@ -408,8 +397,7 @@ export const updateBodyStats = mutation({
 export const setDailyVolumeGoal = mutation({
   args: { dailyVolumeGoalKg: v.number() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const goal = assertRange(args.dailyVolumeGoalKg, 1, LIMITS.dailyVolumeGoalKg, 'Daily goal')
     const profile = await getOrCreateProfile(ctx, userId)
@@ -421,8 +409,7 @@ export const setDailyVolumeGoal = mutation({
 export const updateDisplayName = mutation({
   args: { displayName: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const trimmed = args.displayName.trim()
     if (trimmed.length > 40) {

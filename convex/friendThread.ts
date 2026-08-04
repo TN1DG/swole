@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { latestIncomingMessageAt, messagesBetween } from './messages'
 import { latestIncomingPingAt, pingsBetween } from './pings'
@@ -69,8 +70,7 @@ export const getThread = query({
 export const markRead = mutation({
   args: { friendUserId: v.id('users') },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const existing = await ctx.db
       .query('threadReads')

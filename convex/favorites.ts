@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import { LIMITS } from './validation'
 
 // Exercises visible to a user are built-ins (no owner) plus their own
@@ -82,8 +83,7 @@ export const listMine = query({
 export const toggle = mutation({
   args: { exerciseId: v.id('exercises') },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const exercise = await ctx.db.get(args.exerciseId)
     assertVisible(exercise, userId)

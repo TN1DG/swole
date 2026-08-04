@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import type { Doc, Id } from './_generated/dataModel'
 import { beatsRecord, epley1rm } from './fitness'
 import { reconcileWeek } from './points'
@@ -336,8 +337,7 @@ async function recomputeRecord(
 export const deleteWorkout = mutation({
   args: { workoutId: v.id('workouts') },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const workout = await ctx.db.get(args.workoutId)
     if (!workout || workout.ownerId !== userId) throw new Error('Workout not found')
