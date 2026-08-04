@@ -136,10 +136,20 @@ maintained by `workouts.finish` and `history.deleteWorkout`. Unlike
 `workoutsStarted`, this one *does* decrement — it's a user-facing number, not
 an abuse ration.
 
-**`migrations:backfillWorkoutCounts` must be run on each deployment.** Without
-it, every established user's profile reads 0 workouts, which looks like data
-loss. Idempotent (recomputes rather than increments); verified on dev, where a
-second run patched 0.
+**`migrations:backfillWorkoutCounts` — RUN ON PRODUCTION 2026-08-04.** Result:
+`{ profiles: 15, patched: 15 }`, and a second run returned `patched: 0`,
+confirming idempotency. Also run on dev and on the staging preview, idempotent
+both times.
+
+Note "15 of 15" does not mean fifteen users had workouts — a profile with none
+is still patched, because `undefined` → `0` is a change. What was verified
+directly: the migration completed, is idempotent, and production serves 200 with
+its CSP intact. What was *not* verified from the CLI is the per-profile value,
+which would have needed a read function deployed to production out-of-band;
+the logic is covered by tests and was exercised end-to-end on staging first.
+
+Without this backfill, every established user's profile reads 0 workouts, which
+looks like data loss.
 
 A test pins the case the counter exists for: a workout from 500 days ago is
 outside the read window but still counts toward the lifetime total, while the
@@ -151,12 +161,48 @@ converting it to a mutation and changing how `FriendsPage` calls it. Severity
 dropped materially now that it no longer returns an email — it reveals only
 whether a username exists. Worth doing if abuse appears.
 
-### D. Signup throttle is global, not per-IP
-`signUp` is 20 per 10 minutes app-wide, because Convex actions can't see caller
-IP. That stops a scripted flood but also means one attacker can consume the
-global allowance and **block legitimate signups** — a denial-of-service on
-registration. The real fix is a challenge on the signup form (e.g. Cloudflare
-Turnstile), which sits outside Convex. **Consider this before any launch push.**
+### ~~D. Signup throttle is global, not per-IP~~ — IMPLEMENTED 2026-08-04, NEEDS KEYS
+Cloudflare Turnstile now guards sign-up (`convex/turnstile.ts`,
+`src/components/TurnstileWidget.tsx`). **It is inert until keys are set — see
+below.**
+
+Why it needed two pieces: verifying a token means calling Cloudflare, and only
+a Convex *action* can `fetch`, while the hook that must reject an unverified
+sign-up (`callbacks.afterUserCreatedOrUpdated`) runs in a *mutation*. So the
+action verifies and records a short-lived, single-use pass keyed by email, and
+the mutation spends it. The spend happens **before** the `signUp` rate limit is
+consumed, so an unverified request can't eat from the app-wide bucket — which
+was the denial-of-service in the first place.
+
+**To turn it on** (both are required; either alone leaves it off):
+
+```
+# 1. Cloudflare dashboard -> Turnstile -> add a site for swole.day.
+# 2. Secret key, on the Convex production deployment:
+npx convex env set TURNSTILE_SECRET_KEY <secret> --prod
+# 3. Site key, in Vercel project settings as VITE_TURNSTILE_SITE_KEY
+#    (Production scope), then REDEPLOY - Vite inlines VITE_* at build time,
+#    so setting it without a rebuild changes nothing.
+```
+
+Verify afterwards with `npx convex env get TURNSTILE_SECRET_KEY --prod`.
+
+**Deliberate design: enforcement is conditional on the secret being set.**
+Preview deployments start with zero environment variables, and hard-requiring
+the key would break sign-up on every new branch — a failure this project has
+already shipped once. The cost is that production silently loses the protection
+if the variable ever goes missing, which is why the check above matters.
+
+CSP was updated for it (`script-src` and `frame-src` both need
+`https://challenges.cloudflare.com` — the widget is an iframe, and `frame-src`
+falls back to `default-src 'self'` otherwise), including the `<meta>` mirror
+that is what actually reaches an installed PWA. Pinned by `vercel-headers.test.ts`.
+
+One behaviour worth knowing, pinned by a test so it isn't "fixed" into
+something the transaction model can't honour: rejecting an *expired* pass
+throws, and the throw rolls back the delete of that same row, so the stale row
+survives. It's harmless — still expired, so it authorises nothing, and solving
+a new challenge replaces it rather than stacking.
 
 ### E. Leaderboard volume is self-reported
 Nothing stops a user logging 1500kg × 500 reps to top the volume board. Caps
