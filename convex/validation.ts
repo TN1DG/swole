@@ -43,6 +43,12 @@ export const LIMITS = {
   reps: 500,
   setsPerExercise: 30,
   exercisesPerWorkout: 30,
+  // Every other user-owned table has a ceiling; workouts had none, which made
+  // it the one place an account could grow the database without bound —
+  // `start`, `finish`, repeat. At a genuine 2 sessions a day this is ~27
+  // years, so no real user reaches it, but it stops a script from turning one
+  // account into unbounded storage. Enforced in workouts.ts:start.
+  workoutsPerUser: 20000,
   customExercisesPerUser: 300,
   routinesPerUser: 100,
   exercisesPerRoutine: 30,

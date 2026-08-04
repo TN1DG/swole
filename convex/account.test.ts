@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import {
   createBackend,
   createBuiltInExercise,
@@ -7,6 +7,7 @@ import {
   pointsOf,
   twoFriends,
   userWithUsername,
+  deleteAccountAndPurge,
   type T,
 } from './test.helpers'
 
@@ -40,7 +41,7 @@ describe('deleteAccount', () => {
     await user.mutation(api.favorites.toggle, { exerciseId: builtIn })
     await user.mutation(api.featureRequests.submit, { text: 'Add a rest timer' })
 
-    await user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, user)
 
     // Everything scoped to this user is gone.
     await t.run(async (ctx) => {
@@ -91,7 +92,7 @@ describe('deleteAccount', () => {
     await bob.user.mutation(api.friends.acceptFriendRequest, { requestId: incoming.requestId })
     await eve.user.mutation(api.friends.sendFriendRequest, { username: 'alice' })
 
-    await alice.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, alice.user)
 
     expect(await bob.user.query(api.friends.myFriends, {})).toEqual([])
     expect(await eve.user.query(api.friends.myOutgoingRequests, {})).toEqual([])
@@ -120,7 +121,7 @@ describe('deleteAccount', () => {
       ctx.db.insert('authRefreshTokens', { sessionId, expirationTime: Date.now() + 100_000 }),
     )
 
-    await user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, user)
 
     await t.run(async (ctx) => {
       expect(await ctx.db.get(accountId)).toBeNull()
@@ -148,7 +149,7 @@ describe('deleteAccount: pings and challenges', () => {
     await alice.user.mutation(api.pings.send, { toUserId: bob.userId })
     await bob.user.mutation(api.pings.send, { toUserId: alice.userId })
 
-    await alice.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, alice.user)
 
     const remaining = await t.run(async (ctx) => ctx.db.query('gymPings').collect())
     expect(remaining).toHaveLength(0)
@@ -170,7 +171,7 @@ describe('deleteAccount: pings and challenges', () => {
     await bob.user.mutation(api.challenges.accept, { challengeId })
     expect(await pointsOf(t, bob.userId)).toBe(80)
 
-    await alice.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, alice.user)
 
     expect(await pointsOf(t, bob.userId)).toBe(100)
     const remaining = await t.run(async (ctx) => ctx.db.query('challenges').collect())
@@ -191,7 +192,7 @@ describe('deleteAccount: pings and challenges', () => {
     })
     expect(await pointsOf(t, alice.userId)).toBe(70)
 
-    await bob.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, bob.user)
 
     expect(await pointsOf(t, alice.userId)).toBe(100)
   })
@@ -209,7 +210,65 @@ describe('deleteAccount: pings and challenges', () => {
     await bob.user.mutation(api.challenges.decline, { challengeId })
     expect(await pointsOf(t, alice.userId)).toBe(100) // already refunded
 
-    await bob.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, bob.user)
     expect(await pointsOf(t, alice.userId)).toBe(100) // not double-refunded
+  })
+})
+
+describe('deleteAccount: the synchronous/async split', () => {
+  // The whole point of the split is that the security-critical half does not
+  // wait on the bulk delete. If this ever regresses, a deleted account stays
+  // usable for as long as the purge takes.
+  it('revokes every credential immediately, before the purge has run', async () => {
+    const t: T = createBackend()
+    const { userId, user } = await userWithUsername(t, 'alice')
+
+    const accountId = await t.run(async (ctx) =>
+      ctx.db.insert('authAccounts', {
+        userId,
+        provider: 'password',
+        providerAccountId: 'alice@test.local',
+        emailVerified: 'alice@test.local',
+      }),
+    )
+    const sessionId = await t.run(async (ctx) =>
+      ctx.db.insert('authSessions', { userId, expirationTime: Date.now() + 100_000 }),
+    )
+    await user.mutation(api.workouts.start, {})
+
+    // Note: no scheduler drain here — this is the state between the two halves.
+    await user.mutation(api.account.deleteAccount, {})
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(accountId)).toBeNull()
+      expect(await ctx.db.get(sessionId)).toBeNull()
+      expect(
+        await ctx.db
+          .query('profiles')
+          .withIndex('by_user', (q) => q.eq('userId', userId))
+          .collect(),
+      ).toEqual([])
+      // The bulk data is still there, and that is fine — nobody can reach it.
+      expect(await ctx.db.query('workouts').collect()).toHaveLength(1)
+    })
+
+    const scheduled = await t.run(async (ctx) =>
+      ctx.db.system.query('_scheduled_functions').collect(),
+    )
+    expect(scheduled.map((s) => s.name)).toContain('account:purgeAccountData')
+  })
+
+  it('is idempotent — re-running the purge after it finished is a no-op', async () => {
+    const t: T = createBackend()
+    const { userId, user } = await userWithUsername(t, 'alice')
+    await user.mutation(api.workouts.start, {})
+
+    await deleteAccountAndPurge(t, user)
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toBeNull()
+
+    // A retried or duplicated run must not throw on already-deleted rows.
+    await expect(
+      t.mutation(internal.account.purgeAccountData, { userId }),
+    ).resolves.toBeDefined()
   })
 })

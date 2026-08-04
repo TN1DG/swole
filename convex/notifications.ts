@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { publicIdentity } from './identity'
 
@@ -189,8 +190,7 @@ export const listRecent = query({
 export const markAllRead = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const unread = await ctx.db
       .query('notifications')
@@ -208,8 +208,7 @@ export const markAllRead = mutation({
 export const markRead = mutation({
   args: { notificationId: v.id('notifications') },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) throw new Error('Not signed in')
+    const userId = await requireWriter(ctx)
 
     const notification = await ctx.db.get(args.notificationId)
     if (!notification || notification.userId !== userId) {

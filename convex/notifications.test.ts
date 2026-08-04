@@ -7,6 +7,7 @@ import {
   makeFriends,
   userWithUsername,
   type T,
+  deleteAccountAndPurge,
 } from './test.helpers'
 
 describe('friend request notifications', () => {
@@ -205,7 +206,7 @@ describe('account deletion', () => {
     await alice.user.mutation(api.friends.sendFriendRequest, { username: 'bob' })
     expect(await bob.user.query(api.notifications.listUnread, {})).toHaveLength(1)
 
-    await alice.user.mutation(api.account.deleteAccount, {})
+    await deleteAccountAndPurge(t, alice.user)
 
     // Bob's notice pointed at a now-deleted sender; it should be gone rather
     // than rendering as "Someone".

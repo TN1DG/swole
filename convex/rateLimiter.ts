@@ -1,5 +1,8 @@
 import { RateLimiter, MINUTE } from '@convex-dev/rate-limiter'
+import { getAuthUserId } from '@convex-dev/auth/server'
 import { components } from './_generated/api'
+import type { MutationCtx } from './_generated/server'
+import type { Id } from './_generated/dataModel'
 
 // Central place for every app-level rate limit — see individual call sites
 // for why each one exists. Token buckets allow a small burst then settle to
@@ -15,6 +18,29 @@ import { components } from './_generated/api'
 // spam that lands (an extra friend request, ping, or challenge another user
 // sees), not a client that keeps resubmitting bad input.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
+  // Blanket per-user write budget, keyed by caller userId — defence in depth
+  // behind the specific limits below.
+  //
+  // The named limits guard *social* actions: spam another user receives. They
+  // do nothing about an authenticated client hammering its own self-scoped
+  // writes (logging sets, starting workouts, toggling favourites), which costs
+  // function calls and storage even though nobody else sees it. With the app
+  // going public that's the cheapest way for one account to degrade it.
+  //
+  // Sized off real use, not guesswork: the busiest screen is an active
+  // workout, and `updateSet` fires on blur rather than per keystroke, so a
+  // brisk logging session is ~20-30 writes/minute. 120/min sustained with a
+  // 60 burst is 4-6x headroom for a human and still refuses a script.
+  userWrite: { kind: 'token bucket', rate: 120, period: MINUTE, capacity: 60 },
+
+  // Account deletion, keyed by caller userId. It was never actually limited
+  // before — the file *mentioned* `rateLimiter` (for the otpSend reset), which
+  // is enough to fool a grep but not an attacker. Each call now tears down
+  // auth and schedules a batched purge, so a repeat caller could otherwise
+  // queue purge work faster than it drains. A human deletes their account
+  // once, so this is deliberately tight.
+  deleteAccount: { kind: 'token bucket', rate: 3, period: 60 * MINUTE, capacity: 2 },
+
   // New account creation, app-wide (not per-key: there's no per-signup
   // identifier to key on yet, and an IP isn't available to a Convex action).
   // Deters a scripted flood of throwaway accounts without touching normal
@@ -71,3 +97,27 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   postRepost: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 5 },
   postReport: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 3 },
 })
+
+/**
+ * Auth + the blanket per-user write budget, for the top of a public mutation.
+ *
+ * Deliberately a helper called from each file's existing mutation-side auth
+ * path rather than a wrapper around `mutation`: the ownership helpers
+ * (`getOwnedWorkout` and friends) are already the single funnel every write in
+ * their module passes through, so putting it there covers a whole file without
+ * touching each handler — and without a sweep across dozens of call sites.
+ *
+ * Only valid in a mutation. The limiter writes, so a query cannot consume it;
+ * that is also why `resolveUsername` stays unthrottled (see docs/backlog.md).
+ */
+export async function requireWriter(ctx: MutationCtx): Promise<Id<'users'>> {
+  const userId = await getAuthUserId(ctx)
+  if (userId === null) throw new Error('Not signed in')
+  await consumeWriteBudget(ctx, userId)
+  return userId
+}
+
+/** The budget half of `requireWriter`, for call sites that already have a userId. */
+export async function consumeWriteBudget(ctx: MutationCtx, userId: Id<'users'>) {
+  await rateLimiter.limit(ctx, 'userWrite', { key: userId, throws: true })
+}

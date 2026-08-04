@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
@@ -6,18 +6,17 @@ import { beatsRecord, epley1rm, utcWeekIndex } from './fitness'
 import { assertRange, cleanName, LIMITS } from './validation'
 import { reconcileWeek } from './points'
 import { notify } from './notifications'
+import { requireWriter } from './rateLimiter'
+import { getOrCreateProfile } from './profiles'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
 
-async function requireUserId(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx)
-  if (userId === null) throw new Error('Not signed in')
-  return userId
-}
-
+// Every write in this module funnels through here (directly, or via the
+// getOwned* helpers below), so `requireWriter` charges the per-user write
+// budget once for each of them without each handler having to remember to.
 export async function getOwnedWorkout(ctx: MutationCtx, workoutId: Id<'workouts'>) {
-  const userId = await requireUserId(ctx)
+  const userId = await requireWriter(ctx)
   const workout = await ctx.db.get(workoutId)
   if (!workout || workout.ownerId !== userId) throw new Error('Workout not found')
   return { userId, workout }
@@ -104,7 +103,9 @@ export const getActive = query({
 export const start = mutation({
   args: { localHour: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    // `start` is the one write here that has no existing row to own, so it
+    // charges the budget itself rather than via getOwnedWorkout.
+    const userId = await requireWriter(ctx)
 
     const existing = await ctx.db
       .query('workouts')
@@ -112,6 +113,18 @@ export const start = mutation({
       .filter((q) => q.eq(q.field('endedAt'), undefined))
       .first()
     if (existing) return existing._id
+
+    // Ration lifetime workout creation. The rate limiter caps how *fast* an
+    // account can write; this caps how much it can ever accumulate, which is
+    // what actually costs storage. Checked only when a row is really about to
+    // be inserted — the early return above means re-opening an active workout
+    // is free.
+    const profile = await getOrCreateProfile(ctx, userId)
+    const startedCount = profile.workoutsStarted ?? 0
+    if (startedCount >= LIMITS.workoutsPerUser) {
+      throw new ConvexError('Workout limit reached for this account')
+    }
+    await ctx.db.patch(profile._id, { workoutsStarted: startedCount + 1 })
 
     const hour =
       args.localHour !== undefined
@@ -377,6 +390,15 @@ export const finish = mutation({
       volumeKg: totalVolumeKg,
       setCount: completedSetCount,
       prCount,
+    })
+
+    // This is the moment a workout becomes "completed", so it's the one place
+    // the lifetime counter behind profiles.getMine goes up. The
+    // exerciseCount === 0 path above returns before here, having deleted the
+    // workout outright — a discarded session must not count.
+    const ownerProfile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(ownerProfile._id, {
+      workoutsCompleted: (ownerProfile.workoutsCompleted ?? 0) + 1,
     })
 
     // Points are a property of the week the workout STARTED in, not of the

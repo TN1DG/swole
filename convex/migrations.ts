@@ -154,3 +154,35 @@ export const dropOrphanedEmailSendAttempts = internalMutation({
     return { deleted: rows.length }
   },
 })
+
+// One-off, REQUIRED when deploying the workout-count change:
+//   npx convex run migrations:backfillWorkoutCounts [--prod]
+//
+// profiles.getMine used to derive "workouts completed" by reading every
+// workout row the account had. That count now comes from
+// profiles.workoutsCompleted, maintained by workouts.finish and
+// history.deleteWorkout. Existing profiles have no value for it, so without
+// this backfill every established user's profile would read 0 workouts —
+// visibly wrong, and exactly the kind of regression that looks like data loss.
+//
+// Idempotent: it recomputes from the workouts table rather than incrementing,
+// so running it twice is the same as running it once.
+export const backfillWorkoutCounts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const profiles = await ctx.db.query('profiles').collect()
+    let patched = 0
+    for (const profile of profiles) {
+      const workouts = await ctx.db
+        .query('workouts')
+        .withIndex('by_owner', (q) => q.eq('ownerId', profile.userId))
+        .collect()
+      const completed = workouts.filter((w) => w.endedAt !== undefined).length
+      if (profile.workoutsCompleted !== completed) {
+        await ctx.db.patch(profile._id, { workoutsCompleted: completed })
+        patched++
+      }
+    }
+    return { profiles: profiles.length, patched }
+  },
+})

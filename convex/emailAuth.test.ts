@@ -71,7 +71,14 @@ describe('sign up', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('throttles a flood of new-account creation app-wide', async () => {
+  // Explicit timeout: this test has to create 21 accounts to trip a limit of
+  // 20, and each sign-up runs a real password hash, so it takes ~4.8s of
+  // genuine work. That sat 3% under vitest's 5s default, which made it fail
+  // intermittently on a loaded machine — a timeout, so the summary reported
+  // "1 failed" with no assertion error and no test name. Raise this rather
+  // than the global timeout; every other test here finishes in under 700ms,
+  // and a 5s default is what catches a genuinely hung one.
+  it('throttles a flood of new-account creation app-wide', { timeout: 30_000 }, async () => {
     const t = createBackend()
 
     // The 'signUp' fixed-window limit (convex/rateLimiter.ts) allows 20

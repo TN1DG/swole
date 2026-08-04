@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { vi } from 'vitest'
 import { convexTest, type TestConvex } from 'convex-test'
 import { register as registerRateLimiter } from '@convex-dev/rate-limiter/test'
 import schema from './schema'
@@ -146,4 +147,26 @@ export async function givePoints(t: T, userId: Id<'users'>, amount: number) {
       .unique()
     await ctx.db.patch(profile!._id, { pointsBalance: (profile!.pointsBalance ?? 0) + amount })
   })
+}
+
+// Delete an account and run the purge it schedules.
+//
+// `deleteAccount` is deliberately split: it revokes credentials synchronously
+// and hands the bulk delete to a batched, self-rescheduling internal mutation
+// (see convex/account.ts for why — one transaction failed outright for heavy
+// accounts). Any test asserting on what's left has to drain the scheduler
+// first, or it silently checks un-purged data and passes for the wrong reason.
+//
+// Fake timers must be installed BEFORE the mutation: `runAfter` creates its
+// timer during the mutation, and `vi.runAllTimers` only controls timers created
+// while fake timers are active. Install them after and the purge sits in
+// `_scheduled_functions` as "pending" forever.
+export async function deleteAccountAndPurge(t: T, caller: { mutation: T['mutation'] }) {
+  vi.useFakeTimers()
+  try {
+    await caller.mutation(api.account.deleteAccount, {})
+    await t.finishAllScheduledFunctions(vi.runAllTimers)
+  } finally {
+    vi.useRealTimers()
+  }
 }
