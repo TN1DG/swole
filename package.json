@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc -b && tsc --noEmit -p convex",
     "vercel-build": "node scripts/vercel-build.js",
     "deploy": "convex deploy -y --cmd \"npm run build\" && node -e \"require('fs').copyFileSync('vercel.json','dist/vercel.json')\" && vercel link --yes --project swole --cwd dist --scope tn1dgs-projects && vercel deploy --prod --yes --cwd dist --scope tn1dgs-projects"
   },
@@ -32,6 +33,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "convex-test": "^0.0.54",
+    "jose": "^5.10.0",
     "oxlint": "^1.71.0",
     "sharp": "^0.35.3",
     "typescript": "~6.0.2",
