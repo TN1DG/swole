@@ -193,6 +193,57 @@ the key would break sign-up on every new branch — a failure this project has
 already shipped once. The cost is that production silently loses the protection
 if the variable ever goes missing, which is why the check above matters.
 
+### Where Turnstile stands — paused 2026-08-04, pick up here
+
+**Server side is proven working on staging.** Driven end to end via
+`npx convex run ... --preview-name staging`:
+
+| Check | Setup | Result |
+| --- | --- | --- |
+| Token verification rejects | valid token + *failing* test secret | ✅ "Challenge failed" |
+| Sign-up blocked | no challenge at all | ✅ "Please complete the challenge" |
+| Token verification accepts | valid token + *passing* test secret | ✅ pass recorded |
+| Sign-up allowed | with the pass | ✅ tokens issued |
+| Pass is single-use | second sign-up, no new pass | ✅ blocked |
+
+The first row is the one that matters: the widget produced a valid token and the
+**server** still refused it, so enforcement is server-side, not browser-side.
+
+**Current staging config** (production untouched):
+- Convex `TURNSTILE_SECRET_KEY` = `1x0000000000000000000000000000000AA` (test
+  secret, always passes) on preview deployment `vivid-vulture-847`
+- Vercel `VITE_TURNSTILE_SITE_KEY` = `1x00000000000000000000AA`, scoped to
+  Preview (staging branch)
+
+**OPEN: the widget does not render in the browser on staging.** Sign-up returns
+the *server's* "Please complete the challenge before signing up", which means
+the client never had a site key and submitted without a token.
+
+Ruled out already:
+- Not the secret — the server chain above works.
+- Not the code — building locally with `VITE_TURNSTILE_SITE_KEY` set puts the
+  key in `dist/assets/*.js`.
+- Not build cache — the build log says "Skipping build cache" and rebuilt.
+
+**Leading theory:** the staging build was triggered with `vercel redeploy`,
+which rebuilds a *previous* deployment and appears to reuse that deployment's
+original environment snapshot — captured before the variable existed. If so, a
+`redeploy` can never fix it; it needs a genuinely new deployment (a fresh
+git-triggered build of `staging`, or Redeploy from the Vercel dashboard).
+
+**Next step is one browser check**, because it splits the two candidates:
+open staging → Sign up → console.
+- `Refused to load the script 'https://challenges.cloudflare.com/...'` → CSP,
+  fix in `vercel.json`.
+- No such error and no widget → site key absent from the bundle, confirming the
+  redeploy theory.
+
+Note the bundle can't be inspected from the CLI: `staging.swole.day` is behind
+Vercel deployment protection and returns 302 to `curl`.
+
+Test accounts left on staging from this run: `probe2@test.local` (plus failed
+attempts). Harmless — preview data now persists between pushes.
+
 CSP was updated for it (`script-src` and `frame-src` both need
 `https://challenges.cloudflare.com` — the widget is an iframe, and `frame-src`
 falls back to `default-src 'self'` otherwise), including the `<meta>` mirror
