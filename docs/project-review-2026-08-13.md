@@ -431,9 +431,12 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
 
 Two items are now newly relevant because the repo is public:
 
-10. **Add a LICENSE.** `licenseInfo` is null. A public repo with no licence is
-    "all rights reserved" by default — fine if deliberate, but most people
-    publishing a portfolio project intend otherwise.
+10. ~~**Add a LICENSE.**~~ — **done 2026-08-13.** MIT, © Oluwatobi Tella Ndanusa.
+    Chosen over AGPL deliberately: AGPL would have protected `swole.day` from a
+    hosted clone, but the point of publishing is that people can read and reuse
+    the code. Note GitHub's licence detection reads the **default branch**, so the
+    repo sidebar keeps showing no licence until `LICENSE` reaches `main` with the
+    next promotion.
 11. **Fork PRs are now possible.** `ci.yml` is safe as written — it declares
     `permissions: contents: read`, uses no secrets, and `pull_request` (not
     `pull_request_target`) gives a fork's workflow a read-only token. Keep it that
