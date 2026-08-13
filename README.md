@@ -180,6 +180,11 @@ databases and separate signing keys (`node scripts/setup-auth-env.mjs --prod --s
 - Offline logging with sync
 - Native iOS/Android wrap via Capacitor
 
+## Licence
+
+[MIT](LICENSE) — © 2026 Oluwatobi Tella Ndanusa. Free to read, fork, modify, and
+reuse, including commercially; keep the copyright notice.
+
 ---
 
 Built from scratch with [Claude Code](https://claude.com/claude-code) as a learn-by-building project.
