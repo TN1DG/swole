@@ -152,12 +152,12 @@ Three details specific to this repo, each recorded in the workflow's comments so
 nobody "simplifies" them away:
 
 - **`npm run typecheck` must run both halves.** `tsc -b` alone does *not*
-  typecheck `convex/*.test.ts`. `docs/backlog.md` item 18 records an occasion when
+  typecheck `convex/*.test.ts`. `docs/backlog.md` (gotchas) records an occasion when
   root typecheck, vitest and lint were all green while `npx convex dev` failed with
   five type errors.
 - **`timeout-minutes: 20`, not something tight.** `emailAuth.test.ts` has one test
   that creates 21 accounts to trip a limit of 20, each with a real password hash,
-  deliberately budgeted 30s (backlog item 22). A shared GitHub runner is slower than
+  deliberately budgeted 30s (see the flaky-test gotcha in `docs/backlog.md`). A shared GitHub runner is slower than
   a dev machine, and a timeout there would read as a flake rather than the resource
   limit it is.
 - **The build step is not redundant.** It is the only check that exercises the
@@ -277,7 +277,7 @@ last.
 ### 3.3 `npm audit` has grown since the last pass
 
 **5 high**, across `brace-expansion`, `fast-uri`, `nanoid`, `react-router`,
-`react-router-dom`. `docs/backlog.md` item 14 records 4 high from one root cause on
+`react-router-dom`. `docs/backlog.md` recorded 4 high from one root cause on
 2026-08-04, and separately notes the `brace-expansion` chain had "resolved
 upstream" — it is back, and `fast-uri` and `nanoid` are new and unassessed.
 
@@ -403,7 +403,7 @@ cheapest possible feedback for generated code. Worth a pass through oxlint's
   Fine for a two-action workflow using first-party `actions/*`. Pin third-party
   actions to SHAs if CI ever handles secrets.
 - **npm 10.9.4 → 12.0.2 available.** Cosmetic; CI pins Node 22 to match local.
-- **Convex 1.42.1 → 1.42.3+** still outstanding from backlog item 19.
+- **Convex 1.42.1 → 1.42.3+** still outstanding — now [#29](https://github.com/TN1DG/swole/issues/29).
 
 ---
 
@@ -463,16 +463,28 @@ closed.
    *Fixed in this pass:* `needs-triage`, `needs-info`, `ready-for-agent` and
    `ready-for-human` now exist (`wontfix` already did).
 
-   *Still to do:* migrate `docs/backlog.md`'s numbered items into GitHub issues.
-   A prose file is excellent for a human picking up context and useless as an agent
-   work queue — there is nothing to claim, assign, or close. The backlog's P2–P7
-   items are already written as discrete units with a location and a fix; they need
-   to become addressable. Keep `backlog.md` as the narrative index, with issues as
-   the queue.
+   *Also done 2026-08-13:* `docs/backlog.md`'s numbered items are now **13 open
+   issues, [#19–#31](https://github.com/TN1DG/swole/issues)** — 8 `ready-for-agent`,
+   4 `ready-for-human`, 1 `needs-info`. #22 is marked blocked by #21 using GitHub's
+   native issue dependencies, so a frontier query can skip it.
+
+   Three judgement calls worth recording:
+
+   - **The P4 "known behaviours" were deliberately not migrated.** Each looks like
+     a bug and isn't, or is a trade made on purpose. Filing them as work invites
+     someone to "fix" something that would be worse afterwards. They stay in
+     `backlog.md` under a heading that says so.
+   - **The lb/kg item became two issues, not one.** The backlog itself recommended
+     splitting display (mechanical, agent-safe) from the `ActiveWorkout` inputs
+     (precision policy, a human call). One issue would have been un-claimable.
+   - **`backlog.md` was rewritten, not deleted.** It keeps what isn't issue-shaped:
+     current state, the deliberate behaviours, and the gotchas. Reusable lessons
+     from the old struck-through DONE entries were folded into the gotchas rather
+     than lost to git history.
 
 **4. Scoped agent sessions.** Once 2 and 3 exist: a `/schedule` routine that picks
 up `ready-for-agent` issues, works on `dev`, and opens a PR. CI gates it; you review.
-Start with the mechanical items — the lb/kg **display** layer (backlog item 3) is
+Start with the mechanical items — the lb/kg **display** layer (#21) is
 close to ideal: well-specified, tests already pin the behaviour, and the backlog
 even records the trap (don't regex-sweep it; a lazy `[\s\S]*?` once broke 60 tests).
 
@@ -527,7 +539,9 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
    Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
 5. Re-triage the 5 `npm audit` highs (§3.3)
 6. ~~Rename `npm run deploy` → `deploy:emergency`~~ — **done 2026-08-13** (§3.5)
-7. Migrate `docs/backlog.md` items into GitHub issues (§6.3)
+7. ~~Migrate `docs/backlog.md` items into GitHub issues~~ — **done 2026-08-13**:
+   13 open issues, [#19–#31](https://github.com/TN1DG/swole/issues). `backlog.md`
+   is now the narrative index, not a second queue (§6.3)
 8. ~~Remove `RESEND_API_KEY` from the dev Convex deployment~~ — **done
    2026-08-13**; codes now log to the Convex console in dev (§3.4)
 9. Frontend component tests, starting with `ActiveWorkout.tsx` (§4.2)
