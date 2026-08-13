@@ -1,0 +1,59 @@
+name: CI
+
+# The promotion flow is dev -> staging -> main, each hop via a PR. Running on
+# both `push` and `pull_request` is deliberate: the push trigger gives the
+# branch a status the moment work lands on `dev`, and the PR trigger is what a
+# required status check would gate on at each promotion.
+on:
+  push:
+    branches: [dev, staging, main]
+  pull_request:
+    branches: [dev, staging, main]
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Generous on purpose. `emailAuth.test.ts` has one test that creates 21
+    # accounts to trip a limit of 20, each with a real password hash, and is
+    # budgeted 30s for that reason (docs/backlog.md item 22). A shared runner
+    # is slower than a dev machine, and a timeout failure here would look like
+    # a flake rather than the resource limit it is.
+    timeout-minutes: 20
+
+    steps:
+      # v5, not v4: v4 targets the Node 20 runtime, which GitHub deprecated and
+      # now force-runs on Node 24 with a warning annotation on every run.
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Both halves matter. `tsc -b` alone does NOT typecheck convex/*.test.ts:
+      # root typecheck + vitest + lint were once all green while `npx convex
+      # dev` failed with 5 type errors. See docs/backlog.md item 18.
+      - name: Typecheck (app + convex)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npx vitest run
+
+      # Catches what the other three can't: a CSP change that breaks the
+      # vercel.json -> <meta> mirror in vite.config.ts, and any build-only
+      # plugin failure. This is the same build Vercel runs, minus the deploy.
+      - name: Build
+        run: npm run build
