@@ -53,9 +53,9 @@ Full list, with labels and blocking state:
 | --- | --- | --- |
 | [#19](https://github.com/TN1DG/swole/issues/19) | Stale cached shell hits a dead end when Turnstile is enabled | `ready-for-agent` |
 | [#20](https://github.com/TN1DG/swole/issues/20) | Verify notification tap-through actions end to end | `ready-for-human` |
-| [#21](https://github.com/TN1DG/swole/issues/21) | Wire `unitPreference` into the ~20 remaining kg display sites | `ready-for-agent` |
-| [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, blocked by #21 |
-| [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | `ready-for-agent` |
+| [#21](https://github.com/TN1DG/swole/issues/21) | Wire `unitPreference` into the ~20 remaining kg display sites | closed 2026-08-14 |
+| [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, unblocked by #21 |
+| [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | closed 2026-08-14 |
 | [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | `ready-for-agent` |
 | [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | `ready-for-agent` |
 | [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |

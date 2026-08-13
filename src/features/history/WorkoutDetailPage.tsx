@@ -14,8 +14,9 @@ import {
 } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
-import { behindRecord, formatDuration, formatKg } from '../../../convex/fitness'
+import { behindRecord, formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -36,6 +37,7 @@ export function WorkoutDetailPage() {
   )
   const [selected, setSelected] = useState<Doc<'exercises'> | null>(null)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const { unit, formatWeight, formatWeightWithUnit } = useWeightUnit()
 
   if (detail === undefined)
     return (
@@ -82,8 +84,8 @@ export function WorkoutDetailPage() {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
         {formatWorkoutDate(detail.startedAt)} ·{' '}
-        {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} · {formatKg(totalVolume)} kg ·{' '}
-        {setCount} sets
+        {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} ·{' '}
+        {formatWeightWithUnit(totalVolume)} · {setCount} sets
       </Typography>
 
       <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -99,7 +101,7 @@ export function WorkoutDetailPage() {
             <Table size="small" sx={{ mt: 1 }}>
               <TableHead>
                 <TableRow>
-                  {['Set', 'kg', 'Reps'].map((label) => (
+                  {['Set', unit, 'Reps'].map((label) => (
                     <TableCell
                       key={label}
                       sx={{
@@ -148,7 +150,7 @@ export function WorkoutDetailPage() {
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
                       >
-                        {formatKg(set.weightKg)}
+                        {formatWeight(set.weightKg)}
                       </TableCell>
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}

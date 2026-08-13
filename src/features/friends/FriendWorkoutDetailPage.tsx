@@ -3,9 +3,10 @@ import { useQuery } from 'convex/react'
 import { Box, Button, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { behindRecord, formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 import { TIER_LABELS } from '../../lib/tierLabels'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { GlassTile } from '../../components/GlassTile'
 
 // Read-only detail for a friend's (or public opt-in user's) workout — same
@@ -20,6 +21,8 @@ export function FriendWorkoutDetailPage() {
   const detail = useQuery(api.friends.getFriendWorkoutDetail, {
     workoutId: workoutId as Id<'workouts'>,
   })
+  // Your unit preference, not the owner's — this is your screen to read.
+  const { unit, formatWeight, formatWeightWithUnit } = useWeightUnit()
 
   if (detail === undefined)
     return (
@@ -43,6 +46,9 @@ export function FriendWorkoutDetailPage() {
     .reduce((sum, s) => sum + s.weightKg * s.reps, 0)
   const setCount = detail.exercises.reduce((n, e) => n + e.sets.length, 0)
   const prSet = new Set(detail.prExerciseIds)
+  // The owner's records, not yours — see friends.ts:getFriendWorkoutDetail.
+  // Only those this workout is allowed to be measured against.
+  const eligibleRecordByExercise = new Map(detail.eligibleRecords.map((r) => [r.exerciseId, r]))
   const tierLabel = TIER_LABELS[detail.consistency.tier]
 
   return (
@@ -63,8 +69,8 @@ export function FriendWorkoutDetailPage() {
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
         {formatWorkoutDate(detail.startedAt)} ·{' '}
-        {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} · {formatKg(totalVolume)} kg ·{' '}
-        {setCount} sets
+        {formatDuration((detail.endedAt ?? detail.startedAt) - detail.startedAt)} ·{' '}
+        {formatWeightWithUnit(totalVolume)} · {setCount} sets
       </Typography>
 
       <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -77,7 +83,7 @@ export function FriendWorkoutDetailPage() {
             <Table size="small" sx={{ mt: 1 }}>
               <TableHead>
                 <TableRow>
-                  {['Set', 'kg', 'Reps'].map((label) => (
+                  {['Set', unit, 'Reps'].map((label) => (
                     <TableCell
                       key={label}
                       sx={{
@@ -97,17 +103,45 @@ export function FriendWorkoutDetailPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {entry.sets.map((set) => (
-                  <TableRow key={set._id}>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, color: set.isWarmup ? 'pr.main' : 'text.secondary' }}>
-                      {set.isWarmup ? 'W' : set.setNumber}
-                    </TableCell>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatKg(set.weightKg)}
-                    </TableCell>
-                    <TableCell sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums' }}>{set.reps}</TableCell>
-                  </TableRow>
-                ))}
+                {entry.sets.map((set) => {
+                  // Warm-ups never count toward records, so they're never
+                  // "conquered" either.
+                  const conquered =
+                    !set.isWarmup &&
+                    behindRecord(
+                      set.weightKg,
+                      set.reps,
+                      eligibleRecordByExercise.get(entry.exercise._id),
+                    )
+                  const conqueredSx = conquered
+                    ? { textDecoration: 'line-through', textDecorationColor: 'var(--color-error)', opacity: 0.55 }
+                    : null
+                  return (
+                    <TableRow key={set._id} title={conquered ? 'Beaten by their PR' : undefined}>
+                      <TableCell
+                        sx={{
+                          border: 0,
+                          py: 0.5,
+                          px: 0,
+                          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+                          ...conqueredSx,
+                        }}
+                      >
+                        {set.isWarmup ? 'W' : set.setNumber}
+                      </TableCell>
+                      <TableCell
+                        sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
+                      >
+                        {formatWeight(set.weightKg)}
+                      </TableCell>
+                      <TableCell
+                        sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
+                      >
+                        {set.reps}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </GlassTile>

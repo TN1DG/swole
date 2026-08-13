@@ -2,7 +2,7 @@ import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { getWorkoutExercises, summarizeWorkout } from './history'
+import { eligibleRecordsFor, getWorkoutExercises, summarizeWorkout } from './history'
 import {
   consistencyTier,
   displayStreakWeeks,
@@ -331,7 +331,17 @@ export const getFriendWorkoutDetail = query({
       ownerConsistency(ctx, ownerId, Date.now()),
     ])
 
-    return { ...workout, exercises, prExerciseIds, owner, consistency }
+    // `records` is scoped to `ownerId` above, so the slash measures the
+    // owner's sets against the owner's PRs — the viewer's records never
+    // enter into it, and nothing here escapes the gate applied above.
+    return {
+      ...workout,
+      exercises,
+      prExerciseIds,
+      eligibleRecords: eligibleRecordsFor(records, workout),
+      owner,
+      consistency,
+    }
   },
 })
 

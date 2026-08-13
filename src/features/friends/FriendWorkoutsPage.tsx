@@ -3,8 +3,9 @@ import { useQuery } from 'convex/react'
 import { Box, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { GlassTile } from '../../components/GlassTile'
 
 // Read-only: a friend's (or a public opt-in user's) workout history. Same
@@ -13,6 +14,7 @@ import { GlassTile } from '../../components/GlassTile'
 export function FriendWorkoutsPage() {
   const { userId } = useParams()
   const data = useQuery(api.friends.friendWorkouts, { userId: userId as Id<'users'> })
+  const { formatWeightWithUnit } = useWeightUnit()
 
   return (
     <Box>
@@ -51,7 +53,7 @@ export function FriendWorkoutsPage() {
                       </Typography>
                     </Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+                      {formatDuration(w.durationMs)} · {formatWeightWithUnit(w.totalVolumeKg)} · {w.setCount} sets
                     </Typography>
                     <Box component="ul" sx={{ mt: 1, m: 0, pl: 0, listStyle: 'none' }}>
                       {w.exercises.slice(0, 4).map((ex, i) => (

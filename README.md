@@ -183,7 +183,7 @@ separate signing keys (`node scripts/setup-auth-env.mjs --prod --site-url=https:
 ## Roadmap
 
 - Rest timer between sets
-- kg/lb display toggle everywhere (weights are stored canonically in kg; `profiles.unitPreference` is wired into the Stats page only — roughly 20 other display sites still hard-code kg)
+- kg/lb entry, not just display (weights are stored canonically in kg and every display site now reads `profiles.unitPreference` via `useWeightUnit()`; the set-weight *inputs* still take kg)
 - Bodyweight / rep-only PR tracking
 - Workout notes UI (schema field already exists)
 - Offline logging with sync

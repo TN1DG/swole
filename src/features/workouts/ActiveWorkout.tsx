@@ -4,7 +4,8 @@ import type { FunctionReturnType } from 'convex/server'
 import { Box, Button, ButtonBase, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { beatsRecord, behindRecord, formatDuration, formatKg } from '../../../convex/fitness'
+import { beatsRecord, behindRecord, formatDuration } from '../../../convex/fitness'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { ExercisePicker } from './ExercisePicker'
 import { RestTimer } from './RestTimer'
@@ -54,7 +55,9 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
   const [restSignal, setRestSignal] = useState(0)
   const startRest = () => setRestSignal((n) => n + 1)
 
-  // Live stats shown at the top.
+  // Live stats shown at the top. Display only — the set INPUTS below stay in
+  // kg (see issue #22); converting what you type is a separate, riskier job.
+  const { formatWeightWithUnit } = useWeightUnit()
   const allSets = workout.exercises.flatMap((e) => e.sets)
   const doneSets = allSets.filter((s) => s.completed)
   const volume = doneSets
@@ -120,7 +123,8 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
             {workout.name}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-            <ElapsedTimer since={workout.startedAt} /> · {formatKg(volume)} kg · {doneSets.length} sets
+            <ElapsedTimer since={workout.startedAt} /> · {formatWeightWithUnit(volume)} ·{' '}
+            {doneSets.length} sets
           </Typography>
         </Box>
         <Button

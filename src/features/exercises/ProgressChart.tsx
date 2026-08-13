@@ -24,6 +24,11 @@ export function ProgressChart({ points }: { points: Point[] }) {
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(p.value)}`).join(' ')
   const best = Math.max(...values)
 
+  // Values arrive already in the viewer's display unit (see ExerciseDetail),
+  // so a kg->lb conversion's long tail — 100kg plots as 220.46226218… — has
+  // to be trimmed before it reaches an axis label.
+  const axisLabel = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 })
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       {/* min/max gridlines + labels */}
@@ -38,7 +43,7 @@ export function ProgressChart({ points }: { points: Point[] }) {
             strokeDasharray="3 3"
           />
           <text x={PAD.left - 6} y={y(v) + 3} textAnchor="end" fontSize="9" fill="var(--color-muted)">
-            {v}
+            {axisLabel(v)}
           </text>
         </g>
       ))}
