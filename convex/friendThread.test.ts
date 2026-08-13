@@ -133,6 +133,20 @@ describe('unified thread ordering', () => {
     })
     await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'accept it!' })
 
+    // Same clock hazard as the test above, and it bites harder here: on a tie
+    // the stable sort emits messages before challenges, which is the exact
+    // inverse of what this asserts. Pin both into the past — the accept below
+    // then stamps `startedAt` at the real now, comfortably after the message,
+    // so the reordering it causes is what the second assertion measures.
+    await t.run(async (ctx) => {
+      const base = Date.now() - 60_000
+      const [proposed] = await ctx.db.query('challenges').collect()
+      const [message] = await ctx.db.query('messages').collect()
+
+      await ctx.db.patch(proposed._id, { createdAt: base })
+      await ctx.db.patch(message._id, { sentAt: base + 1000 })
+    })
+
     const before = await alice.user.query(api.friendThread.getThread, { friendUserId: bob.userId })
     expect(before.map((e) => e.type)).toEqual(['challenge', 'message'])
 
