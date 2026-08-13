@@ -2,8 +2,15 @@
 
 Everything known-open as of **2026-08-04**. Ordered by priority. Companion to
 `docs/new-features-progress.md` (the wave-by-wave *why* behind shipped
-features) and `docs/domain-and-environments-plan.md` (the deploy pipeline,
-domain, and preview-environment story). This file is the *what's left*.
+features), `docs/domain-and-environments-plan.md` (the deploy pipeline,
+domain, and preview-environment story), and `docs/project-review-2026-08-13.md`
+(repo/CI/architecture review — read its "Open items" list alongside this one).
+This file is the *what's left*.
+
+> **Updated 2026-08-13.** Several counts below are stale: the suite is now
+> **333 tests across 23 files**, and `npm audit` is **5 high**, not 4 — see items
+> 14 and 20, and §3.3 of the project review. CI now exists
+> (`.github/workflows/ci.yml`) and runs the verify routine on every push and PR.
 
 **Start here next session.** Each item says what's wrong, where, and what the
 fix involves.

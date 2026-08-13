@@ -136,10 +136,20 @@ maintained by `workouts.finish` and `history.deleteWorkout`. Unlike
 `workoutsStarted`, this one *does* decrement — it's a user-facing number, not
 an abuse ration.
 
-**`migrations:backfillWorkoutCounts` must be run on each deployment.** Without
-it, every established user's profile reads 0 workouts, which looks like data
-loss. Idempotent (recomputes rather than increments); verified on dev, where a
-second run patched 0.
+**`migrations:backfillWorkoutCounts` — RUN ON PRODUCTION 2026-08-04.** Result:
+`{ profiles: 15, patched: 15 }`, and a second run returned `patched: 0`,
+confirming idempotency. Also run on dev and on the staging preview, idempotent
+both times.
+
+Note "15 of 15" does not mean fifteen users had workouts — a profile with none
+is still patched, because `undefined` → `0` is a change. What was verified
+directly: the migration completed, is idempotent, and production serves 200 with
+its CSP intact. What was *not* verified from the CLI is the per-profile value,
+which would have needed a read function deployed to production out-of-band;
+the logic is covered by tests and was exercised end-to-end on staging first.
+
+Without this backfill, every established user's profile reads 0 workouts, which
+looks like data loss.
 
 A test pins the case the counter exists for: a workout from 500 days ago is
 outside the read window but still counts toward the lifetime total, while the
@@ -151,12 +161,99 @@ converting it to a mutation and changing how `FriendsPage` calls it. Severity
 dropped materially now that it no longer returns an email — it reveals only
 whether a username exists. Worth doing if abuse appears.
 
-### D. Signup throttle is global, not per-IP
-`signUp` is 20 per 10 minutes app-wide, because Convex actions can't see caller
-IP. That stops a scripted flood but also means one attacker can consume the
-global allowance and **block legitimate signups** — a denial-of-service on
-registration. The real fix is a challenge on the signup form (e.g. Cloudflare
-Turnstile), which sits outside Convex. **Consider this before any launch push.**
+### ~~D. Signup throttle is global, not per-IP~~ — IMPLEMENTED 2026-08-04, NEEDS KEYS
+Cloudflare Turnstile now guards sign-up (`convex/turnstile.ts`,
+`src/components/TurnstileWidget.tsx`). **It is inert until keys are set — see
+below.**
+
+Why it needed two pieces: verifying a token means calling Cloudflare, and only
+a Convex *action* can `fetch`, while the hook that must reject an unverified
+sign-up (`callbacks.afterUserCreatedOrUpdated`) runs in a *mutation*. So the
+action verifies and records a short-lived, single-use pass keyed by email, and
+the mutation spends it. The spend happens **before** the `signUp` rate limit is
+consumed, so an unverified request can't eat from the app-wide bucket — which
+was the denial-of-service in the first place.
+
+**To turn it on** (both are required; either alone leaves it off):
+
+```
+# 1. Cloudflare dashboard -> Turnstile -> add a site for swole.day.
+# 2. Secret key, on the Convex production deployment:
+npx convex env set TURNSTILE_SECRET_KEY <secret> --prod
+# 3. Site key, in Vercel project settings as VITE_TURNSTILE_SITE_KEY
+#    (Production scope), then REDEPLOY - Vite inlines VITE_* at build time,
+#    so setting it without a rebuild changes nothing.
+```
+
+Verify afterwards with `npx convex env get TURNSTILE_SECRET_KEY --prod`.
+
+**Deliberate design: enforcement is conditional on the secret being set.**
+Preview deployments start with zero environment variables, and hard-requiring
+the key would break sign-up on every new branch — a failure this project has
+already shipped once. The cost is that production silently loses the protection
+if the variable ever goes missing, which is why the check above matters.
+
+### Where Turnstile stands — paused 2026-08-04, pick up here
+
+**Server side is proven working on staging.** Driven end to end via
+`npx convex run ... --preview-name staging`:
+
+| Check | Setup | Result |
+| --- | --- | --- |
+| Token verification rejects | valid token + *failing* test secret | ✅ "Challenge failed" |
+| Sign-up blocked | no challenge at all | ✅ "Please complete the challenge" |
+| Token verification accepts | valid token + *passing* test secret | ✅ pass recorded |
+| Sign-up allowed | with the pass | ✅ tokens issued |
+| Pass is single-use | second sign-up, no new pass | ✅ blocked |
+
+The first row is the one that matters: the widget produced a valid token and the
+**server** still refused it, so enforcement is server-side, not browser-side.
+
+**Current staging config** (production untouched):
+- Convex `TURNSTILE_SECRET_KEY` = `1x0000000000000000000000000000000AA` (test
+  secret, always passes) on preview deployment `vivid-vulture-847`
+- Vercel `VITE_TURNSTILE_SITE_KEY` = `1x00000000000000000000AA`, scoped to
+  Preview (staging branch)
+
+**OPEN: the widget does not render in the browser on staging.** Sign-up returns
+the *server's* "Please complete the challenge before signing up", which means
+the client never had a site key and submitted without a token.
+
+Ruled out already:
+- Not the secret — the server chain above works.
+- Not the code — building locally with `VITE_TURNSTILE_SITE_KEY` set puts the
+  key in `dist/assets/*.js`.
+- Not build cache — the build log says "Skipping build cache" and rebuilt.
+
+**Leading theory:** the staging build was triggered with `vercel redeploy`,
+which rebuilds a *previous* deployment and appears to reuse that deployment's
+original environment snapshot — captured before the variable existed. If so, a
+`redeploy` can never fix it; it needs a genuinely new deployment (a fresh
+git-triggered build of `staging`, or Redeploy from the Vercel dashboard).
+
+**Next step is one browser check**, because it splits the two candidates:
+open staging → Sign up → console.
+- `Refused to load the script 'https://challenges.cloudflare.com/...'` → CSP,
+  fix in `vercel.json`.
+- No such error and no widget → site key absent from the bundle, confirming the
+  redeploy theory.
+
+Note the bundle can't be inspected from the CLI: `staging.swole.day` is behind
+Vercel deployment protection and returns 302 to `curl`.
+
+Test accounts left on staging from this run: `probe2@test.local` (plus failed
+attempts). Harmless — preview data now persists between pushes.
+
+CSP was updated for it (`script-src` and `frame-src` both need
+`https://challenges.cloudflare.com` — the widget is an iframe, and `frame-src`
+falls back to `default-src 'self'` otherwise), including the `<meta>` mirror
+that is what actually reaches an installed PWA. Pinned by `vercel-headers.test.ts`.
+
+One behaviour worth knowing, pinned by a test so it isn't "fixed" into
+something the transaction model can't honour: rejecting an *expired* pass
+throws, and the throw rolls back the delete of that same row, so the stale row
+survives. It's harmless — still expired, so it authorises nothing, and solving
+a new challenge replaces it rather than stacking.
 
 ### E. Leaderboard volume is self-reported
 Nothing stops a user logging 1500kg × 500 reps to top the volume board. Caps

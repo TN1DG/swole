@@ -281,6 +281,20 @@ export default defineSchema({
     // it also covers everything by_owner does.
     .index('by_owner_startedAt', ['ownerId', 'startedAt']),
 
+  // A solved Cloudflare Turnstile challenge, waiting to be spent on one
+  // sign-up. See convex/turnstile.ts for why this table has to exist at all:
+  // verifying a token needs `fetch`, which only a Convex *action* has, but the
+  // sign-up hook that must reject unverified accounts runs in a *mutation*.
+  // This row is the handoff between the two.
+  //
+  // Keyed by email rather than by token so the mutation can find it knowing
+  // only what sign-up knows. Single-use (deleted when spent) and short-lived,
+  // so a solved challenge can't be banked or shared.
+  signupChallenges: defineTable({
+    email: v.string(), // normalized: trimmed + lowercased
+    expiresAt: v.number(),
+  }).index('by_email', ['email']),
+
   // An exercise inside a workout, in order.
   workoutExercises: defineTable({
     workoutId: v.id('workouts'),

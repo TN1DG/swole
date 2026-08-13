@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { useAction } from 'convex/react'
 import { Box, Button, TextField, Typography } from '@mui/material'
+import { api } from '../../../convex/_generated/api'
+import { TurnstileWidget } from '../../components/TurnstileWidget'
+import { turnstileEnabled } from '../../lib/turnstile'
 import { errorMessage } from '../../lib/errors'
 
 type Step = 'signIn' | 'signUp' | 'forgotPassword' | 'resetCode'
@@ -14,6 +18,9 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Null until Turnstile hands over a token, and back to null when it expires.
+  const [challengeToken, setChallengeToken] = useState<string | null>(null)
+  const verifyChallenge = useAction(api.turnstile.verifySignupChallenge)
 
   function resetMessages() {
     setError(null)
@@ -28,6 +35,22 @@ export function SignInPage() {
     const formData = new FormData(e.currentTarget)
     formData.set('flow', flow)
     try {
+      // Sign-up only. The challenge exists because the app-wide sign-up limit
+      // can't tell one abuser from everybody else (a Convex action has no
+      // caller IP), so a flood can lock real people out of registering.
+      //
+      // Verified before `signIn` rather than inside it: checking the token
+      // means calling Cloudflare, and only a Convex action can do that, while
+      // the sign-up hook that rejects unverified accounts runs in a mutation.
+      // The action leaves a short-lived pass the mutation spends.
+      if (flow === 'signUp' && turnstileEnabled) {
+        if (challengeToken === null) {
+          setError('Please complete the challenge below, then try again.')
+          setSubmitting(false)
+          return
+        }
+        await verifyChallenge({ token: challengeToken, email: String(formData.get('email') ?? '') })
+      }
       await signIn('password', formData)
     } catch (err) {
       setError(
@@ -121,6 +144,13 @@ export function SignInPage() {
               fullWidth
               slotProps={{ htmlInput: { minLength: 8 } }}
             />
+
+            {/* Sign-up only: signing in to an existing account isn't the
+                thing being flooded, and a challenge on every login would be a
+                tax on real users for no gain. Renders nothing when
+                VITE_TURNSTILE_SITE_KEY is unset, which is the case on preview
+                builds. */}
+            {step === 'signUp' && <TurnstileWidget onToken={setChallengeToken} />}
 
             {error && (
               <Typography variant="body2" color="error">
