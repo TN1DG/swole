@@ -285,22 +285,43 @@ The standing analysis of `react-router` still holds: the advisory is RSC-mode CS
 this is a client-only SPA, and `npm audit fix --force` would downgrade it. **Don't.**
 But the other three deserve a fresh triage rather than inheriting that verdict.
 
-### 3.4 `RESEND_API_KEY` is set on the dev Convex deployment
+### 3.4 ~~`RESEND_API_KEY` is set on the dev Convex deployment~~ — ✅ REMOVED 2026-08-13
 
-Local development can therefore send real email from the live Resend account.
+Local development could send real email from the live Resend account.
 Deliberately *not* set on previews, per the environments plan — the same reasoning
-applies to dev. Low severity, easy to remove.
+applied to dev.
 
-### 3.5 `npm run deploy` is a loaded footgun
+Unset on `necessary-rhinoceros-257` (dev). Production verified untouched
+immediately afterwards, since the two commands differ only by `--prod`.
+
+**Checked before removing, rather than assumed safe** — and it turns out to
+*improve* the dev loop rather than degrade it. Both senders degrade gracefully
+instead of throwing:
+
+- `convex/emailAuth.ts:58` logs the code instead of sending it:
+  `RESEND_API_KEY not set — <kind> code for <email>: <token>`. So verification
+  and password-reset codes now appear in the Convex logs, and testing those
+  flows locally no longer needs a real inbox.
+- `convex/featureRequests.ts:57` skips the send with a warning; the submission
+  still saves. A test pins this (`skips sending (without throwing) when
+  RESEND_API_KEY is unset`).
+
+To restore it for a specific test: `npx convex env set RESEND_API_KEY re_...`.
+
+### 3.5 ~~`npm run deploy` is a loaded footgun~~ — ✅ RENAMED 2026-08-13
 
 The script pushes straight to production Convex and `vercel --prod`, bypassing both
 PR gates and skipping staging entirely. `docs/backlog.md` already says "Don't" in
 prose, which works on a human who has read it and not at all on an agent doing
 script-name autocomplete.
 
-**Recommendation:** rename it `deploy:emergency`. The README now documents it inside
-a collapsed "bypasses both PR gates, emergencies only" block, but a name is a
-stronger signal than a paragraph.
+**Now `npm run deploy:emergency`.** A name is a stronger signal than a paragraph,
+and it no longer sits one tab-completion away from `npm run dev`. References
+updated in `README.md`, `CLAUDE.md`, and `docs/backlog.md`.
+
+Note this matters more than it did when the review was written: `main` is now
+protected and gated on CI, so the PR flow has real checks to bypass. This script
+is the one remaining path around them.
 
 ---
 
@@ -476,7 +497,14 @@ developer **who is about to add agents**.
 | Removed the empty stray `srctheme/` directory | filesystem |
 | Corrected four stale README claims: live URL, styling stack, table count, test count | `README.md` |
 | Documented the branch flow, per-branch environments, and verify routine in the README | `README.md` |
-| Moved `npm run deploy` into a collapsed "emergencies only" block | `README.md` |
+| Renamed `npm run deploy` → `deploy:emergency` and documented what it bypasses | `package.json`, `README.md`, `CLAUDE.md`, `docs/backlog.md` |
+| Made the repo public; protected `main` with `verify` as a required check | GitHub settings |
+| Disabled "auto-delete head branches" after it deleted `dev`; restored the branch | GitHub settings, git |
+| MIT licence | `LICENSE` (new), `README.md` |
+| Enabled `strict` + `noImplicitReturns` on both TS projects (zero fallout) | `tsconfig.app.json`, `tsconfig.node.json` |
+| Diagnosed and closed the Turnstile widget bug; added the enablement runbook | `docs/security-audit.md` |
+| Removed `RESEND_API_KEY` from the dev Convex deployment | `convex env remove` |
+| Filed the first repo issue, for the stale-shell Turnstile dead end | GitHub issue #19 |
 | This document | `docs/project-review-2026-08-13.md` (new) |
 
 The stale README claims, for the record, were: live app at `swole-six.vercel.app`
@@ -498,9 +526,10 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
    fallout; `noImplicitReturns` and `tsconfig.node.json` came along free.
    Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
 5. Re-triage the 5 `npm audit` highs (§3.3)
-6. Rename `npm run deploy` → `deploy:emergency` (§3.5)
+6. ~~Rename `npm run deploy` → `deploy:emergency`~~ — **done 2026-08-13** (§3.5)
 7. Migrate `docs/backlog.md` items into GitHub issues (§6.3)
-8. Remove `RESEND_API_KEY` from the dev Convex deployment (§3.4)
+8. ~~Remove `RESEND_API_KEY` from the dev Convex deployment~~ — **done
+   2026-08-13**; codes now log to the Convex console in dev (§3.4)
 9. Frontend component tests, starting with `ActiveWorkout.tsx` (§4.2)
 
 Two items are now newly relevant because the repo is public:

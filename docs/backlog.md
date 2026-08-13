@@ -73,8 +73,9 @@ Two things worth keeping from the exercise:
   the same way.
 - **A migration can only run where it's deployed.** `--prod` failed with "Could
   not find function" until the promotion reached `main`, because production runs
-  `main`'s code. The shortcut — `npm run deploy` — would have worked by pushing
-  all of `dev` straight to production and bypassing both PR gates. Don't.
+  `main`'s code. The shortcut — `npm run deploy:emergency`, called `npm run
+  deploy` at the time — would have worked by pushing all of `dev` straight to
+  production and bypassing both PR gates. Don't.
 
 ---
 
