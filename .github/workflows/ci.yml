@@ -29,9 +29,11 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      # v5, not v4: v4 targets the Node 20 runtime, which GitHub deprecated and
+      # now force-runs on Node 24 with a warning annotation on every run.
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
