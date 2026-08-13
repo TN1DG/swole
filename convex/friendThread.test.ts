@@ -91,6 +91,24 @@ describe('unified thread ordering', () => {
     })
     await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'last' })
 
+    // Every one of those writes is stamped with `Date.now()`, and getThread's
+    // sort has no tiebreak for equal timestamps — a stable sort then falls
+    // back to insertion order (messages, pings, challenges), which puts the
+    // challenge AFTER 'last'. On a fast runner all four land in the same
+    // millisecond and this failed in CI on 2026-08-13. Space them out so the
+    // assertion tests the chronological merge, not the clock's resolution.
+    await t.run(async (ctx) => {
+      const base = Date.now() - 60_000
+      const messages = await ctx.db.query('messages').collect()
+      const [ping] = await ctx.db.query('gymPings').collect()
+      const [challenge] = await ctx.db.query('challenges').collect()
+
+      await ctx.db.patch(messages.find((m) => m.text === 'first')!._id, { sentAt: base })
+      await ctx.db.patch(ping._id, { sentAt: base + 1000 })
+      await ctx.db.patch(challenge._id, { createdAt: base + 2000 })
+      await ctx.db.patch(messages.find((m) => m.text === 'last')!._id, { sentAt: base + 3000 })
+    })
+
     const thread = await alice.user.query(api.friendThread.getThread, { friendUserId: bob.userId })
     expect(thread.map((e) => e.type)).toEqual(['message', 'ping', 'challenge', 'message'])
 
@@ -159,6 +177,21 @@ describe('unread tracking', () => {
 
     await bob.user.mutation(api.messages.send, { toUserId: alice.userId, text: 'one' })
     await alice.user.mutation(api.friendThread.markRead, { friendUserId: bob.userId })
+
+    // unreadFriendIds compares `sentAt > lastReadAt` strictly, so a message
+    // landing in the very millisecond of the markRead reads as already-seen.
+    // All three writes here can share a millisecond on a fast runner (CI,
+    // 2026-08-13). Pin 'one' and the read marker firmly in the past, so the
+    // only thing that can flip the flag below is 'two' itself.
+    await t.run(async (ctx) => {
+      const now = Date.now()
+      const messages = await ctx.db.query('messages').collect()
+      const [read] = await ctx.db.query('threadReads').collect()
+
+      await ctx.db.patch(messages.find((m) => m.text === 'one')!._id, { sentAt: now - 120_000 })
+      await ctx.db.patch(read._id, { lastReadAt: now - 60_000 })
+    })
+
     expect(await alice.user.query(api.friendThread.unreadFriendIds, {})).toEqual([])
 
     await bob.user.mutation(api.messages.send, { toUserId: alice.userId, text: 'two' })
