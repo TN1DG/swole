@@ -161,7 +161,7 @@ converting it to a mutation and changing how `FriendsPage` calls it. Severity
 dropped materially now that it no longer returns an email — it reveals only
 whether a username exists. Worth doing if abuse appears.
 
-### ~~D. Signup throttle is global, not per-IP~~ — IMPLEMENTED 2026-08-04, NEEDS KEYS
+### ~~D. Signup throttle is global, not per-IP~~ — BUILT AND VERIFIED, NEEDS KEYS
 Cloudflare Turnstile now guards sign-up (`convex/turnstile.ts`,
 `src/components/TurnstileWidget.tsx`). **It is inert until keys are set — see
 below.**
@@ -215,31 +215,62 @@ The first row is the one that matters: the widget produced a valid token and the
 - Vercel `VITE_TURNSTILE_SITE_KEY` = `1x00000000000000000000AA`, scoped to
   Preview (staging branch)
 
-**OPEN: the widget does not render in the browser on staging.** Sign-up returns
-the *server's* "Please complete the challenge before signing up", which means
-the client never had a site key and submitted without a token.
+### ~~OPEN: the widget does not render on staging~~ — RESOLVED 2026-08-13
 
-Ruled out already:
-- Not the secret — the server chain above works.
-- Not the code — building locally with `VITE_TURNSTILE_SITE_KEY` set puts the
-  key in `dist/assets/*.js`.
-- Not build cache — the build log says "Skipping build cache" and rebuilt.
+**The widget renders.** Confirmed in a browser on `staging.swole.day`: the
+Cloudflare challenge appears on the sign-up form with the red "For testing only.
+If seen, report to site owner" banner that marks the test site key.
 
-**Leading theory:** the staging build was triggered with `vercel redeploy`,
-which rebuilds a *previous* deployment and appears to reuse that deployment's
-original environment snapshot — captured before the variable existed. If so, a
-`redeploy` can never fix it; it needs a genuinely new deployment (a fresh
-git-triggered build of `staging`, or Redeploy from the Vercel dashboard).
+The redeploy theory was right, and is now confirmed by elimination rather than
+inference. Four checks against the live staging page:
 
-**Next step is one browser check**, because it splits the two candidates:
-open staging → Sign up → console.
-- `Refused to load the script 'https://challenges.cloudflare.com/...'` → CSP,
-  fix in `vercel.json`.
-- No such error and no widget → site key absent from the bundle, confirming the
-  redeploy theory.
+| Check | Result |
+| --- | --- |
+| Widget visible on sign-up | ✅ renders |
+| Console CSP refusals on `challenges.cloudflare.com` | **none** |
+| `window.turnstile` | `object` — the script loaded |
+| Site key inlined in the deployed bundle | ✅ present |
 
-Note the bundle can't be inspected from the CLI: `staging.swole.day` is behind
-Vercel deployment protection and returns 302 to `curl`.
+**CSP was never the problem** — it was already correct, in both `vercel.json`
+and the `<meta>` mirror. The cause was the site key missing from the bundle,
+because the deployment under test had been produced by `vercel redeploy`, which
+reuses the previous deployment's environment snapshot from before the variable
+existed. **No number of redeploys could ever have fixed it.**
+
+What fixed it was incidental: merging PR #15 triggered the first genuinely new
+git-triggered build of `staging` since the variable was added, and the key
+inlined correctly.
+
+The bundle could not be inspected from the CLI (`staging.swole.day` is behind
+Vercel deployment protection and 302s to `curl`), so this needed a browser
+signed in to Vercel.
+
+### Production ships the widget code *compiled out* — read before enabling
+
+Checked at the same time, and it sharpens the enablement warning below.
+
+The production bundle contains **no Turnstile code at all**: no
+`challenges.cloudflare.com`, no site key. This is not a stale deployment —
+production is the build from PR #16, and its CSP already allows Cloudflare,
+which only shipped with the Turnstile commit.
+
+It is **tree-shaking**. With no Production-scoped `VITE_TURNSTILE_SITE_KEY`,
+Vite inlines `import.meta.env.VITE_TURNSTILE_SITE_KEY` as `undefined`, both
+guards in `TurnstileWidget` constant-fold, and Rollup drops the whole
+script-loading path. (The string `turnstile` survives only as the
+`window.turnstile` property access, which minifiers don't rename.)
+
+Production is therefore in a **correct, consistent inert state** — both ends
+off, sign-up unaffected. But it means enabling has a strict order, because the
+two ends fail asymmetrically:
+
+| Order | What happens |
+| --- | --- |
+| Site key + rebuild **first**, secret after | Widget renders, `verifySignupChallenge` returns `{required:false}` and records nothing, `spendSignupChallenge` returns early. Sign-up works throughout. **Safe.** |
+| Secret **first** | No widget in the shipped bundle → no token → no pass → `spendSignupChallenge` throws "Please complete the challenge before signing up". **Sign-up breaks for every new user, with no widget on screen to solve.** |
+
+So: **site key and a real rebuild first, secret last.** See "Turning Turnstile on
+in production" below for the full runbook.
 
 Test accounts left on staging from this run: `probe2@test.local` (plus failed
 attempts). Harmless — preview data now persists between pushes.
@@ -254,6 +285,73 @@ something the transaction model can't honour: rejecting an *expired* pass
 throws, and the throw rolls back the delete of that same row, so the stale row
 survives. It's harmless — still expired, so it authorises nothing, and solving
 a new challenge replaces it rather than stacking.
+
+### Turning Turnstile on in production — runbook
+
+Not yet done. Follow the order exactly: the two ends fail asymmetrically, and
+the wrong order breaks sign-up for every new user.
+
+**1. Get real Cloudflare keys.** Dashboard → Turnstile → Add site. Hostname
+`swole.day` (add `www.swole.day` too — it 307s to the apex, but costs nothing).
+Widget type **Managed**. You get a **site key** (public, starts `0x4AAA…`) and a
+**secret key** (private). Staging's `1x…` pair are Cloudflare's always-passes
+test keys and must not be used in production.
+
+**2. Site key into Vercel, Production scope.** Project → Settings →
+Environment Variables → `VITE_TURNSTILE_SITE_KEY`, value = the site key, scope
+**Production** only. Leave staging's Preview-scoped entry alone.
+
+**3. Force a genuinely new build.** This is the step that has already caught
+this project out once. Vite inlines `VITE_*` at **build** time, and
+`vercel redeploy` reuses the previous deployment's environment snapshot — the
+variable will be invisible to it. It must be a real git-triggered build.
+
+Note `main` is protected, so this is a PR, not a push: commit anything trivial
+to `dev` → PR to `staging` → PR to `main`. The promotion itself is the trigger.
+
+**4. Verify the key actually reached the bundle *before* going further.**
+`swole.day` is public, so this needs no auth:
+
+```js
+// In the browser console on https://swole.day
+const html = await fetch('/', {cache:'reload'}).then(r => r.text())
+const asset = html.match(/\/assets\/[^"]+\.js/)[0]
+const js = await fetch(asset, {cache:'reload'}).then(r => r.text())
+/0x4AAA[A-Za-z0-9_-]{10,}/.test(js)   // must be true before step 5
+```
+
+If that is `false`, **stop** — the build did not pick the variable up, and
+setting the secret now is what breaks sign-up. Also confirm the widget renders
+on the sign-up form. At this point the widget is live but the server ignores it,
+so sign-up keeps working either way. There is no rush between steps 4 and 5.
+
+**5. Secret key onto production Convex — last.**
+
+```bash
+npx convex env set TURNSTILE_SECRET_KEY <secret> --prod
+npx convex env get TURNSTILE_SECRET_KEY --prod    # confirm
+```
+
+This takes effect immediately: it is a runtime variable, no rebuild needed.
+
+**6. Test a real sign-up** on `swole.day` with a throwaway address, then delete
+the account.
+
+**Rollback is instant and needs no rebuild** — the asymmetry works in your
+favour here:
+
+```bash
+npx convex env remove TURNSTILE_SECRET_KEY --prod
+```
+
+`spendSignupChallenge` returns early the moment the variable is gone, so
+sign-up is unguarded but working again within seconds. That is the lever to
+pull if anything goes wrong, *not* a redeploy.
+
+**One operational risk to know about:** verification **fails closed** on a
+non-200 from Cloudflare (deliberate — failing open would make the guard
+bypassable by waiting for an outage). So a Cloudflare outage stops new sign-ups
+until it passes, or until you pull the rollback lever above.
 
 ### E. Leaderboard volume is self-reported
 Nothing stops a user logging 1500kg × 500 reps to top the volume board. Caps
