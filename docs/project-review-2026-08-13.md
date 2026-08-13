@@ -319,9 +319,39 @@ components", most of that safety is discarded at the boundary where it would do 
 most good: a Convex query result is `T | undefined` while loading, and without
 `strictNullChecks` nothing makes you handle the `undefined`.
 
-**Recommendation: enable `strict` in its own dedicated PR.** It will produce a
-fallout list of unknown size, which is exactly why it must not ride along with
-other work. This is the single highest-value change available after CI.
+**✅ DONE 2026-08-13 — and the predicted fallout was zero.**
+
+This section recommended enabling `strict` in a dedicated PR because it "will
+produce a fallout list of unknown size". The size turned out to be **0 errors
+across all 75 files**. The code was already written to strict standards; the flag
+simply was never set. Plausibly because `convex/` *is* strict and the Convex
+generated types flow into the components precisely enough to keep the frontend
+honest by accident.
+
+Verified rather than assumed, because a zero-error result is exactly what a
+silently-ignored flag also looks like:
+
+- `tsc --showConfig` confirms `"strict": true` in the effective config over 75 files.
+- A throwaway probe file compiled against the real config tripped **TS18048**
+  (`'s' is possibly 'undefined'`) and **TS7006** (implicit `any`), proving
+  `strictNullChecks` and `noImplicitAny` are actually enforcing.
+
+`noImplicitReturns` was also zero-error, so it went in alongside — same category,
+same config block, no cost. `tsconfig.node.json` had the identical gap and was
+also clean, so both projects now match: a file can't get looser checking just by
+living in the build-tooling project.
+
+**Still available, measured but not applied** — these are real work, not free:
+
+| Flag | Errors |
+| --- | --- |
+| `noUncheckedIndexedAccess` | 23 |
+| `exactOptionalPropertyTypes` | 16 |
+| `noPropertyAccessFromIndexSignature` | 7 |
+
+`noUncheckedIndexedAccess` is the one worth doing next — it catches the
+`array[i]` -is-actually-possibly-undefined class of bug, which is the most
+common remaining unsoundness in an otherwise strict codebase.
 
 ### 4.2 Test coverage is lopsided
 
@@ -464,7 +494,9 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
    confirmed. **Still to do: turn Turnstile on in production** — a runbook now,
    not an investigation. See "Turning Turnstile on in production" in
    `docs/security-audit.md`, and follow the order exactly (§3.1)
-4. Enable `strict` in `tsconfig.app.json`, own PR (§4.1)
+4. ~~Enable `strict` in `tsconfig.app.json`~~ — **done 2026-08-13**, zero
+   fallout; `noImplicitReturns` and `tsconfig.node.json` came along free.
+   Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
 5. Re-triage the 5 `npm audit` highs (§3.3)
 6. Rename `npm run deploy` → `deploy:emergency` (§3.5)
 7. Migrate `docs/backlog.md` items into GitHub issues (§6.3)
