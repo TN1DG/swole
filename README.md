@@ -2,7 +2,7 @@
 
 A Hevy-style gym app: log your workouts set by set, track personal records automatically, build routines, and export your session as a shareable photo overlay.
 
-**Live app:** https://swole-six.vercel.app — open it on your phone and *Add to Home Screen* to install it as an app.
+**Live app:** https://swole.day — open it on your phone and *Add to Home Screen* to install it as an app.
 
 ## Features
 
@@ -27,7 +27,7 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 | Layer | Choice | Why |
 |---|---|---|
 | Frontend | [React](https://react.dev) + [Vite](https://vite.dev) + TypeScript | Fast dev loop; types flow end-to-end from the DB schema into components |
-| Styling | [Tailwind CSS v4](https://tailwindcss.com) | Mobile-first utilities, design tokens in one `@theme` block |
+| Styling | [MUI](https://mui.com) v9 + [Emotion](https://emotion.sh) | Component library with a custom dark theme; design tokens live in `src/theme/` |
 | Backend | [Convex](https://convex.dev) | Reactive database + serverless functions; `useQuery` results update live across devices with zero refetch code |
 | Auth | [Convex Auth](https://labs.convex.dev/auth) | Email/password, JWTs signed server-side; email verification + password reset via Resend-sent 6-digit codes, no third-party auth service |
 | Image export | [modern-screenshot](https://github.com/qq15725/modern-screenshot) | Renders the share-card DOM node to a high-res PNG (what you preview is exactly what exports) |
@@ -39,9 +39,10 @@ A Hevy-style gym app: log your workouts set by set, track personal records autom
 
 ```
 convex/                 # Backend: schema + all queries/mutations
-  schema.ts             #   13 tables: exercises, workouts, sets, routines, PRs,
-                        #   favorites, friendRequests, friendships, featureRequests,
-                        #   emailSendAttempts…
+  schema.ts             #   24 tables: exercises, workouts, workoutExercises, sets,
+                        #   routines, personalRecords, favorites, profiles, posts,
+                        #   postLikes, postComments, friendships, messages,
+                        #   notifications, challenges, gymPings…
   auth.ts               #   Convex Auth config: Password provider + verify/reset
   emailAuth.ts          #   6-digit-code email providers for verify/reset, Resend
                         #   send + its own throttle (auth's own rate limiter only
@@ -104,8 +105,21 @@ Optional: `npx convex env set RESEND_API_KEY re_...` to enable feature-request e
 ## Testing
 
 ```bash
-npm test              # 92 tests, ~2s
+npm test              # 333 tests, 23 files, ~16s
 ```
+
+The full verify routine — what CI runs on every push and PR, and what you should
+run before committing:
+
+```bash
+npm run typecheck     # tsc -b && tsc --noEmit -p convex — both halves matter
+npm run lint          # oxlint, currently zero warnings
+npm test              # vitest
+npm run build
+```
+
+`tsc -b` alone does *not* typecheck `convex/*.test.ts`, which is why
+`typecheck` runs both projects.
 
 The suite runs the **actual backend functions** against an in-memory Convex (`convex-test`):
 
@@ -124,16 +138,43 @@ Test files live in `convex/` next to the code they test; the Convex CLI skips an
 
 ## Deployment
 
+Work promotes through **`dev` → `staging` → `main`**, each hop via a reviewed pull
+request. New work is committed to `dev`, never to `main`.
+
+| Branch | Deploys to | Convex backend |
+|---|---|---|
+| `dev` | `swole-git-dev-….vercel.app` | its own preview deployment |
+| `staging` | [staging.swole.day](https://staging.swole.day) (behind Vercel SSO) | its own **persistent** preview deployment |
+| `main` | [swole.day](https://swole.day) — production | production |
+
+Vercel builds every branch through `scripts/vercel-build.js`. Production gets the
+real Convex backend; every other branch gets its own isolated Convex preview
+deployment, auto-seeded with the exercise library and auto-configured with its own
+auth signing keys. Previews are *reused* across pushes (`--preview-name`), so test
+accounts survive — and so a schema change that can't cope with existing rows fails
+on staging rather than in production.
+
+`.github/workflows/ci.yml` runs typecheck, lint, tests, and the build on every push
+and PR to these three branches.
+
+<details><summary>Manual deploy — bypasses both PR gates, emergencies only</summary>
+
 ```bash
 npm run deploy
 ```
 
-One command: pushes functions to the production Convex deployment, rebuilds the frontend against the prod URL, and deploys `dist/` to Vercel. Production and dev are fully separate deployments with separate databases and separate signing keys (`node scripts/setup-auth-env.mjs --prod --site-url=https://…`).
+Pushes functions straight to the production Convex deployment, rebuilds the
+frontend against the prod URL, and deploys `dist/` to Vercel. It skips `staging`
+entirely, so a migration or schema change goes to production with no rehearsal.
+Prefer the PR flow. Production and dev are fully separate deployments with separate
+databases and separate signing keys (`node scripts/setup-auth-env.mjs --prod --site-url=https://…`).
+
+</details>
 
 ## Roadmap
 
 - Rest timer between sets
-- kg/lb display toggle (weights are stored canonically in kg; the profile's `unitPreference` field exists but isn't wired into any display yet)
+- kg/lb display toggle everywhere (weights are stored canonically in kg; `profiles.unitPreference` is wired into the Stats page only — roughly 20 other display sites still hard-code kg)
 - Bodyweight / rep-only PR tracking
 - Workout notes UI (schema field already exists)
 - Offline logging with sync
