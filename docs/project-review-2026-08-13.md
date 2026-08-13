@@ -227,7 +227,21 @@ set, so the protection has never been on.
 This is not urgent — the global limit still stops scripted floods — but the work is
 built, tested, and sitting unshipped, which is the worst of both worlds.
 
-### 3.2 Promotion debt: work is finished and not shipped
+### 3.2 Promotion debt — ✅ shipped 2026-08-13
+
+**Resolved the same day.** PR #15 (`dev → staging`) and PR #16 (`staging → main`)
+both merged; `staging` and `main` are now identical and production carries the
+Turnstile machinery, CI, and the MIT licence. PR #16 was the first merge the
+required `verify` check ever gated — it sat at `BLOCKED` until CI reported green.
+
+Merging PR #15 also, incidentally, **fixed the staging widget bug** by producing
+the first genuinely new git-triggered build since the site key was added. See
+`docs/security-audit.md` for the confirmed diagnosis.
+
+What remains is only the key setup, which is a runbook now rather than an
+investigation. The original description follows.
+
+<details><summary>Original finding, 2026-08-13 morning</summary>
 
 The repo has been untouched for nine days (`pushedAt` 2026-08-04):
 
@@ -251,6 +265,14 @@ browser on staging. The audit narrowed it to a single console check that
 distinguishes the two candidates (a CSP refusal on
 `https://challenges.cloudflare.com` versus the site key being absent from the
 bundle). That is a ten-minute job, not an investigation.
+
+**Note the key order above (secret at step 2, site key at step 3) is wrong** and
+was corrected once the diagnosis landed: setting the secret before a rebuild that
+carries the site key breaks sign-up for every new user. The runbook in
+`docs/security-audit.md` has the safe order — site key and rebuild first, secret
+last.
+
+</details>
 
 ### 3.3 `npm audit` has grown since the last pass
 
@@ -437,8 +459,11 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
 1. ~~Delete the merged branch~~ — **done 2026-08-13** (§1)
 2. ~~Decide branch protection~~ — **done 2026-08-13**: repo made public, `main`
    protected with `verify` as a required check (§2)
-3. **Ship the promotion debt and turn Turnstile on in production** (§3.1, §3.2)
-   — now the top item, and more time-sensitive since the docs went public
+3. ~~Ship the promotion debt~~ — **done 2026-08-13**, PRs #15 and #16 merged.
+   ~~Diagnose the staging widget~~ — **done**, it renders; the redeploy theory was
+   confirmed. **Still to do: turn Turnstile on in production** — a runbook now,
+   not an investigation. See "Turning Turnstile on in production" in
+   `docs/security-audit.md`, and follow the order exactly (§3.1)
 4. Enable `strict` in `tsconfig.app.json`, own PR (§4.1)
 5. Re-triage the 5 `npm audit` highs (§3.3)
 6. Rename `npm run deploy` → `deploy:emergency` (§3.5)
