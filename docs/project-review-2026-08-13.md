@@ -89,12 +89,29 @@ and needs one command from you. Merge status re-confirmed immediately beforehand
 git push origin --delete feature/workout-feedback-immersive-ui
 ```
 
-### Ongoing hygiene
+### Ongoing hygiene — and a recommendation this review got wrong
 
-Enable **automatic branch deletion on merge** in the repo settings
-(Settings → General → "Automatically delete head branches"). It is the reason this
-one lingered for ten days, and it will matter far more once agents are opening
-branches.
+The original version of this section recommended enabling **"Automatically delete
+head branches"** (Settings → General), on the reasoning that it's what stops
+merged branches lingering, and that it matters more once agents are opening them.
+
+**That advice was wrong for this repo, and it cost the `dev` branch.** It was
+enabled, and merging PR #15 (`dev → staging`) deleted `dev` — because in a
+promotion flow the *head* of every PR is a **permanent** branch, not a disposable
+feature branch. Left on, merging PR #16 (`staging → main`) would have deleted
+`staging` next.
+
+Recovery was trivial because nothing was lost: `dev`'s tip was already fully
+merged into `staging`, so `git push origin dev:dev` from the local clone restored
+it exactly. The setting is now **off**, which is the correct state for this
+workflow.
+
+The general principle still holds — merged feature branches shouldn't accumulate.
+But it has to be applied by hand here (`git push origin --delete <branch>` after
+merging a genuine feature branch), because GitHub's setting cannot distinguish a
+throwaway head from a permanent one. **If agents start opening feature branches,
+delete them explicitly as part of the merge step rather than reaching for this
+setting.**
 
 ---
 
