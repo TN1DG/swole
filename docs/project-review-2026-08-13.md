@@ -147,20 +147,43 @@ nobody "simplifies" them away:
   `vercel.json` → `<meta>` CSP mirror in `vite.config.ts`, which is pinned by
   `vercel-headers.test.ts` but generated at build time.
 
-### Still open — CI without required checks is advisory
+### Resolved same day — the repo went public and `main` is now protected
 
 A green tick nobody is obliged to look at is documentation, not a gate. Turning it
-into enforcement needs branch protection, which needs one of:
+into enforcement needed branch protection, which on a private repo is a paid
+feature. **The repository was made public on 2026-08-13**, which makes protection
+and unlimited Actions minutes free.
 
-| Option | Cost | Notes |
+Before relying on that, history was scanned rather than assumed safe — going public
+exposes every commit, not just the current tree. Across all 77 commits:
+
+- No `.env*` file was ever committed (`--diff-filter=A` over all refs, empty).
+- No file matching `secret`, `credential`, `.pem`, `.key`, or `id_rsa` was ever added.
+- No content matching Resend keys (`re_…`), Stripe-style keys, `BEGIN … PRIVATE KEY`,
+  Turnstile secrets (`0x4AAA…`), or a production Convex deployment string.
+- `.vercel/` is untracked; `project.json` with the org and project ids never landed.
+
+**Protection now applied to `main`:**
+
+| Setting | Value | Why |
 | --- | --- | --- |
-| **GitHub Pro** | ~$4/month | Cheapest real enforcement. Protection + required status checks on the private repo, no other changes. |
-| **Make the repo public** | free | Protection becomes free. The repo is already a portfolio piece and contains no secrets (`.env*` is gitignored; all keys live in Convex/Vercel env). Worth a deliberate look at git *history* first, but nothing suspicious surfaced. |
-| **Stay convention-only** | free | Fine today. Blocks the automation roadmap at step 2. |
+| Require a pull request | yes, **0 required approvals** | GitHub blocks self-approval, and this is a solo repo — requiring 1 would make every PR unmergeable. |
+| Require status checks | **`verify`** | The CI job. This is the control that stops a red build reaching production. |
+| Strict (branch up to date) | **off** | Deliberate. `main` gains a merge commit on every promotion that `staging` does not have, so strict mode would demand `staging` be updated before *every* merge — constant friction for no safety gain in a linear promotion flow. |
+| Force pushes / deletions | blocked | — |
+| Conversation resolution | required | — |
+| Enforce on admins | **off** | An emergency escape hatch, since a CI outage unrelated to the code would otherwise block a hotfix. It is a hatch, not a workflow. |
 
-**Recommendation: pick one before automating anything.** For agent-driven
-development, required status checks are the single control that stops a red build
-reaching `main`.
+`staging` is deliberately left unprotected so it stays cheap to iterate on as a
+rehearsal surface. Revisit when agents start owning the `dev → staging` hop.
+
+**One consequence of going public to keep in view:** this document and
+`docs/security-audit.md` are now world-readable, and they name live weaknesses
+precisely — that Turnstile is inert in production, the exact rate-limit numbers,
+and that `resolveUsername` enumeration is unthrottled. That disclosure only has
+teeth while the weaknesses are live, which makes §3.1/§3.2 more time-sensitive
+than they were this morning. The chosen answer is to close the findings rather
+than redact the writing.
 
 ---
 
@@ -336,9 +359,10 @@ The stated goal is agent-driven development. Ordered, with the reasoning:
 
 **1. CI.** Done above. Nothing else is safe without it.
 
-**2. Required status checks** — needs the branch-protection decision in §2. This is
-what converts CI from a green tick into a gate. **This is the gating step for
-everything below it.** An agent that can merge a red build is worse than no agent.
+**2. Required status checks.** ✅ **Done 2026-08-13** — the repo went public and
+`main` now requires a PR with a green `verify` check. This is what converts CI
+from a green tick into a gate, and it was the blocker for everything below it. An
+agent that can merge a red build is worse than no agent.
 
 **3. Issues as the work queue.** The scaffolding docs describe a machine with no
 parts: `docs/agents/triage-labels.md` specifies five canonical labels and
@@ -393,12 +417,24 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
 
 ## Open items, in recommended order
 
-1. Delete the merged branch: `git push origin --delete feature/workout-feedback-immersive-ui` (§1)
-2. Decide branch protection: GitHub Pro, public repo, or convention-only (§2)
-3. Ship the promotion debt and turn Turnstile on in production (§3.1, §3.2)
+1. ~~Delete the merged branch~~ — **done 2026-08-13** (§1)
+2. ~~Decide branch protection~~ — **done 2026-08-13**: repo made public, `main`
+   protected with `verify` as a required check (§2)
+3. **Ship the promotion debt and turn Turnstile on in production** (§3.1, §3.2)
+   — now the top item, and more time-sensitive since the docs went public
 4. Enable `strict` in `tsconfig.app.json`, own PR (§4.1)
 5. Re-triage the 5 `npm audit` highs (§3.3)
 6. Rename `npm run deploy` → `deploy:emergency` (§3.5)
 7. Migrate `docs/backlog.md` items into GitHub issues (§6.3)
 8. Remove `RESEND_API_KEY` from the dev Convex deployment (§3.4)
 9. Frontend component tests, starting with `ActiveWorkout.tsx` (§4.2)
+
+Two items are now newly relevant because the repo is public:
+
+10. **Add a LICENSE.** `licenseInfo` is null. A public repo with no licence is
+    "all rights reserved" by default — fine if deliberate, but most people
+    publishing a portfolio project intend otherwise.
+11. **Fork PRs are now possible.** `ci.yml` is safe as written — it declares
+    `permissions: contents: read`, uses no secrets, and `pull_request` (not
+    `pull_request_target`) gives a fork's workflow a read-only token. Keep it that
+    way: adding a secret to this workflow would expose it to anyone who forks.

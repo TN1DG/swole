@@ -34,14 +34,18 @@ deployment; `staging` gets a real Vercel preview build against its own
 *persistent* Convex preview deployment. **Commit new work to `dev`, not `main`**
 — including backlog/feature work from manual or scheduled sessions.
 
-`main` is **not** mechanically protected: branch protection and rulesets are
-GitHub Pro features on a private repo, and both return 403 here. Nothing stops a
-direct push to `main` except this instruction, so treat it as binding rather than
-advisory. Never push to `main` or `staging` directly, and never run
-`npm run deploy` — it goes straight to production Convex and Vercel, bypassing
-both PR gates and skipping the staging rehearsal.
+`main` **is** mechanically protected (since 2026-08-13, when the repo went
+public): merging requires a pull request and a green `verify` check, and force
+pushes and branch deletion are refused. The repo owner is deliberately *not*
+bound by the rule, so it is an emergency escape hatch, not a wall — do not use
+it. **Never push to `main` directly, and never run `npm run deploy`** — it goes
+straight to production Convex and Vercel, bypassing both PR gates and skipping
+the staging rehearsal.
+
+`staging` is deliberately unprotected so it stays fast to iterate on. Treat
+"commit to `dev`" as binding there.
 
 `.github/workflows/ci.yml` runs `npm run typecheck`, `npm run lint`,
 `npx vitest run` and `npm run build` on every push and PR to these three
-branches. Run those four locally before committing; CI is not yet a *required*
-status check, so a red run does not block a merge on its own.
+branches, as a job named `verify`. Run those four locally before committing —
+a red run now blocks the `staging → main` merge.
