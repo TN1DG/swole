@@ -4,6 +4,7 @@ import { Box, Button, Chip, IconButton, TextField, Typography } from '@mui/mater
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
 import { MUSCLE_GROUPS } from '../../../convex/constants'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { BarbellIcon, HeartOutlineIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { ExerciseDetail } from './ExerciseDetail'
@@ -20,6 +21,8 @@ export function ExercisesPage() {
     () => new Map((prs ?? []).map((r) => [r.exerciseId, r])),
     [prs],
   )
+
+  const { formatWeightWithUnit } = useWeightUnit()
 
   const favoriteIds = useQuery(api.favorites.myFavoriteIds)
   const favoriteIdSet = useMemo(() => new Set(favoriteIds ?? []), [favoriteIds])
@@ -154,7 +157,7 @@ export function ExercisesPage() {
                       <Typography noWrap variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {ex.equipment}
                         {recordByExercise.has(ex._id) &&
-                          ` · 🏆 ${recordByExercise.get(ex._id)!.bestWeightKg} kg`}
+                          ` · 🏆 ${formatWeightWithUnit(recordByExercise.get(ex._id)!.bestWeightKg)}`}
                       </Typography>
                     </Box>
                     {ex.isCustom && (

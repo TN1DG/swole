@@ -4,9 +4,10 @@ import { useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { Box, Button, IconButton, Menu, MenuItem, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { Avatar } from '../../components/Avatar'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -24,13 +25,14 @@ type WorkoutSnapshot = {
 }
 
 function StatLine({ post: p }: { post: WorkoutSnapshot }) {
+  const { formatWeightWithUnit } = useWeightUnit()
   if (p.workoutName === null) return null
   return (
     <>
       <Typography sx={{ mt: 1, fontWeight: 600 }}>{p.workoutName}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
         {p.durationMs !== null && `${formatDuration(p.durationMs)} · `}
-        {formatKg(p.volumeKg ?? 0)} kg · {p.setCount ?? 0} sets
+        {formatWeightWithUnit(p.volumeKg ?? 0)} · {p.setCount ?? 0} sets
         {(p.prCount ?? 0) > 0 && ` · 🏆 ${p.prCount}`}
       </Typography>
       {p.exerciseNames.length > 0 && (

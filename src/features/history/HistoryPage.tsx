@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { usePaginatedQuery, useQuery } from 'convex/react'
 import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
 import { formatShortDate, formatWorkoutDate } from '../../lib/dates'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { BarbellIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { GlassTile } from '../../components/GlassTile'
@@ -45,6 +46,7 @@ function WorkoutList() {
     {},
     { initialNumItems: 20 },
   )
+  const { formatWeightWithUnit } = useWeightUnit()
 
   if (status === 'LoadingFirstPage')
     return (
@@ -74,7 +76,7 @@ function WorkoutList() {
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-              {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+              {formatDuration(w.durationMs)} · {formatWeightWithUnit(w.totalVolumeKg)} · {w.setCount} sets
             </Typography>
             <Box component="ul" sx={{ mt: 1, m: 0, pl: 0, listStyle: 'none' }}>
               {w.exercises.slice(0, 4).map((ex, i) => (
@@ -108,6 +110,7 @@ function WorkoutList() {
 
 function RecordList() {
   const records = useQuery(api.prs.listMine)
+  const { formatWeightWithUnit } = useWeightUnit()
 
   if (records === undefined)
     return (
@@ -134,7 +137,8 @@ function RecordList() {
           <Box>
             <Typography sx={{ fontWeight: 500 }}>{r.exercise?.name ?? '?'}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-              🏆 {formatKg(r.bestWeightKg)} kg × {r.bestWeightReps} · est. 1RM {formatKg(r.bestEst1rm)} kg
+              🏆 {formatWeightWithUnit(r.bestWeightKg)} × {r.bestWeightReps} · est. 1RM{' '}
+              {formatWeightWithUnit(r.bestEst1rm)}
             </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary">

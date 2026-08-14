@@ -136,6 +136,26 @@ export async function getWorkoutExercises(ctx: QueryCtx | MutationCtx, workoutId
   )
 }
 
+// Which of an owner's records a workout's sets may be measured against for
+// the "conquered" red slash. A record only applies to the workout that set it
+// and to workouts logged afterwards — slashing sets in workouts that happened
+// BEFORE the PR would rewrite history with knowledge the lifter didn't have
+// yet. The explicit `workoutId` check isn't redundant with the timestamp one:
+// a PR's `achievedAt` is stamped at finish time, which is always *after* its
+// own workout's `startedAt`.
+//
+// Shared with friends.getFriendWorkoutDetail, which passes the *owner's*
+// records — a friend's PR is theirs, never the viewer's.
+export function eligibleRecordsFor(records: Doc<'personalRecords'>[], workout: Doc<'workouts'>) {
+  return records
+    .filter((r) => r.workoutId === workout._id || workout.startedAt >= r.achievedAt)
+    .map((r) => ({
+      exerciseId: r.exerciseId,
+      bestWeightKg: r.bestWeightKg,
+      bestEst1rm: r.bestEst1rm,
+    }))
+}
+
 // Full workout detail: every exercise with every set, plus which exercises
 // earned a PR in this workout (records still pointing at it).
 export const getDetail = query({
@@ -157,22 +177,12 @@ export const getDetail = query({
       .filter((r) => r.workoutId === workout._id)
       .map((r) => r.exerciseId)
 
-    // Which records this workout's sets may be measured against for the
-    // "conquered" red slash. A record only applies to the workout that set
-    // it and to workouts logged afterwards — slashing sets in workouts that
-    // happened BEFORE the PR would rewrite history with knowledge the lifter
-    // didn't have yet. The explicit `workoutId` check isn't redundant with
-    // the timestamp one: a PR's `achievedAt` is stamped at finish time, which
-    // is always *after* its own workout's `startedAt`.
-    const eligibleRecords = records
-      .filter((r) => r.workoutId === workout._id || workout.startedAt >= r.achievedAt)
-      .map((r) => ({
-        exerciseId: r.exerciseId,
-        bestWeightKg: r.bestWeightKg,
-        bestEst1rm: r.bestEst1rm,
-      }))
-
-    return { ...workout, exercises, prExerciseIds, eligibleRecords }
+    return {
+      ...workout,
+      exercises,
+      prExerciseIds,
+      eligibleRecords: eligibleRecordsFor(records, workout),
+    }
   },
 })
 

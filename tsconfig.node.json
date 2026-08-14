@@ -14,8 +14,13 @@
     "noEmit": true,
 
     /* Linting */
+    // Same gap as tsconfig.app.json, same result: zero errors. Keeping the two
+    // projects on matching strictness means a file can't get looser checking
+    // just by living in the build-tooling project instead of the app one.
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
