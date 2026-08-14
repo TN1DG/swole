@@ -12,6 +12,13 @@ import {
 import { CalorieBreakdown } from '../stats/CalorieBreakdown'
 import { FlameIcon, PeopleIcon } from '../../components/icons'
 import { errorMessage } from '../../lib/errors'
+import {
+  canonicalBody,
+  convertBodyFields,
+  EMPTY_BODY_FIELDS,
+  type BodyFields,
+} from '../../lib/bodyUnits'
+import type { WeightUnit } from '../../lib/weightFormat'
 import { SegmentedControl } from '../../components/SegmentedControl'
 
 const STORY_SLIDES = [
@@ -206,19 +213,34 @@ function StatsSlide({
   }) => void
 }) {
   const updateBodyStats = useMutation(api.profiles.updateBodyStats)
-  const [height, setHeight] = useState('')
-  const [weight, setWeight] = useState('')
+  const setUnitPreference = useMutation(api.profiles.setUnitPreference)
+  // Display units only — cm/kg is what actually gets stored, whichever of
+  // these is selected. Defaults to metric, matching the schema default.
+  const [units, setUnits] = useState<WeightUnit>('kg')
+  const [fields, setFields] = useState<BodyFields>(EMPTY_BODY_FIELDS)
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<Sex>('male')
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const setField = (key: keyof BodyFields, value: string) =>
+    setFields((prev) => ({ ...prev, [key]: value }))
+
+  // Carry whatever is already typed across to the new unit, then remember the
+  // choice: someone who says "pounds" here should not have to say it a second
+  // time on the Stats page before the rest of the app believes them.
+  function handleUnitsChange(next: WeightUnit) {
+    if (next === units) return
+    setFields((prev) => convertBodyFields(next, prev))
+    setUnits(next)
+    void setUnitPreference({ unitPreference: next })
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    const heightCm = parseFloat(height)
-    const weightKg = parseFloat(weight)
+    const { heightCm, weightKg } = canonicalBody(units, fields)
     const ageYears = parseInt(age, 10)
     setSubmitting(true)
     try {
@@ -243,20 +265,48 @@ function StatsSlide({
         </Typography>
       </Box>
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <SegmentedControl
+          value={units}
+          onChange={handleUnitsChange}
+          options={[
+            { value: 'kg', label: 'Metric' },
+            { value: 'lb', label: 'Imperial' },
+          ]}
+        />
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+          {units === 'lb' ? (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+              <TextField
+                value={fields.heightFt}
+                onChange={(e) => setField('heightFt', e.target.value)}
+                required
+                placeholder="Height (ft)"
+                fullWidth
+                slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+              />
+              <TextField
+                value={fields.heightIn}
+                onChange={(e) => setField('heightIn', e.target.value)}
+                placeholder="in"
+                fullWidth
+                slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+              />
+            </Box>
+          ) : (
+            <TextField
+              value={fields.height}
+              onChange={(e) => setField('height', e.target.value)}
+              required
+              placeholder="Height (cm)"
+              fullWidth
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+            />
+          )}
           <TextField
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
+            value={fields.weight}
+            onChange={(e) => setField('weight', e.target.value)}
             required
-            placeholder="Height (cm)"
-            fullWidth
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-          />
-          <TextField
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            required
-            placeholder="Weight (kg)"
+            placeholder={units === 'lb' ? 'Weight (lb)' : 'Weight (kg)'}
             fullWidth
             slotProps={{ htmlInput: { inputMode: 'decimal' } }}
           />

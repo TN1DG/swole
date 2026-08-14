@@ -358,8 +358,13 @@ export const removeAvatar = mutation({
 })
 
 // Display-only preference — height/weight are always stored canonically as
-// cm/kg (see updateBodyStats below); this just controls whether the Stats
-// page shows cm/kg or ft+in/lb.
+// cm/kg (see updateBodyStats below), as are set weights. This controls how
+// every weight in the app is *rendered*: the body-stats forms (Stats page and
+// the onboarding slide) switch between cm/kg and ft+in/lb, and every other
+// weight on screen goes through useWeightUnit().
+//
+// Uses getOrCreateProfile, so it is safe to call during onboarding, before
+// the user has a profile row.
 export const setUnitPreference = mutation({
   args: { unitPreference: v.union(v.literal('kg'), v.literal('lb')) },
   handler: async (ctx, args) => {

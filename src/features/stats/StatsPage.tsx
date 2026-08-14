@@ -5,10 +5,6 @@ import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/mater
 import { api } from '../../../convex/_generated/api'
 import {
   ACTIVITY_LEVELS,
-  cmToFtIn,
-  ftInToCm,
-  kgToLb,
-  lbToKg,
   mifflinStJeorBmr,
   tdee,
   type ActivityLevel,
@@ -16,13 +12,15 @@ import {
 } from '../../../convex/fitness'
 import { CalorieBreakdown } from './CalorieBreakdown'
 import { errorMessage } from '../../lib/errors'
+import {
+  bodyFieldsFor,
+  canonicalBody,
+  convertBodyFields,
+  EMPTY_BODY_FIELDS,
+  type BodyFields,
+} from '../../lib/bodyUnits'
+import type { WeightUnit } from '../../lib/weightFormat'
 import { SegmentedControl } from '../../components/SegmentedControl'
-
-// One decimal is plenty for a converted bodyweight — avoids showing
-// "176.36981..." lb after a kg -> lb round trip.
-function round1(n: number): number {
-  return Math.round(n * 10) / 10
-}
 
 export function StatsPage() {
   const profile = useQuery(api.profiles.getMine)
@@ -31,17 +29,18 @@ export function StatsPage() {
   const setUnitPreference = useMutation(api.profiles.setUnitPreference)
 
   // Display units only — heightCm/weightKg are always what gets stored.
-  // 'kg' = metric (cm), 'lb' = imperial (ft+in).
-  const [units, setUnits] = useState<'kg' | 'lb'>('kg')
-  const [height, setHeight] = useState('')
-  const [heightFt, setHeightFt] = useState('')
-  const [heightIn, setHeightIn] = useState('')
-  const [weight, setWeight] = useState('')
+  // 'kg' = metric (cm), 'lb' = imperial (ft+in). The conversion itself lives
+  // in src/lib/bodyUnits.ts, shared with the onboarding body-stats slide.
+  const [units, setUnits] = useState<WeightUnit>('kg')
+  const [fields, setFields] = useState<BodyFields>(EMPTY_BODY_FIELDS)
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<Sex>('male')
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const setField = (key: keyof BodyFields, value: string) =>
+    setFields((prev) => ({ ...prev, [key]: value }))
 
   const [dailyGoal, setDailyGoal] = useState('')
   const [goalSaved, setGoalSaved] = useState(false)
@@ -57,18 +56,7 @@ export function StatsPage() {
     // profile prefers to display before they hit the form fields.
     const pref = profile?.unitPreference ?? 'kg'
     setUnits(pref)
-    if (profile?.heightCm) {
-      if (pref === 'lb') {
-        const { ft, inch } = cmToFtIn(profile.heightCm)
-        setHeightFt(String(ft))
-        setHeightIn(String(inch))
-      } else {
-        setHeight(String(profile.heightCm))
-      }
-    }
-    if (profile?.weightKg) {
-      setWeight(String(pref === 'lb' ? round1(kgToLb(profile.weightKg)) : profile.weightKg))
-    }
+    setFields(bodyFieldsFor(pref, { heightCm: profile?.heightCm, weightKg: profile?.weightKg }))
     if (profile?.age) setAge(String(profile.age))
     if (profile?.sex) setSex(profile.sex)
     if (profile?.activityLevel) setActivityLevel(profile.activityLevel)
@@ -78,24 +66,9 @@ export function StatsPage() {
 
   // Convert whatever is currently typed so the numbers don't jump when the
   // toggle flips, then persist the preference.
-  function handleUnitsChange(next: 'kg' | 'lb') {
+  function handleUnitsChange(next: WeightUnit) {
     if (next === units) return
-    if (next === 'lb') {
-      const cm = parseFloat(height)
-      if (Number.isFinite(cm) && cm > 0) {
-        const { ft, inch } = cmToFtIn(cm)
-        setHeightFt(String(ft))
-        setHeightIn(String(inch))
-      }
-      const kg = parseFloat(weight)
-      if (Number.isFinite(kg) && kg > 0) setWeight(String(round1(kgToLb(kg))))
-    } else {
-      const ft = parseFloat(heightFt) || 0
-      const inch = parseFloat(heightIn) || 0
-      if (ft > 0 || inch > 0) setHeight(String(Math.round(ftInToCm(ft, inch))))
-      const lb = parseFloat(weight)
-      if (Number.isFinite(lb) && lb > 0) setWeight(String(round1(lbToKg(lb))))
-    }
+    setFields((prev) => convertBodyFields(next, prev))
     setUnits(next)
     void setUnitPreference({ unitPreference: next })
   }
@@ -110,11 +83,7 @@ export function StatsPage() {
 
   // Whatever the form shows, these are always cm/kg — the only units that
   // ever reach the backend or the calorie math.
-  const heightCm =
-    units === 'lb'
-      ? ftInToCm(parseFloat(heightFt) || 0, parseFloat(heightIn) || 0)
-      : parseFloat(height)
-  const weightKg = units === 'lb' ? lbToKg(parseFloat(weight)) : parseFloat(weight)
+  const { heightCm, weightKg } = canonicalBody(units, fields)
   const ageYears = parseInt(age, 10)
   const hasAllInputs =
     Number.isFinite(heightCm) &&
@@ -191,15 +160,15 @@ export function StatsPage() {
             {units === 'lb' ? (
               <Box sx={{ mt: 0.5, display: 'flex', gap: 1 }}>
                 <TextField
-                  value={heightFt}
-                  onChange={(e) => setHeightFt(e.target.value)}
+                  value={fields.heightFt}
+                  onChange={(e) => setField('heightFt', e.target.value)}
                   slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': 'Height feet' } }}
                   placeholder="5"
                   fullWidth
                 />
                 <TextField
-                  value={heightIn}
-                  onChange={(e) => setHeightIn(e.target.value)}
+                  value={fields.heightIn}
+                  onChange={(e) => setField('heightIn', e.target.value)}
                   slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': 'Height inches' } }}
                   placeholder="10"
                   fullWidth
@@ -207,8 +176,8 @@ export function StatsPage() {
               </Box>
             ) : (
               <TextField
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
+                value={fields.height}
+                onChange={(e) => setField('height', e.target.value)}
                 slotProps={{ htmlInput: { inputMode: 'decimal' } }}
                 placeholder="180"
                 fullWidth
@@ -221,8 +190,8 @@ export function StatsPage() {
               {units === 'lb' ? 'Weight (lb)' : 'Weight (kg)'}
             </Typography>
             <TextField
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
+              value={fields.weight}
+              onChange={(e) => setField('weight', e.target.value)}
               slotProps={{ htmlInput: { inputMode: 'decimal' } }}
               placeholder={units === 'lb' ? '175' : '80'}
               fullWidth
