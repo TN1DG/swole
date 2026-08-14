@@ -79,6 +79,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // conversation fires several messages a minute and shouldn't feel throttled.
   messageSend: { kind: 'token bucket', rate: 30, period: MINUTE, capacity: 15 },
 
+  // Username lookups, keyed by caller userId. This one guards *reading*, not
+  // spam: `resolveUsername` answers "does this username exist", so an
+  // unthrottled caller can enumerate the whole user base as fast as the
+  // network allows. It is also what makes the outgoing-request avatar
+  // withholding necessary (see friends.ts:myOutgoingRequests), so the two
+  // defences are related.
+  //
+  // Sized for the real flow: you type one username into the search box and
+  // press Search. Ten in a burst covers someone working through a list of
+  // gym friends; 20/minute sustained is far past human patience, while
+  // turning an unbounded enumeration into a crawl.
+  usernameLookup: { kind: 'token bucket', rate: 20, period: MINUTE, capacity: 10 },
+
   // Avatar upload URLs, keyed by caller userId. Each generated URL is a
   // licence to write a blob into file storage, and a client that requests one
   // but never calls setAvatar leaves an orphan behind — so the mint rate is
@@ -107,8 +120,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
  * their module passes through, so putting it there covers a whole file without
  * touching each handler — and without a sweep across dozens of call sites.
  *
- * Only valid in a mutation. The limiter writes, so a query cannot consume it;
- * that is also why `resolveUsername` stays unthrottled (see docs/backlog.md).
+ * Only valid in a mutation. The limiter writes, so a query cannot consume it —
+ * which is why `resolveUsername` is a mutation rather than the query it looks
+ * like it should be (see `consumeUsernameLookup` below).
  */
 export async function requireWriter(ctx: MutationCtx): Promise<Id<'users'>> {
   const userId = await getAuthUserId(ctx)
@@ -120,4 +134,16 @@ export async function requireWriter(ctx: MutationCtx): Promise<Id<'users'>> {
 /** The budget half of `requireWriter`, for call sites that already have a userId. */
 export async function consumeWriteBudget(ctx: MutationCtx, userId: Id<'users'>) {
   await rateLimiter.limit(ctx, 'userWrite', { key: userId, throws: true })
+}
+
+/**
+ * Charges one username lookup against the caller.
+ *
+ * Separate from the blanket write budget on purpose: 120 writes/minute is
+ * sized for logging an active workout, which would still let someone walk
+ * through thousands of usernames an hour. Enumeration needs its own, much
+ * tighter ceiling.
+ */
+export async function consumeUsernameLookup(ctx: MutationCtx, userId: Id<'users'>) {
+  await rateLimiter.limit(ctx, 'usernameLookup', { key: userId, throws: true })
 }

@@ -197,10 +197,13 @@ rehearsal surface. Revisit when agents start owning the `dev → staging` hop.
 **One consequence of going public to keep in view:** this document and
 `docs/security-audit.md` are now world-readable, and they name live weaknesses
 precisely — that Turnstile is inert in production, the exact rate-limit numbers,
-and that `resolveUsername` enumeration is unthrottled. That disclosure only has
-teeth while the weaknesses are live, which makes §3.1/§3.2 more time-sensitive
-than they were this morning. The chosen answer is to close the findings rather
-than redact the writing.
+and (at the time of writing) that `resolveUsername` enumeration was unthrottled.
+That disclosure only has teeth while the weaknesses are live, which makes
+§3.1/§3.2 more time-sensitive than they were this morning. The chosen answer is
+to close the findings rather than redact the writing.
+
+Enumeration was closed on 2026-08-14 (issue #24). Turnstile remains the
+outstanding one.
 
 ---
 

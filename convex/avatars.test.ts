@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { asUser, createBackend, createUser, type T } from './test.helpers'
@@ -37,14 +37,14 @@ describe('setAvatar', () => {
     const second = await storeBlob(t, pngBlob())
     await user.mutation(api.profiles.setAvatar, { storageId: second })
 
-    // The old blob must not linger — nothing would ever reference it again.
+    // The old blob must not linger â€” nothing would ever reference it again.
     expect(await storedFileCount(t)).toBe(1)
     expect(await t.run(async (ctx) => await ctx.storage.getUrl(first))).toBeNull()
   })
 
-  // Note: the sibling `contentType` rejection can't be exercised here —
+  // Note: the sibling `contentType` rejection can't be exercised here â€”
   // convex-test's storage.store records only sha256 and size, never a
-  // contentType — but it's the same branch as the size check below, so the
+  // contentType â€” but it's the same branch as the size check below, so the
   // reject-and-clean-up behaviour is still covered.
   it('rejects an oversized image and deletes the rejected upload', async () => {
     const t = createBackend()
@@ -122,7 +122,7 @@ describe('avatar visibility', () => {
 
     await bob.user.mutation(api.profiles.setAvatar, { storageId: await storeBlob(t, pngBlob()) })
 
-    const found = await alice.user.query(api.friends.resolveUsername, { username: 'bob' })
+    const found = await alice.user.mutation(api.friends.resolveUsername, { username: 'bob' })
     expect(found).not.toBeNull()
     expect(found).not.toHaveProperty('avatarUrl')
   })
