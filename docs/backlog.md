@@ -51,7 +51,7 @@ Full list, with labels and blocking state:
 
 | # | Item | State |
 | --- | --- | --- |
-| [#19](https://github.com/TN1DG/swole/issues/19) | Stale cached shell hits a dead end when Turnstile is enabled | `ready-for-agent` |
+| [#19](https://github.com/TN1DG/swole/issues/19) | Stale cached shell hits a dead end when Turnstile is enabled | closed 2026-08-14 |
 | [#20](https://github.com/TN1DG/swole/issues/20) | Verify notification tap-through actions end to end | `ready-for-human` |
 | [#21](https://github.com/TN1DG/swole/issues/21) | Wire `unitPreference` into the ~20 remaining kg display sites | closed 2026-08-14 |
 | [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, unblocked by #21 |
@@ -133,7 +133,19 @@ of them.
    clients exist for a window after every deploy. The non-breaking shape is
    additive — leave the old export answering harmlessly, add the new one beside
    it, delete the old one a release later. Same family as
-   [#19](https://github.com/TN1DG/swole/issues/19).
+   [#19](https://github.com/TN1DG/swole/issues/19), which closed by *detecting*
+   the disagreement and telling the user to refresh. The same trick is not
+   available here: a stale bundle calling a now-mutation gets a transport-level
+   error inside `useQuery`, which the ErrorBoundary catches before any code of
+   ours can interpret it.
+
+   **The unfixed root cause is still open**: `registerType: 'autoUpdate'`
+   activates a new worker on the *next* navigation, so a stale shell always
+   exists for one session after a deploy. `clientsClaim` + `skipWaiting` in
+   `vite.config.ts` would close the whole class, at the cost of swapping assets
+   under a running app. #19 called that out as deserving its own decision, and
+   it still does — it is the single change that would have prevented both of
+   these.
 9. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
    deliberately skipped: the weight is MUI + Convex client + React, needed by
    every route, and this is a PWA that precaches the whole bundle. Revisit only

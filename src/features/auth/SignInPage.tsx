@@ -4,7 +4,12 @@ import { useAction } from 'convex/react'
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { TurnstileWidget } from '../../components/TurnstileWidget'
-import { turnstileEnabled } from '../../lib/turnstile'
+import {
+  isStaleShellChallengeError,
+  STALE_SHELL_MESSAGE,
+  turnstileEnabled,
+} from '../../lib/turnstile'
+import { updateServiceWorker } from '../../lib/serviceWorker'
 import { errorMessage } from '../../lib/errors'
 
 type Step = 'signIn' | 'signUp' | 'forgotPassword' | 'resetCode'
@@ -53,19 +58,31 @@ export function SignInPage() {
       }
       await signIn('password', formData)
     } catch (err) {
-      setError(
-        flow === 'signIn'
-          ? 'Wrong email or password. New here? Tap "Sign up" below.'
-          : // Don't name a cause this branch hasn't verified. `errorMessage`
-            // returns this fallback for anything that isn't a ConvexError —
-            // including a misconfigured deployment — and the password length
-            // is already enforced by `minLength: 8` on the input below, so it
-            // can't realistically be what failed here.
-            errorMessage(
-              err,
-              'Could not create the account. Please try again, or sign in if you already have one.',
-            ),
+      const message = errorMessage(
+        err,
+        'Could not create the account. Please try again, or sign in if you already have one.',
       )
+
+      // A bundle built before Turnstile was switched on has no widget to show,
+      // so the server's "complete the challenge" is advice this page cannot be
+      // acted on — a dead end that only a refresh escapes. Say that instead,
+      // and pull the new service worker in so the refresh actually lands on a
+      // current shell rather than the same cached one.
+      if (isStaleShellChallengeError({ flow, widgetAvailable: turnstileEnabled, message })) {
+        void updateServiceWorker()
+        setError(STALE_SHELL_MESSAGE)
+      } else {
+        setError(
+          flow === 'signIn'
+            ? 'Wrong email or password. New here? Tap "Sign up" below.'
+            : // Don't name a cause this branch hasn't verified. `errorMessage`
+              // returns this fallback for anything that isn't a ConvexError —
+              // including a misconfigured deployment — and the password length
+              // is already enforced by `minLength: 8` on the input below, so it
+              // can't realistically be what failed here.
+              message,
+        )
+      }
     } finally {
       setSubmitting(false)
     }
