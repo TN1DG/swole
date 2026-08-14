@@ -113,15 +113,36 @@ of them.
    comment on `myOutgoingRequests` in `convex/friends.ts`. Still the right call
    after [#24](https://github.com/TN1DG/swole/issues/24) closed: lookup is now
    rate limited, not prevented, so the harvest is slower rather than blocked.
-8. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
+8. **Changing a Convex function's *kind* breaks already-loaded clients**, and
+   that was accepted knowingly for
+   [#24](https://github.com/TN1DG/swole/issues/24). `resolveUsername` went from
+   `query` to `mutation`, so a client running a cached bundle calls it the old
+   way and gets `Trying to execute friends.js:resolveUsername as Query, but it
+   is defined as Mutation` — which the ErrorBoundary turns into a **full-app
+   crash screen**, not a broken search box. Observed on staging 2026-08-14,
+   with the page on `index-CYB9Q-vW.js` while the network served
+   `index-OvW8ypDw.js`.
+
+   `registerType: 'autoUpdate'` (`vite.config.ts`) activates the new worker on
+   the *next* visit, so the exposure is one session per user: they must reload
+   before the new code runs. "Reload App" on the crash screen fixes it. Accepted
+   because this is a personal project with no user base to protect.
+
+   **The general lesson, for next time:** renaming or retyping a public Convex
+   function is a breaking API change, and a precaching PWA guarantees old
+   clients exist for a window after every deploy. The non-breaking shape is
+   additive — leave the old export answering harmlessly, add the new one beside
+   it, delete the old one a release later. Same family as
+   [#19](https://github.com/TN1DG/swole/issues/19).
+9. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
    deliberately skipped: the weight is MUI + Convex client + React, needed by
    every route, and this is a PWA that precaches the whole bundle. Revisit only
    if initial load becomes a *measured* problem.
-9. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
-   deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
-   the first-deploy path is the one that matters for a new branch. Look here if a
-   new branch ever comes up with an empty exercise library.
-10. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
+10. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
+    deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
+    the first-deploy path is the one that matters for a new branch. Look here if a
+    new branch ever comes up with an empty exercise library.
+11. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
     10 minutes app-wide, because a Convex action cannot see the caller's IP. That
     stops scripted floods but not a slow distributed trickle. The real fix —
     Cloudflare Turnstile — is built and verified; see the runbook above.

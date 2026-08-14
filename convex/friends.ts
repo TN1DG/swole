@@ -106,6 +106,14 @@ async function ownerConsistency(ctx: QueryCtx, ownerId: Id<'users'>, now: number
 // query cannot do. Reactivity is the price: the search box now holds its
 // result in component state instead of resubscribing. That costs almost
 // nothing here, because the box already only searched on submit.
+//
+// Flipping query -> mutation is a BREAKING API change for clients already
+// running an older bundle, and this app is a precaching PWA, so those clients
+// exist for a window after every deploy. On staging this surfaced as a
+// full-app crash ("Trying to execute friends.js:resolveUsername as Query, but
+// it is defined as Mutation") for anyone who searched before reloading. That
+// was accepted deliberately here — see docs/backlog.md, "Known behaviours" #8,
+// which also describes the additive shape to use if it ever isn't acceptable.
 export const resolveUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
