@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 
 type Line = {
   id: string
@@ -28,13 +29,15 @@ export function WorkoutBreakdown({
   prCount: number
   lines: Line[]
 }) {
+  // The exported PNG carries whatever units the person sharing it reads in.
+  const { formatWeightWithUnit } = useWeightUnit()
   const shown = lines.slice(0, 6)
 
   return (
     <>
       <Box sx={{ display: 'flex', gap: 2, fontSize: '0.875rem', color: '#fff' }}>
         <span>⏱ {formatDuration(durationMs)}</span>
-        <span>🏋 {formatKg(volumeKg)} kg</span>
+        <span>🏋 {formatWeightWithUnit(volumeKg)}</span>
         <span>{setCount} sets</span>
         {prCount > 0 && (
           <Box component="span" sx={{ fontWeight: 600, color: '#fbbf24' }}>
@@ -52,7 +55,7 @@ export function WorkoutBreakdown({
             </Typography>
             {line.top && line.top.weightKg > 0 && (
               <Typography sx={{ fontSize: '0.875rem', color: 'rgb(255 255 255 / 0.8)' }}>
-                {formatKg(line.top.weightKg)} kg × {line.top.reps}
+                {formatWeightWithUnit(line.top.weightKg)} × {line.top.reps}
               </Typography>
             )}
           </Box>

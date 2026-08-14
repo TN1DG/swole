@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
-import { DAY_MS, utcMonthStart, utcWeekStart, WEEK_MS } from './fitness'
+import { DAY_MS, epley1rm, utcMonthStart, utcWeekStart, WEEK_MS } from './fitness'
 import {
   asUser,
   createBackend,
@@ -299,6 +299,52 @@ describe('getFriendWorkoutDetail', () => {
 
     const anon: T = t
     expect(await anon.query(api.friends.getFriendWorkoutDetail, { workoutId })).toBeNull()
+  })
+
+  // The "conquered" slash on a friend's workout has to be measured against
+  // the OWNER's records. Getting the subject wrong here would both show the
+  // wrong slashes and leak the viewer's PRs into someone else's page.
+  it('returns the owner’s eligible records, never the viewer’s', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice, bob } = await twoFriends(t)
+
+    // Alice PRs at 140, then logs a lighter session her own PR has left behind.
+    await logWorkout(t, alice.user, exerciseId, 0, 140)
+    const lighter = await logWorkout(t, alice.user, exerciseId, 0, 90)
+    // Bob is much stronger — his record must not follow him onto Alice's page.
+    await logWorkout(t, bob.user, exerciseId, 0, 200)
+
+    const detail = await bob.user.query(api.friends.getFriendWorkoutDetail, {
+      workoutId: lighter,
+    })
+    expect(detail!.eligibleRecords).toEqual([
+      { exerciseId, bestWeightKg: 140, bestEst1rm: epley1rm(140, 5) },
+    ])
+  })
+
+  it('a stranger with a public opt-in still gets no records leak', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const eve = await userWithUsername(t, 'eve')
+
+    await logWorkout(t, alice.user, exerciseId, 0, 140)
+    const lighter = await logWorkout(t, alice.user, exerciseId, 0, 90)
+    await logWorkout(t, eve.user, exerciseId, 0, 200)
+
+    // Gate still shut: no detail at all, so no records either.
+    expect(
+      await eve.user.query(api.friends.getFriendWorkoutDetail, { workoutId: lighter }),
+    ).toBeNull()
+
+    await alice.user.mutation(api.profiles.setWorkoutsPublic, { workoutsPublic: true })
+    const detail = await eve.user.query(api.friends.getFriendWorkoutDetail, {
+      workoutId: lighter,
+    })
+    expect(detail!.eligibleRecords).toEqual([
+      { exerciseId, bestWeightKg: 140, bestEst1rm: epley1rm(140, 5) },
+    ])
   })
 })
 

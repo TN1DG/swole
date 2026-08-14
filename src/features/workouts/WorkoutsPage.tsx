@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { Box, Button, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ChecklistIcon, PlateIcon, StopwatchIcon } from '../../components/icons'
 import { StatTile } from '../../components/StatTile'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
@@ -18,6 +19,7 @@ export function WorkoutsPage() {
   const routines = useQuery(api.routines.list)
   const startFromRoutine = useMutation(api.routines.startFromRoutine)
   const [summary, setSummary] = useState<FinishSummary | null>(null)
+  const { formatWeightWithUnit } = useWeightUnit()
 
   if (active === undefined) {
     return (
@@ -51,7 +53,7 @@ export function WorkoutsPage() {
               </Typography>
               <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
                 <StatTile icon={<StopwatchIcon />} label="Duration" value={formatDuration(summary.durationMs)} />
-                <StatTile icon={<PlateIcon />} label="Volume" value={`${formatKg(summary.totalVolumeKg)} kg`} />
+                <StatTile icon={<PlateIcon />} label="Volume" value={formatWeightWithUnit(summary.totalVolumeKg)} />
                 <StatTile icon={<ChecklistIcon />} label="Sets" value={String(summary.completedSetCount)} />
                 <StatTile label="New PRs" value={summary.prCount > 0 ? `🏆 ${summary.prCount}` : '—'} />
               </Box>

@@ -38,9 +38,10 @@ deployment; `staging` gets a real Vercel preview build against its own
 public): merging requires a pull request and a green `verify` check, and force
 pushes and branch deletion are refused. The repo owner is deliberately *not*
 bound by the rule, so it is an emergency escape hatch, not a wall — do not use
-it. **Never push to `main` directly, and never run `npm run deploy`** — it goes
-straight to production Convex and Vercel, bypassing both PR gates and skipping
-the staging rehearsal.
+it. **Never push to `main` directly, and never run `npm run deploy:emergency`**
+— it goes straight to production Convex and Vercel, bypassing both PR gates, the
+CI check, and the staging rehearsal. (It was called `deploy` until 2026-08-13;
+renamed so nobody reaches for it by autocomplete.)
 
 `staging` is deliberately unprotected so it stays fast to iterate on. Treat
 "commit to `dev`" as binding there.

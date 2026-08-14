@@ -58,7 +58,7 @@ Built:
 
 **Placement decision in `ActiveWorkout`**: the slash goes on the set-number badge only, not the weight/reps fields — those are live text inputs, and striking through what you're mid-way through typing reads as an error state rather than an achievement. In the (read-only) history table the strikethrough covers the whole row, which is the intended stronger visual.
 
-**Not touched**: `friends.getFriendWorkoutDetail` — a friend viewing your workout won't see slashes yet. Deliberate scope limit; it'd need the same `eligibleRecords` treatment against the *owner's* records.
+**Not touched at the time**: `friends.getFriendWorkoutDetail`. Closed on 2026-08-14 (issue #23) — the eligibility filter moved into an exported `eligibleRecordsFor(records, workout)` in `convex/history.ts`, and `getFriendWorkoutDetail` calls it with the records it already loads for `ownerId`. The subject is the owner's, never the viewer's; two tests pin that, including one where the viewer's own record is heavier than the owner's.
 
 **Note on `--color-error`**: used `textDecorationColor: 'var(--color-error)'` rather than MUI's `'error.main'`, because `textDecorationColor` isn't one of MUI's palette-aware `sx` keys and would pass through unresolved. Confirmed `--color-error` is a real published CSS custom property (`src/theme/globalStyles.ts`, backed by `tokens.error`).
 

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { Box, ButtonBase, IconButton, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { formatDuration, formatKg } from '../../../convex/fitness'
+import { formatDuration } from '../../../convex/fitness'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ProgressRing } from '../../components/ProgressRing'
 import { GlassTile } from '../../components/GlassTile'
 
@@ -24,6 +25,7 @@ export function CalendarView() {
 
   const profile = useQuery(api.profiles.getMine)
   const workouts = useQuery(api.history.listForCalendar, { startMs, endMs })
+  const { formatWeightWithUnit } = useWeightUnit()
 
   const byDay = useMemo(() => {
     const map = new Map<number, { totalVolumeKg: number; workouts: NonNullable<typeof workouts> }>()
@@ -130,7 +132,8 @@ export function CalendarView() {
       {selected && (
         <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {selectedDay} {monthCursor.toLocaleDateString([], { month: 'short' })} — {formatKg(selected.totalVolumeKg)} kg
+            {selectedDay} {monthCursor.toLocaleDateString([], { month: 'short' })} —{' '}
+            {formatWeightWithUnit(selected.totalVolumeKg)}
             total
           </Typography>
           {selected.workouts.map((w) => (
@@ -138,7 +141,7 @@ export function CalendarView() {
               <GlassTile sx={{ borderRadius: '16px', p: 2, color: 'text.primary' }}>
                 <Typography sx={{ fontWeight: 600 }}>{w.name}</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-                  {formatDuration(w.durationMs)} · {formatKg(w.totalVolumeKg)} kg · {w.setCount} sets
+                  {formatDuration(w.durationMs)} · {formatWeightWithUnit(w.totalVolumeKg)} · {w.setCount} sets
                 </Typography>
               </GlassTile>
             </Link>

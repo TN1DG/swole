@@ -100,7 +100,14 @@ npx convex dev        # watches convex/ and pushes functions
 npm run dev           # Vite dev server → http://localhost:5173
 ```
 
-Optional: `npx convex env set RESEND_API_KEY re_...` to enable feature-request emails (get a free key at [resend.com](https://resend.com)). Without it, submissions still save — the email send is just skipped with a console warning.
+Optional: `npx convex env set RESEND_API_KEY re_...` to enable outgoing email (get a free key at [resend.com](https://resend.com)).
+
+Leaving it unset is the recommended default for a dev deployment, and it's usually *more* convenient than setting it:
+
+- **Verification and password-reset codes get logged instead of emailed** — look for `RESEND_API_KEY not set — <kind> code for <email>: <token>` in the Convex logs. No real inbox needed to test those flows.
+- **Feature-request submissions still save**; only the notification email is skipped.
+
+Deliberately unset on preview deployments too — pointing a disposable preview at the live email account isn't worth it.
 
 ## Testing
 
@@ -160,21 +167,23 @@ and PR to these three branches.
 <details><summary>Manual deploy — bypasses both PR gates, emergencies only</summary>
 
 ```bash
-npm run deploy
+npm run deploy:emergency
 ```
 
-Pushes functions straight to the production Convex deployment, rebuilds the
-frontend against the prod URL, and deploys `dist/` to Vercel. It skips `staging`
-entirely, so a migration or schema change goes to production with no rehearsal.
-Prefer the PR flow. Production and dev are fully separate deployments with separate
-databases and separate signing keys (`node scripts/setup-auth-env.mjs --prod --site-url=https://…`).
+Named for what it is. Pushes functions straight to the production Convex
+deployment, rebuilds the frontend against the prod URL, and deploys `dist/` to
+Vercel — bypassing both PR gates, the CI check, and the staging rehearsal, so a
+migration or schema change reaches production untested. Use the PR flow.
+
+Production and dev are fully separate deployments with separate databases and
+separate signing keys (`node scripts/setup-auth-env.mjs --prod --site-url=https://…`).
 
 </details>
 
 ## Roadmap
 
 - Rest timer between sets
-- kg/lb display toggle everywhere (weights are stored canonically in kg; `profiles.unitPreference` is wired into the Stats page only — roughly 20 other display sites still hard-code kg)
+- kg/lb entry, not just display (weights are stored canonically in kg and every display site now reads `profiles.unitPreference` via `useWeightUnit()`; the set-weight *inputs* still take kg)
 - Bodyweight / rep-only PR tracking
 - Workout notes UI (schema field already exists)
 - Offline logging with sync

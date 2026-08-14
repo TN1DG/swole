@@ -3,8 +3,8 @@ import { useMutation, useQuery } from 'convex/react'
 import { Box, Button, IconButton, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { formatKg } from '../../../convex/fitness'
 import { formatShortDate } from '../../lib/dates'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { BarbellIcon, PlateIcon } from '../../components/icons'
 import { ExerciseForm } from './ExerciseForm'
 import { ProgressChart } from './ProgressChart'
@@ -26,10 +26,13 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
   const isFavorited = useQuery(api.favorites.isFavorited, { exerciseId: exercise._id })
   const toggleFavorite = useMutation(api.favorites.toggle)
   const [editOpen, setEditOpen] = useState(false)
+  const { unit, toDisplay, formatWeightWithUnit } = useWeightUnit()
 
+  // The chart plots display units too — leaving its axis in kg under tiles
+  // that read "lb" would be worse than not converting at all.
   const points = (history ?? []).slice(-30).map((s) => ({
     label: formatShortDate(s.startedAt),
-    value: s.topWeightKg,
+    value: toDisplay(s.topWeightKg),
   }))
   // "Compounded lift": total weight ever moved on this exercise, across every session.
   const lifetimeVolumeKg = (history ?? []).reduce((sum, s) => sum + s.volumeKg, 0)
@@ -79,7 +82,7 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
               Best weight
             </Typography>
             <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
-              🏆 {formatKg(record.bestWeightKg)} kg × {record.bestWeightReps}
+              🏆 {formatWeightWithUnit(record.bestWeightKg)} × {record.bestWeightReps}
             </Typography>
           </GlassTile>
           <GlassTile sx={{ p: 1.5 }}>
@@ -92,7 +95,7 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
               <BarbellIcon size={14} /> Est. 1RM
             </Typography>
             <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
-              {formatKg(record.bestEst1rm)} kg
+              {formatWeightWithUnit(record.bestEst1rm)}
             </Typography>
           </GlassTile>
         </Box>
@@ -108,14 +111,14 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
             <PlateIcon size={14} /> Lifetime volume
           </Typography>
           <Typography sx={{ mt: 0.5, fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
-            {formatKg(lifetimeVolumeKg)} kg
+            {formatWeightWithUnit(lifetimeVolumeKg)}
           </Typography>
         </GlassTile>
       )}
 
       {/* Progress chart */}
       <Typography variant="overline" color="text.secondary" component="h3" sx={{ display: 'block', mt: 3 }}>
-        Top set per session
+        Top set per session ({unit})
       </Typography>
       {history === undefined ? (
         <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
@@ -158,10 +161,10 @@ export function ExerciseDetail({ exercise, record, onClose }: Props) {
                     {formatShortDate(s.startedAt)}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {formatKg(s.topWeightKg)} kg × {s.topWeightReps}
+                    {formatWeightWithUnit(s.topWeightKg)} × {s.topWeightReps}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {s.setCount} sets · {formatKg(s.volumeKg)} kg
+                    {s.setCount} sets · {formatWeightWithUnit(s.volumeKg)}
                   </Typography>
                 </GlassTile>
               ))}

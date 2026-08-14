@@ -1,33 +1,36 @@
 # Backlog
 
-Everything known-open as of **2026-08-04**. Ordered by priority. Companion to
-`docs/new-features-progress.md` (the wave-by-wave *why* behind shipped
-features), `docs/domain-and-environments-plan.md` (the deploy pipeline,
-domain, and preview-environment story), and `docs/project-review-2026-08-13.md`
-(repo/CI/architecture review — read its "Open items" list alongside this one).
-This file is the *what's left*.
+**As of 2026-08-13, the work queue lives in [GitHub Issues](https://github.com/TN1DG/swole/issues), not in this file.**
 
-> **Updated 2026-08-13.** Several counts below are stale: the suite is now
-> **333 tests across 23 files**, and `npm audit` is **5 high**, not 4 — see items
-> 14 and 20, and §3.3 of the project review. CI now exists
-> (`.github/workflows/ci.yml`) and runs the verify routine on every push and PR.
+A prose list is good for a human picking up context and useless as a queue —
+there is nothing to claim, assign, block, or close. Every actionable item that
+was numbered here is now an issue. This file keeps what is *not* issue-shaped:
+the current state, the behaviours that are deliberate, and the gotchas worth
+re-reading before you start.
 
-**Start here next session.** Each item says what's wrong, where, and what the
-fix involves.
+Companion to `docs/new-features-progress.md` (the wave-by-wave *why* behind
+shipped features), `docs/domain-and-environments-plan.md` (deploy pipeline,
+domain, preview environments), `docs/security-audit.md` (the `convex/` audit and
+the Turnstile runbook), and `docs/project-review-2026-08-13.md` (repo, CI, and
+architecture review).
 
 ---
 
 ## Current state
 
-- **Live at <https://swole.day>** (bought 2026-08-04). `www` redirects to the
-  apex; `staging.swole.day` is bound to the `staging` branch behind Vercel SSO.
-- **Branch workflow: `dev` → `staging` → `main`**, each hop via a PR. `main` is
-  protected and is production. **Commit new work to `dev`.**
+- **Live at <https://swole.day>.** `www` redirects to the apex;
+  `staging.swole.day` is bound to the `staging` branch behind Vercel SSO.
+- **Public repo, MIT licensed** since 2026-08-13.
+- **Branch workflow: `dev` → `staging` → `main`**, each hop via a PR.
+  **Commit new work to `dev`.** `main` is now *mechanically* protected — merging
+  requires a PR and a green `verify` check.
+- **CI runs on every push and PR** (`.github/workflows/ci.yml`): typecheck, lint,
+  tests, build.
 - **Preview deployments are self-sufficient.** Every non-production branch gets
-  its own Convex deployment; `scripts/vercel-build.js` seeds the exercise
-  library and sets the auth keys automatically. Deployments are now *reused*
-  across pushes (`--preview-name`), so test accounts survive.
-- **312 tests, 21 files.** Verify with:
+  its own Convex deployment; `scripts/vercel-build.js` seeds the exercise library
+  and sets the auth keys automatically. Deployments are *reused* across pushes
+  (`--preview-name`), so test accounts survive.
+- **333 tests, 23 files.** Both TS projects are `strict`.
 
 ```
 npm run typecheck    # tsc -b && tsc --noEmit -p convex  (both matter)
@@ -36,192 +39,83 @@ npm run lint         # currently zero warnings
 npm run build
 ```
 
----
-
-## P1 — Real bugs
-
-*Nothing open.* The `deleteAccount` orphan bug (`gymPings`/`challenges` plus
-escrow refund) was fixed 2026-07-28 and is covered by `convex/account.test.ts`.
+`npm run deploy:emergency` bypasses all of the above and ships straight to
+production. It is named for what it is. Use the PR flow.
 
 ---
 
-## P2 — Shipped but unverified
+## Open work
 
-### 1. Notification tap-through actions never exercised end to end
-Backend paths are covered by `convex/notifications.test.ts`, and the banners
-render and dismiss. But the *actions* were never driven with two real accounts:
-one-tap ping acknowledge, and the deep-link to a friend's workout
-(`/friends/:userId/:workoutId`). Component: `src/components/NotificationsBanner.tsx`.
-Now that staging keeps its data between pushes, this is much easier to test.
+Full list, with labels and blocking state:
+**<https://github.com/TN1DG/swole/issues>**
 
-### 2. ~~Orphaned `emailSendAttempts` rows in production~~ — DONE 2026-08-04
-`migrations:dropOrphanedEmailSendAttempts` was run against production and
-deleted **6 rows** (this file previously estimated ~4 — the estimate was low).
-The table is now empty, verified with `npx convex data emailSendAttempts
---prod`, and a second run returned `{deleted: 0}`, confirming idempotency.
-Production served HTTP 200 throughout.
+| # | Item | State |
+| --- | --- | --- |
+| [#19](https://github.com/TN1DG/swole/issues/19) | Stale cached shell hits a dead end when Turnstile is enabled | `ready-for-agent` |
+| [#20](https://github.com/TN1DG/swole/issues/20) | Verify notification tap-through actions end to end | `ready-for-human` |
+| [#21](https://github.com/TN1DG/swole/issues/21) | Wire `unitPreference` into the ~20 remaining kg display sites | closed 2026-08-14 |
+| [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, unblocked by #21 |
+| [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | closed 2026-08-14 |
+| [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | `ready-for-agent` |
+| [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | `ready-for-agent` |
+| [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |
+| [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
+| [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
+| [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | `ready-for-agent` |
+| [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
+| [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | `ready-for-agent` |
 
-The empty table itself still appears in the table listing. That's harmless —
-it holds no documents, and the privacy concern was the rows.
-
-Two things worth keeping from the exercise:
-
-- **Removing a table from `convex/schema.ts` does not remove its rows.** They
-  simply stop being validated, and stop being visible to typed queries. Reaching
-  them again needs a cast, because the generated `DataModel` no longer declares
-  the table. Anything dropped from the schema in future leaves its data behind
-  the same way.
-- **A migration can only run where it's deployed.** `--prod` failed with "Could
-  not find function" until the promotion reached `main`, because production runs
-  `main`'s code. The shortcut — `npm run deploy` — would have worked by pushing
-  all of `dev` straight to production and bypassing both PR gates. Don't.
+Not an issue, because it is a runbook rather than a decision: **turning Turnstile
+on in production**. Site key is set and verified in the production bundle; only
+the Convex secret remains. See `docs/security-audit.md` → "Turning Turnstile on
+in production", and follow the order exactly.
 
 ---
 
-## P3 — Scope gaps
+## Known behaviours — decide, don't "fix" blindly
 
-### 3. lb/ft is still mostly Stats-page only — *bigger than it looks*
-`profiles.unitPreference` is wired and readable, and `kgToLb`/`lbToKg` live in
-`convex/fitness.ts`, but only `StatsPage.tsx` uses them.
+**Deliberately not issues.** Each of these looks like a bug and isn't, or is a
+trade that was made on purpose. Filing them as work invites someone to "fix"
+something that would be worse afterwards. Read the reasoning before changing any
+of them.
 
-The previous version of this backlog called this "display plumbing" in three
-places. That was an undercount — a survey on 2026-08-04 found **~20 display
-sites across a dozen files** (`ExerciseDetail`, `ExercisesPage`, `PostCard`,
-`FriendWorkoutDetailPage`, `FriendWorkoutsPage`, `CalendarView`, `HistoryPage`,
-`WorkoutDetailPage`, `ActiveWorkout`, the leaderboard in `FriendsPage`…), all
-using the `{formatKg(x)} kg` pattern. Doing it properly needs:
-
-1. A shared hook (e.g. `useWeightUnit()`) so each site doesn't separately fetch
-   the profile.
-2. Explicit per-file edits. **Do not regex-sweep this** — a lazy `[\s\S]*?`
-   across these files broke 60 tests during an earlier cleanup.
-3. Test updates, since some tests assert on `kg` strings.
-4. **`ActiveWorkout.tsx` set inputs are a separate, riskier problem.** Those are
-   *inputs*, not display: the canonical store is kg, so entering in lb means
-   converting on save. Keep full precision on the stored kg and only convert
-   fields the user actually edited, or it drifts on every save — the same shape
-   as the imperial-height issue in P4 below.
-
-Recommend splitting: display layer first (safe, mechanical), inputs as a
-deliberate second pass.
-
-### 4. PR "conquered" slash is absent for friends
-`history.getDetail` returns `eligibleRecords`; `friends.getFriendWorkoutDetail`
-needs the same treatment against the *owner's* records.
-
-### 5. ~~Avatars absent on pending friend-request rows~~ — DONE 2026-08-04
-Incoming requests now show the sender's avatar (`myIncomingRequests` uses
-`profileForWithAvatar`, and `FriendsPage` renders it).
-
-**Outgoing requests deliberately still don't**, and this is not an oversight —
-see the comment on `myOutgoingRequests` in `convex/friends.ts`. Usernames are
-resolvable by anyone via `resolveUsername`, so returning an avatar there would
-let anyone harvest any user's photo by looking them up and sending a request
-the target never accepts. The old backlog's "one-line change each" was right
-about incoming and wrong about outgoing.
-
----
-
-## P4 — Known behaviours (decide, don't "fix" blindly)
-
-6. **Imperial height rounds to whole inches.** 176cm → 5'9" → back to 175cm; up
+1. **Imperial height rounds to whole inches.** 176cm → 5'9" → back to 175cm; up
    to ~1.3cm drift, and saving while in imperial stores the rounded value
    (~5 kcal of TDEE). Avoiding it means tracking whether the ft/in fields were
-   actually edited and preserving the original cm if not.
-7. **Daily lifting goal stays kg** even in imperial — it's a lifted *volume*,
+   actually edited and preserving the original cm if not — the same shape as
+   [#22](https://github.com/TN1DG/swole/issues/22).
+2. **Daily lifting goal stays kg** even in imperial — it's a lifted *volume*,
    not a bodyweight, and its 1–50000 validation range is defined in kg.
-8. **A challenge is one thread entry, not an event log.** Shows current status,
+3. **A challenge is one thread entry, not an event log.** Shows current status,
    positioned at `resolvedAt ?? startedAt ?? createdAt`. Per-transition history
    would need a new append-only table.
-9. **Account deletion leaves the friend's `threadReads` row** pointing at the
+4. **Account deletion leaves the friend's `threadReads` row** pointing at the
    departed user. Harmless timestamp; finding them would need an index that
    exists for nothing else.
-10. **Avatar `contentType` check tolerates a missing type.** Client-asserted and
-    therefore not a security boundary; `size` is the real guard. See
-    `convex/profiles.ts:setAvatar` before "tightening" it.
-11. **Comment authors on a public post are visible to strangers** (the composer
-    says so), and reports have no moderator UI — they're read from the Convex
-    dashboard, like `featureRequests`.
-
----
-
-## P5 — Security follow-ups
-
-12. **`resolveUsername` enumeration is unthrottled.** It's a reactive `query`,
-    and the rate limiter needs write access, so throttling means converting it
-    to a `mutation` and changing how `FriendsPage` calls it. Low severity — it
-    only reveals whether a username exists — so documented residual risk.
-    Note it's also what makes the outgoing-avatar leak in #5 real.
-13. **Signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
-    10 minutes app-wide because Convex actions can't see caller IP. Stops
-    scripted floods, not a slow distributed trickle. Real fix is a challenge on
-    the signup form (e.g. Cloudflare Turnstile) — outside Convex.
-14. **`npm audit`: 4 high, one root cause** (was 10 high / 2 causes; the
-    `brace-expansion` chain resolved upstream). What remains is the
-    `react-router` RSC-mode CSRF advisory, only exploitable in RSC mode, which
-    this client-only SPA does not use. `npm audit fix --force` would downgrade
-    `react-router` — **don't**. Re-evaluate when upstream ships a non-breaking fix.
-
----
-
-## P6 — Deferred features
-
-15. **Real push notifications.** *The one that matters for the mobile app.* The
-    app has zero push infra: no service-worker push handler, no permission flow,
-    no subscription table (`vite-plugin-pwa` is asset-caching only). The
-    `notifications` table was deliberately designed so push can layer on top
-    without reworking the data model — a push sender would read the same rows.
-    A proper project, not an afternoon.
-16. **Mobile app deep linking.** Universal Links need
-    `https://swole.day/.well-known/apple-app-site-association`; App Links need
-    `assetlinks.json`. Both are static files under `public/`. The catch-all SPA
-    rewrite in `vercel.json` is *not* the risk (Vercel only rewrites when
-    nothing matches on disk) — the thing to check is whether Vite copies a
-    dot-directory out of `public/` into `dist/`. See
-    `docs/domain-and-environments-plan.md`.
-17. **Animated exercise demos with muscle highlighting.** Blocked on an asset
-    decision, not code. `exercises` has no media field and `seedData.ts` has no
-    image data; needs a schema field plus slots in `ExercisesPage`/
-    `ExerciseDetail`/`ExercisePicker`.
-
----
-
-## P7 — Tooling & maintenance
-
-18. ~~Add `tsc --noEmit -p convex` to the verify routine.~~ **DONE 2026-08-04** —
-    `npm run typecheck` runs both. `tsc -b` alone does *not* typecheck
-    `convex/*.test.ts`; root typecheck + vitest + lint were once all green while
-    `npx convex dev` failed with 5 type errors.
-19. **Convex patch available**, 1.42.1 → 1.42.3 (or newer — re-check).
-20. **Bundle is ~229KB gzipped** with a >500KB chunk warning. Code splitting was
-    deliberately skipped: the weight is MUI + Convex client + React, needed by
-    every route, and this is a PWA that precaches the whole bundle. Revisit only
-    if initial load becomes a measured problem.
-21. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
-    deployment logs `"Seeded 70 exercises."`. Seeded state is correct either
-    way; the first-deploy path is the one that matters for a new branch. Look
-    here if a new branch ever comes up with an empty exercise library.
-22. ~~**There is at least one flaky test.**~~ — **FOUND AND FIXED 2026-08-04.**
-    It was `convex/emailAuth.test.ts > sign up > throttles a flood of
-    new-account creation app-wide`, and it was **a timeout, not a logic bug** —
-    which is why the summary said "1 failed" with no assertion error and no
-    test name.
-
-    The test must create 21 accounts to trip a limit of 20, and each sign-up
-    runs a real password hash. Measured across five runs it takes
-    **3993–4848ms**, against vitest's **5000ms** default. Routinely within 3–20%
-    of the ceiling, so any load spike tips it over. It first appeared while
-    several `npx` commands were running concurrently.
-
-    Fixed with an explicit `{ timeout: 30_000 }` on that one test. Deliberately
-    *not* a raised global timeout: every other test finishes in under 700ms, and
-    a 5s default is what catches a genuinely hung one.
-
-    **Method worth reusing.** Brute repetition was the wrong tool — 26 runs,
-    including shuffled ones, never reproduced it. What found it in one run was
-    `npx vitest run --reporter=verbose` and sorting by duration: the culprit was
-    the only test in the suite anywhere near the limit. If another mystery flake
-    appears, check durations against the timeout before hunting for a race.
+5. **Avatar `contentType` check tolerates a missing type.** Client-asserted and
+   therefore not a security boundary; `size` is the real guard. See
+   `convex/profiles.ts:setAvatar` before "tightening" it.
+6. **Comment authors on a public post are visible to strangers** (the composer
+   says so), and reports have no moderator UI — they're read from the Convex
+   dashboard, like `featureRequests`.
+7. **Outgoing friend requests deliberately show no avatar.** Incoming ones do.
+   Usernames are resolvable by anyone via `resolveUsername`, so returning an
+   avatar on outgoing requests would let anyone harvest any user's photo by
+   looking them up and sending a request the target never accepts. See the
+   comment on `myOutgoingRequests` in `convex/friends.ts`. Tied to
+   [#24](https://github.com/TN1DG/swole/issues/24).
+8. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
+   deliberately skipped: the weight is MUI + Convex client + React, needed by
+   every route, and this is a PWA that precaches the whole bundle. Revisit only
+   if initial load becomes a *measured* problem.
+9. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
+   deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
+   the first-deploy path is the one that matters for a new branch. Look here if a
+   new branch ever comes up with an empty exercise library.
+10. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
+    10 minutes app-wide, because a Convex action cannot see the caller's IP. That
+    stops scripted floods but not a slow distributed trickle. The real fix —
+    Cloudflare Turnstile — is built and verified; see the runbook above.
 
 ---
 
@@ -242,6 +136,18 @@ stays re-readable from Profile → "What's new".
   back with everything else. This bit twice — see `convex/profiles.ts:setAvatar`
   (returns a result instead of throwing) and the comment at the top of
   `convex/rateLimiter.ts`.
+- **`tsc -b` alone does not typecheck `convex/*.test.ts`.** Root typecheck,
+  vitest and lint were once all green while `npx convex dev` failed with five
+  type errors. `npm run typecheck` runs both projects for this reason; CI runs
+  the same script.
+- **A migration can only run where it's deployed.** `--prod` once failed with
+  "Could not find function" until the promotion reached `main`, because
+  production runs `main`'s code. `npm run deploy:emergency` would have "worked",
+  by pushing all of `dev` to production and bypassing both gates. Don't.
+- **Removing a table from `convex/schema.ts` does not remove its rows.** They
+  stop being validated and stop being visible to typed queries, but they persist.
+  Reaching them again needs a cast, because the generated `DataModel` no longer
+  declares the table.
 - **Don't name a cause you haven't checked in a user-facing error.** Sign-up
   spent a session blaming "password must be at least 8 characters" for a
   deployment with no auth keys — a cause the input's own `minLength: 8` made
@@ -258,12 +164,29 @@ stays re-readable from Profile → "What's new".
   once: `img-src` was missing `https://*.convex.cloud`, so every avatar in
   production silently rendered as the fallback initial. CSP failures are
   console-only — nothing in the UI says "blocked".
-- **A header-only change cannot reach an installed PWA.** The service worker
-  precaches `index.html`, and a navigation served from the Cache API carries the
-  headers it was cached with. `vite.config.ts` mirrors the policy into a
-  build-only `<meta http-equiv>` tag (`cspMetaTag`) so it travels with the shell
-  it applies to; `vercel.json` stays the source of truth and
-  `vercel-headers.test.ts` pins both copies.
+- **A header-only change cannot reach an installed PWA**, and neither can a new
+  bundle, immediately. The service worker precaches `index.html`, so a navigation
+  served from the Cache API carries the headers *and the asset references* it was
+  cached with. `vite.config.ts` mirrors the CSP into a build-only
+  `<meta http-equiv>` tag (`cspMetaTag`) so the policy travels with the shell it
+  applies to; `vercel.json` stays the source of truth and `vercel-headers.test.ts`
+  pins both copies. Observed 2026-08-13: after a production deploy, the **first**
+  navigation still served the previous bundle and the second picked up the new
+  one. That one-visit lag is what [#19](https://github.com/TN1DG/swole/issues/19)
+  is about.
 - Anything loaded from a new origin — fonts, analytics, remote images — needs a
   CSP entry, a rebuilt `index.html`, *and* a check that the live `curl -sI`
   response actually carries it.
+- **Chasing a flaky test? Check durations before hunting for a race.** The one
+  flake this project has had was a *timeout*, not a logic bug — 21 real password
+  hashes against vitest's 5000ms default, measured at 3993–4848ms. Brute
+  repetition never reproduced it across 26 runs, including shuffled. What found
+  it in a single run was `npx vitest run --reporter=verbose` sorted by duration.
+  It now carries an explicit `{ timeout: 30_000 }`; the global default stays 5s
+  deliberately, because that is what catches a genuinely hung test.
+
+---
+
+*Items completed before 2026-08-13 lived in this file as struck-through entries.
+They are in git history — `git log --follow docs/backlog.md` — and the reusable
+lessons from them have been folded into the gotchas above.*

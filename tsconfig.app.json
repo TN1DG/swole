@@ -17,8 +17,15 @@
     "jsx": "react-jsx",
 
     /* Linting */
+    // `strict` was missing here while convex/tsconfig.json had it, so the
+    // backend was strict-checked and the whole React layer was not — no
+    // strictNullChecks on the boundary where a Convex query result is
+    // `T | undefined` while it loads. Turning it on produced zero errors: the
+    // code was already written to this standard, the flag just wasn't set.
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
