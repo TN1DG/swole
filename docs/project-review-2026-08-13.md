@@ -413,18 +413,46 @@ travels; in a test it fails on the spot, in the assertion that was going to
 catch it anyway. Tests are still fully typechecked — `npm run typecheck` now
 runs three projects.
 
-### 4.2 Test coverage is lopsided
+### 4.2 ~~Test coverage is lopsided~~ — first component tests landed 2026-08-14
 
-21 backend test files against **2** frontend ones (`releaseNotes.test.ts`,
-`restPresets.test.ts`), and both of those are pure-logic — no component renders
-anywhere in the suite. There is no Testing Library dependency.
+Was: 21 backend test files against **2** frontend ones, both pure-logic, no
+component rendering anywhere and no Testing Library dependency. The imbalance
+was fine while every release was hand-QA'd by the person who wrote it, and
+stopped being fine the moment an agent started editing components.
 
-The backend suite is excellent and the imbalance has been fine while every release
-is manually QA'd on staging by the person who wrote it. It stops being fine the
-moment an agent edits a component: nothing would catch it. The highest-risk targets
-are `ActiveWorkout.tsx` (514 lines, the app's core interaction, and the file the
-backlog flags as riskiest for the lb/kg work) and `SignInPage.tsx` (290 lines, the
-flow that has already shipped a misleading-error bug).
+Closed as a *start*, not a finish ([#30](https://github.com/TN1DG/swole/issues/30)).
+Testing Library + jsdom are wired up, and the two highest-risk files named here
+now have behavioural tests: `ActiveWorkout.tsx` (volume totals, warm-up
+exclusion, the trophy/slash marks, and that weight *entry* stays kg while
+display follows `unitPreference` — pinned deliberately ahead of #22) and
+`SignInPage.tsx` (the sign-in failure message and all three branches of the
+stale-shell detection from #19).
+
+**Vitest now runs four projects** rather than one global environment, because
+they genuinely differ:
+
+| Project | Environment | Files |
+| --- | --- | --- |
+| `convex` | `edge-runtime` | `convex/**/*.test.ts` — matches convex-test |
+| `ui` | `jsdom` | `src/**/*.test.tsx` — renders components |
+| `logic` | `node` | `src/**/*.test.ts` — pure functions |
+| `root` | `node` | `*.test.ts` — the CSP guard, which reads `vercel.json` |
+
+Two things learned wiring that up, both worth keeping:
+
+- **Explicit `include` globs silently drop files.** The first split lost
+  `vercel-headers.test.ts` — it sits at the repo root and matched no project,
+  so the suite went quietly from 372 tests to 365 and still reported all green.
+  Check the *count*, not the colour, after changing test config.
+- **Scope jsdom to the files that need a DOM.** Running the pure-logic `src`
+  tests under jsdom too cost ~19s of environment setup for nothing; splitting
+  `logic` out cut it to ~7s.
+
+**Honest note on speed:** the suite went from ~9s to ~17s wall time. That is
+not nothing, and it is the one acceptance criterion on #30 not fully met — the
+cost is importing React and MUI to render real components, which is the point
+of the exercise. Worth revisiting (happy-dom, or shallower fixtures) if it
+grows again.
 
 ### 4.3 The lint ruleset is thin
 

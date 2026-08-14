@@ -62,7 +62,7 @@ Full list, with labels and blocking state:
 | [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
 | [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | closed 2026-08-14, now 1.44.0 |
-| [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
+| [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | closed 2026-08-14 (a start, not full coverage) |
 | [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | closed 2026-08-14 |
 
 **On `npm audit`** (closed 2026-08-14, kept here because the count will grow
