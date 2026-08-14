@@ -197,10 +197,13 @@ rehearsal surface. Revisit when agents start owning the `dev → staging` hop.
 **One consequence of going public to keep in view:** this document and
 `docs/security-audit.md` are now world-readable, and they name live weaknesses
 precisely — that Turnstile is inert in production, the exact rate-limit numbers,
-and that `resolveUsername` enumeration is unthrottled. That disclosure only has
-teeth while the weaknesses are live, which makes §3.1/§3.2 more time-sensitive
-than they were this morning. The chosen answer is to close the findings rather
-than redact the writing.
+and (at the time of writing) that `resolveUsername` enumeration was unthrottled.
+That disclosure only has teeth while the weaknesses are live, which makes
+§3.1/§3.2 more time-sensitive than they were this morning. The chosen answer is
+to close the findings rather than redact the writing.
+
+Enumeration was closed on 2026-08-14 (issue #24). Turnstile remains the
+outstanding one.
 
 ---
 
@@ -274,16 +277,34 @@ last.
 
 </details>
 
-### 3.3 `npm audit` has grown since the last pass
+### 3.3 ~~`npm audit` has grown since the last pass~~ — ✅ CLEARED 2026-08-14
 
-**5 high**, across `brace-expansion`, `fast-uri`, `nanoid`, `react-router`,
-`react-router-dom`. `docs/backlog.md` recorded 4 high from one root cause on
-2026-08-04, and separately notes the `brace-expansion` chain had "resolved
-upstream" — it is back, and `fast-uri` and `nanoid` are new and unassessed.
+Was **5 high**. Now **0**, via plain `npm audit fix`. Every fix was a patch bump
+inside an existing semver range, so `package.json` did not change at all — only
+`package-lock.json`.
 
-The standing analysis of `react-router` still holds: the advisory is RSC-mode CSRF,
-this is a client-only SPA, and `npm audit fix --force` would downgrade it. **Don't.**
-But the other three deserve a fresh triage rather than inheriting that verdict.
+The triage is recorded per advisory below, because "0 vulnerabilities" is a
+fact with a short shelf life and the *reachability reasoning* is what survives
+the next time these reappear.
+
+| Advisory | Reaches | Verdict |
+| --- | --- | --- |
+| `brace-expansion` — DoS via unbounded expansion (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) | build only | `vite-plugin-pwa` → `workbox-build` → `minimatch`, via both `glob` and `ejs`/`jake`/`filelist`. Not in the bundle. Exploiting it means feeding hostile glob patterns to your own build. |
+| `fast-uri` — host confusion via backslash (GHSA-7p8r-x3mc-p8w7) | build only | `vite-plugin-pwa` → `workbox-build` → `ajv`. Schema validation during the PWA build. Never sees user input. |
+| `nanoid` — infinite loop on size zero (GHSA-2v37-7h3g-55p8) | build only | `vite` → `postcss`. Generates ids while processing CSS at build time. Also needs a *custom* generator called with size 0, which postcss does not do. |
+| `react-router` / `react-router-dom` — RSC-mode CSRF (GHSA-qwww-vcr4-c8h2) | ships | Only exploitable in RSC mode. This is a client-only SPA with no server component runtime, so the vulnerable path does not exist here. Patched anyway. |
+
+**The important structural point: four of the five were `devDependencies`.**
+`vite` and `vite-plugin-pwa` are build tooling; nothing under them is served to
+a browser. Only `react-router-dom` is a production dependency, and it was the
+one already assessed as not applicable. So the "5 high" was never 5 live risks
+in the deployed app — worth remembering before the next count causes alarm.
+
+**The old "don't run `npm audit fix --force`" warning is now spent** for this
+set: `react-router-dom@7.18.2` is a patched release inside `^7.18.1`, so plain
+`npm audit fix` took it without a downgrade. The general caution still stands —
+`--force` makes semver-major changes and would have moved `react-router` across
+a major boundary. Check what it intends to do before running it, every time.
 
 ### 3.4 ~~`RESEND_API_KEY` is set on the dev Convex deployment~~ — ✅ REMOVED 2026-08-13
 
@@ -537,7 +558,8 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
 4. ~~Enable `strict` in `tsconfig.app.json`~~ — **done 2026-08-13**, zero
    fallout; `noImplicitReturns` and `tsconfig.node.json` came along free.
    Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
-5. Re-triage the 5 `npm audit` highs (§3.3)
+5. ~~Re-triage the 5 `npm audit` highs~~ — **done 2026-08-14**, now 0; four of
+   the five were build-only `devDependencies` (§3.3)
 6. ~~Rename `npm run deploy` → `deploy:emergency`~~ — **done 2026-08-13** (§3.5)
 7. ~~Migrate `docs/backlog.md` items into GitHub issues~~ — **done 2026-08-13**:
    13 open issues, [#19–#31](https://github.com/TN1DG/swole/issues). `backlog.md`

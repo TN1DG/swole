@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
 import { DAY_MS, epley1rm, utcMonthStart, utcWeekStart, WEEK_MS } from './fitness'
 import {
@@ -29,7 +29,7 @@ async function logWorkout(
     completed: true,
   })
   await user.mutation(api.workouts.finish, { workoutId })
-  // Backdate it directly — the mutations above always use Date.now().
+  // Backdate it directly â€” the mutations above always use Date.now().
   await t.run(async (ctx) => {
     const workout = (await ctx.db.get(workoutId))!
     const shift = daysAgo * 24 * 60 * 60 * 1000
@@ -47,7 +47,7 @@ describe('resolveUsername', () => {
     const alice = await userWithUsername(t, 'alice')
     const bob = await userWithUsername(t, 'bob')
 
-    const found = await bob.user.query(api.friends.resolveUsername, { username: 'ALICE' })
+    const found = await bob.user.mutation(api.friends.resolveUsername, { username: 'ALICE' })
     expect(found).toMatchObject({ userId: alice.userId, username: 'alice', isMe: false })
   })
 
@@ -55,25 +55,75 @@ describe('resolveUsername', () => {
     const t = createBackend()
     const bob = await userWithUsername(t, 'bob')
     expect(
-      await bob.user.query(api.friends.resolveUsername, { username: 'nobody' }),
+      await bob.user.mutation(api.friends.resolveUsername, { username: 'nobody' }),
     ).toBeNull()
   })
 
   // Regression: `displayName` used to fall back to the user's email address.
   // Anyone can call resolveUsername against any username, so that published
-  // the email of every account that had a username but no display name — a
+  // the email of every account that had a username but no display name â€” a
   // state `setUsername` can produce on its own, since it doesn't set one.
   it('never exposes the email address of a user who has no display name', async () => {
     const t = createBackend()
     const alice = await userWithUsername(t, 'alice')
     const bob = await userWithUsername(t, 'bob')
 
-    const found = await bob.user.query(api.friends.resolveUsername, { username: 'alice' })
+    const found = await bob.user.mutation(api.friends.resolveUsername, { username: 'alice' })
     expect(found).not.toBeNull()
     expect(found!.displayName).not.toContain('@')
     expect(found!.displayName).toBe('alice')
     expect(JSON.stringify(found)).not.toContain('test.local')
     expect(alice.userId).toBeTruthy()
+  })
+
+  // Enumeration guard. This is a `mutation` purely so it can consume a rate
+  // limit — a Convex query cannot, because the limiter writes.
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    await userWithUsername(t, 'alice')
+
+    const anon: T = t
+    await expect(
+      anon.mutation(api.friends.resolveUsername, { username: 'alice' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+
+  it('lets a normal run of searches through, then refuses a flood', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    await userWithUsername(t, 'bob')
+
+    // The 'usernameLookup' bucket (convex/rateLimiter.ts) has a burst capacity
+    // of 10. Unlike the sendFriendRequest limit, every one of these calls
+    // succeeds — a miss returns null rather than throwing — so each really
+    // does consume a token rather than rolling its own back.
+    for (let i = 0; i < 10; i++) {
+      await alice.user.mutation(api.friends.resolveUsername, { username: 'bob' })
+    }
+    await expect(
+      alice.user.mutation(api.friends.resolveUsername, { username: 'bob' }),
+    ).rejects.toThrow(/rate/i)
+  })
+
+  // A shared limit would let one script lock every other user out of adding
+  // friends — turning an enumeration guard into a denial of service.
+  it('limits per user, so one abuser cannot lock anyone else out', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const bob = await userWithUsername(t, 'bob')
+    await userWithUsername(t, 'carol')
+
+    for (let i = 0; i < 10; i++) {
+      await alice.user.mutation(api.friends.resolveUsername, { username: 'carol' })
+    }
+    await expect(
+      alice.user.mutation(api.friends.resolveUsername, { username: 'carol' }),
+    ).rejects.toThrow(/rate/i)
+
+    // Bob's own bucket is untouched.
+    expect(
+      await bob.user.mutation(api.friends.resolveUsername, { username: 'carol' }),
+    ).toMatchObject({ username: 'carol' })
   })
 })
 
@@ -127,7 +177,7 @@ describe('sendFriendRequest', () => {
     // The 'sendFriendRequest' token bucket (convex/rateLimiter.ts) has a
     // burst capacity of 5. A rejected request rolls back its own mutation
     // (Convex mutations are all-or-nothing), which undoes the token it
-    // consumed — so this has to be a run of *successful* sends, each to a
+    // consumed â€” so this has to be a run of *successful* sends, each to a
     // distinct target, to actually observe the limit.
     for (let i = 0; i < 5; i++) {
       await userWithUsername(t, `target${i}`)
@@ -167,7 +217,7 @@ describe('accept / decline', () => {
     expect(await alice.user.query(api.friends.myFriends, {})).toEqual([])
   })
 
-  it("only the recipient can accept — not the sender, not a stranger", async () => {
+  it("only the recipient can accept â€” not the sender, not a stranger", async () => {
     const t = createBackend()
     const alice = await userWithUsername(t, 'alice')
     const bob = await userWithUsername(t, 'bob')
@@ -256,7 +306,7 @@ describe('getFriendWorkoutDetail', () => {
     const detail = await bob.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
     expect(detail).not.toBeNull()
     // Falls back to the username, never the email. This previously asserted
-    // 'alice@test.local' — the test was pinning an email leak in place.
+    // 'alice@test.local' â€” the test was pinning an email leak in place.
     expect(detail!.owner.displayName).toBe('alice')
     expect(detail!.owner.displayName).not.toContain('@')
     expect(detail!.exercises).toHaveLength(1)
@@ -276,7 +326,7 @@ describe('getFriendWorkoutDetail', () => {
     await alice.user.mutation(api.profiles.setWorkoutsPublic, { workoutsPublic: true })
     const detail = await eve.user.query(api.friends.getFriendWorkoutDetail, { workoutId })
     expect(detail).not.toBeNull()
-    // Eve is a stranger here — a public opt-in shares the *workout*, not the
+    // Eve is a stranger here â€” a public opt-in shares the *workout*, not the
     // owner's email. This asserted 'alice@test.local' before, i.e. it pinned
     // "strangers can read your email address" as the expected behaviour.
     expect(detail!.owner.displayName).toBe('alice')
@@ -304,7 +354,7 @@ describe('getFriendWorkoutDetail', () => {
   // The "conquered" slash on a friend's workout has to be measured against
   // the OWNER's records. Getting the subject wrong here would both show the
   // wrong slashes and leak the viewer's PRs into someone else's page.
-  it('returns the owner’s eligible records, never the viewer’s', async () => {
+  it('returns the ownerâ€™s eligible records, never the viewerâ€™s', async () => {
     const t = createBackend()
     const exerciseId = await createBuiltInExercise(t)
     const { alice, bob } = await twoFriends(t)
@@ -312,7 +362,7 @@ describe('getFriendWorkoutDetail', () => {
     // Alice PRs at 140, then logs a lighter session her own PR has left behind.
     await logWorkout(t, alice.user, exerciseId, 0, 140)
     const lighter = await logWorkout(t, alice.user, exerciseId, 0, 90)
-    // Bob is much stronger — his record must not follow him onto Alice's page.
+    // Bob is much stronger â€” his record must not follow him onto Alice's page.
     await logWorkout(t, bob.user, exerciseId, 0, 200)
 
     const detail = await bob.user.query(api.friends.getFriendWorkoutDetail, {

@@ -20,7 +20,7 @@ import {
   trainedWeekSet,
 } from './points'
 import { cleanUsername, LIMITS } from './validation'
-import { rateLimiter, requireWriter } from './rateLimiter'
+import { consumeUsernameLookup, rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
 import { areFriends } from './friendships'
 
@@ -95,14 +95,22 @@ async function ownerConsistency(ctx: QueryCtx, ownerId: Id<'users'>, now: number
 
 // ---------- queries ----------
 
-// Resolve a username to a userId — safe to expose (identity only, no workout
-// data): the friend-search box uses this to find who to add or view, and
-// friendWorkouts does its own permission check once you get there.
-export const resolveUsername = query({
+// Resolve a username to a userId — identity only, no workout data: the
+// friend-search box uses this to find who to add or view, and friendWorkouts
+// does its own permission check once you get there.
+//
+// A `mutation` despite reading nothing but identity, and despite sitting under
+// the "queries" heading in spirit. It answers "does this username exist", so
+// left unthrottled it enumerates the user base as fast as the network allows —
+// and throttling requires consuming a rate limit, which writes, which a Convex
+// query cannot do. Reactivity is the price: the search box now holds its
+// result in component state instead of resubscribing. That costs almost
+// nothing here, because the box already only searched on submit.
+export const resolveUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (userId === null) return null
+    const userId = await requireUserId(ctx)
+    await consumeUsernameLookup(ctx, userId)
 
     const username = args.username.trim().toLowerCase()
     const profile = await ctx.db
