@@ -19,6 +19,7 @@ import { FeedTab } from '../feed/FeedTab'
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
 type OutgoingRequests = FunctionReturnType<typeof api.friends.myOutgoingRequests>
+type SearchResult = FunctionReturnType<typeof api.friends.resolveUsername>
 
 // A username is always set by the time this page is reachable — OnboardingGate
 // (src/features/onboarding/OnboardingGate.tsx) captures it during the welcome
@@ -29,20 +30,34 @@ export function FriendsPage() {
   const friends = useQuery(api.friends.myFriends)
 
   const sendFriendRequest = useMutation(api.friends.sendFriendRequest)
+  const resolveUsername = useMutation(api.friends.resolveUsername)
 
   const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>('feed')
   const [searchTerm, setSearchTerm] = useState('')
   const [committedSearch, setCommittedSearch] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const searchResult = useQuery(
-    api.friends.resolveUsername,
-    committedSearch ? { username: committedSearch } : 'skip',
-  )
+  // Held in state rather than subscribed: resolveUsername is a mutation so it
+  // can consume a rate limit (see convex/friends.ts). `undefined` keeps its
+  // useQuery meaning of "in flight", so the three-state render below is
+  // unchanged.
+  const [searchResult, setSearchResult] = useState<SearchResult | undefined>(undefined)
 
-  function handleSearch(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setActionError(null)
-    setCommittedSearch(searchTerm.trim())
+    const username = searchTerm.trim()
+    if (!username) return
+
+    setCommittedSearch(username)
+    setSearchResult(undefined)
+    try {
+      setSearchResult(await resolveUsername({ username }))
+    } catch (err) {
+      // Includes being throttled. Drop the result tile so a stale hit from an
+      // earlier search can't sit there looking like the answer to this one.
+      setCommittedSearch(null)
+      setActionError(errorMessage(err, 'Could not search for that username.'))
+    }
   }
 
   async function runAction(action: () => Promise<unknown>) {

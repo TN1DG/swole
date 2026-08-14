@@ -49,8 +49,9 @@ so that is the right place to limit.
 name. Its comment claimed every caller had "already established friendship or a
 public opt-in". Both remaining callers are stranger-facing:
 
-- `resolveUsername` — any signed-in user can look up any username, and it is
-  deliberately unthrottled.
+- `resolveUsername` — any signed-in user can look up any username. It was
+  unthrottled at the time of this audit; it is now rate limited per caller
+  (see section C), which slows enumeration but does not stop lookup.
 - `myOutgoingRequests` — people who never accepted anything.
 
 Reachable: `displayName` is optional in the schema, and `setUsername` is its own
@@ -155,11 +156,22 @@ A test pins the case the counter exists for: a workout from 500 days ago is
 outside the read window but still counts toward the lifetime total, while the
 streak correctly ignores it.
 
-### C. `resolveUsername` enumeration is still unthrottled
-A reactive query, and the limiter needs write access, so throttling means
-converting it to a mutation and changing how `FriendsPage` calls it. Severity
-dropped materially now that it no longer returns an email — it reveals only
-whether a username exists. Worth doing if abuse appears.
+### ~~C. `resolveUsername` enumeration is still unthrottled~~ — FIXED 2026-08-14
+Closed by issue #24. It is now a `mutation` consuming a `usernameLookup` token
+bucket (20/minute, burst 10, keyed by caller), which is the only way to
+throttle it: the limiter writes, and a Convex query cannot write.
+
+The cost is reactivity at that one call site — `FriendsPage` holds the result
+in component state instead of subscribing. Almost free in practice, because the
+search box already only ran on submit.
+
+The limit is deliberately per-user rather than global. A shared bucket would
+let one script lock every other user out of adding friends, turning an
+enumeration guard into a denial of service; a test pins that isolation.
+
+Note this does not make enumeration *impossible*, only slow — 20/minute against
+a namespace is a crawl. That is the appropriate ceiling given severity: since
+the email leak was closed, a hit reveals only that a username exists.
 
 ### ~~D. Signup throttle is global, not per-IP~~ — BUILT AND VERIFIED, NEEDS KEYS
 Cloudflare Turnstile now guards sign-up (`convex/turnstile.ts`,

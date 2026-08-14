@@ -56,14 +56,22 @@ Full list, with labels and blocking state:
 | [#21](https://github.com/TN1DG/swole/issues/21) | Wire `unitPreference` into the ~20 remaining kg display sites | closed 2026-08-14 |
 | [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, unblocked by #21 |
 | [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | closed 2026-08-14 |
-| [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | `ready-for-agent` |
-| [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | `ready-for-agent` |
+| [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | closed 2026-08-14 |
+| [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | closed 2026-08-14, now 0 |
 | [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |
 | [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
 | [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | `ready-for-agent` |
 | [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
 | [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | `ready-for-agent` |
+
+**On `npm audit`** (closed 2026-08-14, kept here because the count will grow
+again): four of those five highs were `devDependencies` — `vite` and
+`vite-plugin-pwa` build tooling, nothing served to a browser. Only
+`react-router-dom` ships, and its advisory is RSC-mode-only, which this SPA
+does not use. A raw high count is not a count of live risks; check the
+dependency path with `npm ls <pkg> --all` before reacting. Per-advisory
+reasoning is in `docs/project-review-2026-08-13.md` §3.3.
 
 Not an issue, because it is a runbook rather than a decision: **turning Turnstile
 on in production**. Site key is set and verified in the production bundle; only
@@ -102,17 +110,39 @@ of them.
    Usernames are resolvable by anyone via `resolveUsername`, so returning an
    avatar on outgoing requests would let anyone harvest any user's photo by
    looking them up and sending a request the target never accepts. See the
-   comment on `myOutgoingRequests` in `convex/friends.ts`. Tied to
-   [#24](https://github.com/TN1DG/swole/issues/24).
-8. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
+   comment on `myOutgoingRequests` in `convex/friends.ts`. Still the right call
+   after [#24](https://github.com/TN1DG/swole/issues/24) closed: lookup is now
+   rate limited, not prevented, so the harvest is slower rather than blocked.
+8. **Changing a Convex function's *kind* breaks already-loaded clients**, and
+   that was accepted knowingly for
+   [#24](https://github.com/TN1DG/swole/issues/24). `resolveUsername` went from
+   `query` to `mutation`, so a client running a cached bundle calls it the old
+   way and gets `Trying to execute friends.js:resolveUsername as Query, but it
+   is defined as Mutation` — which the ErrorBoundary turns into a **full-app
+   crash screen**, not a broken search box. Observed on staging 2026-08-14,
+   with the page on `index-CYB9Q-vW.js` while the network served
+   `index-OvW8ypDw.js`.
+
+   `registerType: 'autoUpdate'` (`vite.config.ts`) activates the new worker on
+   the *next* visit, so the exposure is one session per user: they must reload
+   before the new code runs. "Reload App" on the crash screen fixes it. Accepted
+   because this is a personal project with no user base to protect.
+
+   **The general lesson, for next time:** renaming or retyping a public Convex
+   function is a breaking API change, and a precaching PWA guarantees old
+   clients exist for a window after every deploy. The non-breaking shape is
+   additive — leave the old export answering harmlessly, add the new one beside
+   it, delete the old one a release later. Same family as
+   [#19](https://github.com/TN1DG/swole/issues/19).
+9. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
    deliberately skipped: the weight is MUI + Convex client + React, needed by
    every route, and this is a PWA that precaches the whole bundle. Revisit only
    if initial load becomes a *measured* problem.
-9. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
-   deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
-   the first-deploy path is the one that matters for a new branch. Look here if a
-   new branch ever comes up with an empty exercise library.
-10. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
+10. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
+    deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
+    the first-deploy path is the one that matters for a new branch. Look here if a
+    new branch ever comes up with an empty exercise library.
+11. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
     10 minutes app-wide, because a Convex action cannot see the caller's IP. That
     stops scripted floods but not a slow distributed trickle. The real fix —
     Cloudflare Turnstile — is built and verified; see the runbook above.
