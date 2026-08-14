@@ -57,13 +57,21 @@ Full list, with labels and blocking state:
 | [#22](https://github.com/TN1DG/swole/issues/22) | Enter set weights in lb without precision drift | `ready-for-human`, unblocked by #21 |
 | [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | closed 2026-08-14 |
 | [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | closed 2026-08-14 |
-| [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | `ready-for-agent` |
+| [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | closed 2026-08-14, now 0 |
 | [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |
 | [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
 | [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | `ready-for-agent` |
 | [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
 | [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | `ready-for-agent` |
+
+**On `npm audit`** (closed 2026-08-14, kept here because the count will grow
+again): four of those five highs were `devDependencies` — `vite` and
+`vite-plugin-pwa` build tooling, nothing served to a browser. Only
+`react-router-dom` ships, and its advisory is RSC-mode-only, which this SPA
+does not use. A raw high count is not a count of live risks; check the
+dependency path with `npm ls <pkg> --all` before reacting. Per-advisory
+reasoning is in `docs/project-review-2026-08-13.md` §3.3.
 
 Not an issue, because it is a runbook rather than a decision: **turning Turnstile
 on in production**. Site key is set and verified in the production bundle; only
