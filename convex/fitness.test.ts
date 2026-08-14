@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ACTIVITY_LEVELS,
   beatsRecord,
   behindRecord,
   cmToFtIn,
   consistencyTier,
+  GOALS,
   dayCurvePoints,
   displayStreakWeeks,
   distinctTrainingDays,
@@ -166,6 +168,23 @@ describe('tdee', () => {
   it('scales BMR by the activity multiplier', () => {
     expect(tdee(1780, 'sedentary')).toBeCloseTo(2136, 5)
     expect(tdee(1780, 'moderate')).toBeCloseTo(2759, 5)
+  })
+})
+
+// The Cut hint used to read "steady fat loss, ~0.5 kg/week" — a weight spelled
+// out in English prose inside a shared constant, which stayed in kilograms for
+// imperial users and which no `formatKg` grep could ever surface. Rates belong
+// in these constants as numbers; units belong to the render.
+describe('display constants carry no baked-in units', () => {
+  const hints = [...GOALS, ...ACTIVITY_LEVELS].map((entry) => entry.hint)
+
+  it.each(hints)('hint %j names no weight unit', (hint) => {
+    expect(hint).not.toMatch(/\b(kg|lb|lbs|kilograms?|pounds?)\b/i)
+  })
+
+  it('exposes the cut rate as a number for the UI to convert', () => {
+    const cut = GOALS.find((g) => g.value === 'cut')!
+    expect(cut).toHaveProperty('rateKgPerWeek', 0.5)
   })
 })
 

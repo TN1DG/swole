@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material'
 import { GOALS, goalCalories, macroTargets } from '../../../convex/fitness'
+import { useWeightUnit } from '../../lib/useWeightUnit'
 import { FlameIcon } from '../../components/icons'
 import { GlassTile } from '../../components/GlassTile'
 
@@ -16,6 +17,8 @@ export function CalorieBreakdown({
   tdeeValue: number
   weightKg: number
 }) {
+  const { formatWeightWithUnit } = useWeightUnit()
+
   return (
     <>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
@@ -68,6 +71,7 @@ export function CalorieBreakdown({
               </Box>
               <Typography variant="body2" color="text.secondary">
                 {goal.hint}
+                {'rateKgPerWeek' in goal && `, ~${formatWeightWithUnit(goal.rateKgPerWeek)}/week`}
               </Typography>
               {/* auto-fit rather than a hard 4 columns: at 4 across on a
                   narrow phone each cell is ~42px of content, which clips

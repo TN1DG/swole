@@ -91,12 +91,22 @@ export const ACTIVITY_LEVELS = [
   { value: 'very_active', label: 'Very Active', hint: 'hard exercise + physical job' },
 ] as const satisfies readonly { value: ActivityLevel; label: string; hint: string }[]
 
+// `rateKgPerWeek` is a number rather than part of the `hint` prose on purpose.
+// It used to read "steady fat loss, ~0.5 kg/week", which left one weight on the
+// screen ignoring the viewer's unit preference — and being spelled out inside
+// an English sentence, no `formatKg` grep would ever find it. The UI renders it
+// through `useWeightUnit` instead; see CalorieBreakdown.
 export const GOALS = [
   { value: 'maintain', label: 'Maintain', hint: 'stay at your current weight' },
-  { value: 'cut', label: 'Cut', hint: 'steady fat loss, ~0.5 kg/week' },
+  { value: 'cut', label: 'Cut', hint: 'steady fat loss', rateKgPerWeek: 0.5 },
   { value: 'bulk', label: 'Bulk', hint: 'lean muscle gain' },
   { value: 'recomp', label: 'Recomp', hint: 'lose fat and build muscle at once' },
-] as const satisfies readonly { value: Goal; label: string; hint: string }[]
+] as const satisfies readonly {
+  value: Goal
+  label: string
+  hint: string
+  rateKgPerWeek?: number
+}[]
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
