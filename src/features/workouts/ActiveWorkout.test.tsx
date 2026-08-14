@@ -56,11 +56,17 @@ function workoutWith(sets: { weightKg: number; reps: number; completed?: boolean
   } as never
 }
 
-function renderWorkout(sets: Parameters<typeof workoutWith>[0], unitPreference: 'kg' | 'lb' = 'kg') {
-  state.queries.set(getFunctionName(api.prs.listMine), [RECORD])
+function renderWorkout(
+  sets: Parameters<typeof workoutWith>[0],
+  unitPreference: 'kg' | 'lb' = 'kg',
+  records: unknown[] = [RECORD],
+) {
+  state.queries.set(getFunctionName(api.prs.listMine), records)
   state.queries.set(getFunctionName(api.profiles.getMine), { unitPreference })
   return render(<ActiveWorkout workout={workoutWith(sets)} onFinished={vi.fn()} />)
 }
+
+const trophies = () => screen.queryAllByText(/🏆/)
 
 beforeEach(() => {
   state.queries.clear()
@@ -112,6 +118,65 @@ describe('ActiveWorkout set marks', () => {
   it('does not slash a warm-up', () => {
     renderWorkout([{ weightKg: 80, reps: 5, isWarmup: true }])
     expect(screen.queryByTitle('Beaten by your PR')).not.toBeInTheDocument()
+  })
+})
+
+// `workouts.finish` awards at most one record per exercise, from the best
+// working set. The live view has to reach the same answer itself, because
+// prs.listMine only carries finished workouts.
+describe('ActiveWorkout PR trophy', () => {
+  // The reported bug: a brand-new account has no stored record, and "no record
+  // yet" means "first PR" — so asking per set marked every single one.
+  it('marks only the best set when the account has no records at all', () => {
+    renderWorkout(
+      [
+        { weightKg: 60, reps: 5 },
+        { weightKg: 100, reps: 5 },
+        { weightKg: 80, reps: 5 },
+      ],
+      'kg',
+      [],
+    )
+    expect(trophies()).toHaveLength(1)
+    // Set 2 — the heaviest — not the first or the last.
+    expect(trophies()[0]!.textContent).toContain('2')
+  })
+
+  // Same shape with a record present: three ascending sets all beat a 50kg
+  // record, but they are still one PR between them.
+  it('marks one set, not every set that beats the stored record', () => {
+    renderWorkout(
+      [
+        { weightKg: 60, reps: 5 },
+        { weightKg: 70, reps: 5 },
+        { weightKg: 80, reps: 5 },
+      ],
+      'kg',
+      [{ exerciseId: EXERCISE_ID, bestWeightKg: 50, bestEst1rm: epley1rm(50, 5) }],
+    )
+    expect(trophies()).toHaveLength(1)
+  })
+
+  it('marks nothing when no set reaches the record', () => {
+    renderWorkout([{ weightKg: 80, reps: 5 }])
+    expect(trophies()).toHaveLength(0)
+  })
+
+  it('ignores warm-ups and incomplete sets when picking the best', () => {
+    renderWorkout(
+      [
+        { weightKg: 200, reps: 5, isWarmup: true },
+        { weightKg: 150, reps: 5, completed: false },
+        { weightKg: 90, reps: 5 },
+      ],
+      'kg',
+      [],
+    )
+    expect(trophies()).toHaveLength(1)
+    // Set 3, the 90kg working set — not the heavier warm-up above it, nor the
+    // 150kg row that was never checked off.
+    expect(trophies()[0]!.textContent).toContain('3')
+    expect(screen.getByDisplayValue('90')).toBeInTheDocument()
   })
 })
 
