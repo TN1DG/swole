@@ -424,7 +424,13 @@ cheapest possible feedback for generated code. Worth a pass through oxlint's
   Fine for a two-action workflow using first-party `actions/*`. Pin third-party
   actions to SHAs if CI ever handles secrets.
 - **npm 10.9.4 → 12.0.2 available.** Cosmetic; CI pins Node 22 to match local.
-- **Convex 1.42.1 → 1.42.3+** still outstanding — now [#29](https://github.com/TN1DG/swole/issues/29).
+- ~~**Convex 1.42.1 → 1.42.3+**~~ — **done 2026-08-14** ([#29](https://github.com/TN1DG/swole/issues/29)),
+  to **1.44.0** rather than a 1.42.x patch. The declared range was already
+  `^1.42.1`, so 1.44.0 was permitted all along and the *lockfile* was simply
+  behind the manifest — worth noting, because it means a lockfile-less install
+  would have resolved differently from the pinned one. Peers were satisfied
+  (`@convex-dev/auth` wants `^1.17.0`, `@convex-dev/rate-limiter` `^1.24.8`),
+  `convex/_generated` did not drift, and all four gates passed unchanged.
 
 ---
 

@@ -61,7 +61,7 @@ Full list, with labels and blocking state:
 | [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |
 | [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
-| [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | `ready-for-agent` |
+| [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | closed 2026-08-14, now 1.44.0 |
 | [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
 | [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | `ready-for-agent` |
 
