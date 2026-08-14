@@ -7,6 +7,17 @@
     /* These settings are not required by Convex and can be modified. */
     "allowJs": true,
     "strict": true,
+    /* Matches tsconfig.app.json. The backend files are compiled by both
+     * projects (the React layer imports them), so leaving it off here would
+     * mean the same file was checked to two different standards.
+     *
+     * Tests are excluded below and checked by tsconfig.test.json without this
+     * flag. The flag exists to stop an out-of-range read becoming a silent
+     * `undefined` that travels; in a test an out-of-range read fails the test
+     * immediately, which is the point of the test. Enabling it there produced
+     * 155 errors whose only fix was 155 non-null assertions — pure noise, and
+     * a habit worth not teaching. */
+    "noUncheckedIndexedAccess": true,
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "skipLibCheck": true,
@@ -23,5 +34,5 @@
     "noEmit": true
   },
   "include": ["./**/*"],
-  "exclude": ["./_generated"]
+  "exclude": ["./_generated", "./**/*.test.ts", "./test.helpers.ts"]
 }

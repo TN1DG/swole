@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { ConvexError } from 'convex/values'
 import { action, internalMutation, type MutationCtx } from './_generated/server'
 import { internal } from './_generated/api'
+import { CHALLENGE_REQUIRED_MESSAGE } from './constants'
 
 /**
  * Cloudflare Turnstile, guarding sign-up.
@@ -150,7 +151,7 @@ export async function spendSignupChallenge(ctx: MutationCtx, rawEmail: string): 
     .first()
 
   if (!pass) {
-    throw new ConvexError('Please complete the challenge before signing up.')
+    throw new ConvexError(CHALLENGE_REQUIRED_MESSAGE)
   }
   await ctx.db.delete(pass._id)
   if (pass.expiresAt < Date.now()) {

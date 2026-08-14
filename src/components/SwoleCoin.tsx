@@ -91,9 +91,12 @@ function ringGlyphs(
   let consumed = 0
 
   return chars.map((ch, i) => {
-    // Centre each glyph in its own proportional slice of the arc.
-    const offset = -spread / 2 + (spread * (consumed + widths[i] / 2)) / total
-    consumed += widths[i]
+    // Centre each glyph in its own proportional slice of the arc. Measured
+    // from `ch` directly rather than looked up in `widths` by index — same
+    // number, and it cannot fall out of step with the character it describes.
+    const width = glyphWidth(ch)
+    const offset = -spread / 2 + (spread * (consumed + width / 2)) / total
+    consumed += width
     if (ch === ' ') return null
 
     // 0deg is the top of the coin, positive is clockwise.

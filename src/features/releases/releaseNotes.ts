@@ -20,7 +20,12 @@ export type Release = {
 }
 
 // Newest first.
-export const RELEASES: Release[] = [
+//
+// Typed as a non-empty tuple so `CURRENT_RELEASE` below is a `Release` rather
+// than `Release | undefined`. There has always been at least one release and
+// deleting the last one would be meaningless, so the invariant belongs in the
+// type instead of being re-checked at every use.
+export const RELEASES: [Release, ...Release[]] = [
   {
     version: '1.4.0',
     releasedAt: Date.UTC(2026, 6, 28),

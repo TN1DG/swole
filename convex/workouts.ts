@@ -258,9 +258,13 @@ export const moveExercise = mutation({
     const ordered = await exercisesOf(ctx, workoutExercise.workoutId)
     const index = ordered.findIndex((we) => we._id === workoutExercise._id)
     const targetIndex = args.direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= ordered.length) return
 
+    // Covers both ends: a negative index and one past the last both read back
+    // as undefined, so this replaces the explicit bounds check that used to
+    // sit here rather than duplicating it.
     const target = ordered[targetIndex]
+    if (!target) return
+
     await ctx.db.patch(workoutExercise._id, { position: target.position })
     await ctx.db.patch(target._id, { position: workoutExercise.position })
   },

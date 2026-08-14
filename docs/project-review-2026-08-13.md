@@ -385,28 +385,74 @@ living in the build-tooling project.
 
 **Still available, measured but not applied** — these are real work, not free:
 
-| Flag | Errors |
-| --- | --- |
-| `noUncheckedIndexedAccess` | 23 |
-| `exactOptionalPropertyTypes` | 16 |
-| `noPropertyAccessFromIndexSignature` | 7 |
+| Flag | Errors | Status |
+| --- | --- | --- |
+| `noUncheckedIndexedAccess` | 23 | ✅ **on, 2026-08-14** ([#31](https://github.com/TN1DG/swole/issues/31)) |
+| `exactOptionalPropertyTypes` | 16 | available |
+| `noPropertyAccessFromIndexSignature` | 7 | available |
 
-`noUncheckedIndexedAccess` is the one worth doing next — it catches the
-`array[i]` -is-actually-possibly-undefined class of bug, which is the most
+`noUncheckedIndexedAccess` was the one worth doing next — it catches the
+`array[i]` -is-actually-possibly-undefined class of bug, which was the most
 common remaining unsoundness in an otherwise strict codebase.
 
-### 4.2 Test coverage is lopsided
+**How the 23 were fixed matters more than that they were.** Most became
+*provable* rather than asserted: a bounds check that reads the element and
+tests it (`convex/workouts.ts`, `RoutineEditor`) instead of comparing indices
+to `length`; a non-empty tuple type on `RELEASES` so `CURRENT_RELEASE` is a
+`Release` by construction; `.at()` in `ProgressChart`; measuring a glyph from
+the character itself in `SwoleCoin` rather than looking it up by a parallel
+index. Two sites kept a non-null assertion — `dayCurvePoints`, which clamps its
+index on the line above, and the increment/workout pairing in `points.ts` — and
+both carry a comment saying why an assertion beats a `?? 0` there: a silent
+zero would mis-award points, where a throw would not.
 
-21 backend test files against **2** frontend ones (`releaseNotes.test.ts`,
-`restPresets.test.ts`), and both of those are pure-logic — no component renders
-anywhere in the suite. There is no Testing Library dependency.
+**Tests are excluded from this one flag**, via `convex/tsconfig.test.json`.
+Enabling it there produced 155 errors fixable only by 155 non-null assertions.
+The flag exists so an out-of-range read cannot become an `undefined` that
+travels; in a test it fails on the spot, in the assertion that was going to
+catch it anyway. Tests are still fully typechecked — `npm run typecheck` now
+runs three projects.
 
-The backend suite is excellent and the imbalance has been fine while every release
-is manually QA'd on staging by the person who wrote it. It stops being fine the
-moment an agent edits a component: nothing would catch it. The highest-risk targets
-are `ActiveWorkout.tsx` (514 lines, the app's core interaction, and the file the
-backlog flags as riskiest for the lb/kg work) and `SignInPage.tsx` (290 lines, the
-flow that has already shipped a misleading-error bug).
+### 4.2 ~~Test coverage is lopsided~~ — first component tests landed 2026-08-14
+
+Was: 21 backend test files against **2** frontend ones, both pure-logic, no
+component rendering anywhere and no Testing Library dependency. The imbalance
+was fine while every release was hand-QA'd by the person who wrote it, and
+stopped being fine the moment an agent started editing components.
+
+Closed as a *start*, not a finish ([#30](https://github.com/TN1DG/swole/issues/30)).
+Testing Library + jsdom are wired up, and the two highest-risk files named here
+now have behavioural tests: `ActiveWorkout.tsx` (volume totals, warm-up
+exclusion, the trophy/slash marks, and that weight *entry* stays kg while
+display follows `unitPreference` — pinned deliberately ahead of #22) and
+`SignInPage.tsx` (the sign-in failure message and all three branches of the
+stale-shell detection from #19).
+
+**Vitest now runs four projects** rather than one global environment, because
+they genuinely differ:
+
+| Project | Environment | Files |
+| --- | --- | --- |
+| `convex` | `edge-runtime` | `convex/**/*.test.ts` — matches convex-test |
+| `ui` | `jsdom` | `src/**/*.test.tsx` — renders components |
+| `logic` | `node` | `src/**/*.test.ts` — pure functions |
+| `root` | `node` | `*.test.ts` — the CSP guard, which reads `vercel.json` |
+
+Two things learned wiring that up, both worth keeping:
+
+- **Explicit `include` globs silently drop files.** The first split lost
+  `vercel-headers.test.ts` — it sits at the repo root and matched no project,
+  so the suite went quietly from 372 tests to 365 and still reported all green.
+  Check the *count*, not the colour, after changing test config.
+- **Scope jsdom to the files that need a DOM.** Running the pure-logic `src`
+  tests under jsdom too cost ~19s of environment setup for nothing; splitting
+  `logic` out cut it to ~7s.
+
+**Honest note on speed:** the suite went from ~9s to ~17s wall time. That is
+not nothing, and it is the one acceptance criterion on #30 not fully met — the
+cost is importing React and MUI to render real components, which is the point
+of the exercise. Worth revisiting (happy-dom, or shallower fixtures) if it
+grows again.
 
 ### 4.3 The lint ruleset is thin
 
@@ -424,7 +470,13 @@ cheapest possible feedback for generated code. Worth a pass through oxlint's
   Fine for a two-action workflow using first-party `actions/*`. Pin third-party
   actions to SHAs if CI ever handles secrets.
 - **npm 10.9.4 → 12.0.2 available.** Cosmetic; CI pins Node 22 to match local.
-- **Convex 1.42.1 → 1.42.3+** still outstanding — now [#29](https://github.com/TN1DG/swole/issues/29).
+- ~~**Convex 1.42.1 → 1.42.3+**~~ — **done 2026-08-14** ([#29](https://github.com/TN1DG/swole/issues/29)),
+  to **1.44.0** rather than a 1.42.x patch. The declared range was already
+  `^1.42.1`, so 1.44.0 was permitted all along and the *lockfile* was simply
+  behind the manifest — worth noting, because it means a lockfile-less install
+  would have resolved differently from the pinned one. Peers were satisfied
+  (`@convex-dev/auth` wants `^1.17.0`, `@convex-dev/rate-limiter` `^1.24.8`),
+  `convex/_generated` did not drift, and all four gates passed unchanged.
 
 ---
 
@@ -557,7 +609,9 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
    `docs/security-audit.md`, and follow the order exactly (§3.1)
 4. ~~Enable `strict` in `tsconfig.app.json`~~ — **done 2026-08-13**, zero
    fallout; `noImplicitReturns` and `tsconfig.node.json` came along free.
-   Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
+   Follow-up ~~`noUncheckedIndexedAccess` (23 errors)~~ — **done 2026-08-14**
+   ([#31](https://github.com/TN1DG/swole/issues/31)), tests excluded from that
+   one flag on purpose (§4.1)
 5. ~~Re-triage the 5 `npm audit` highs~~ — **done 2026-08-14**, now 0; four of
    the five were build-only `devDependencies` (§3.3)
 6. ~~Rename `npm run deploy` → `deploy:emergency`~~ — **done 2026-08-13** (§3.5)

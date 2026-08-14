@@ -1,0 +1,20 @@
+{
+  /* The backend tests, checked with the same settings as the functions they
+   * exercise apart from one: `noUncheckedIndexedAccess` is off here.
+   *
+   * That flag earns its place in production code, where an out-of-range read
+   * turns into an `undefined` that travels somewhere far away before it
+   * breaks. A test that indexes past the end fails on the spot, loudly, in the
+   * assertion that was already going to catch it — so the flag buys nothing
+   * and costs 155 non-null assertions across the suite.
+   *
+   * Tests are still fully typechecked; `npm run typecheck` runs this project
+   * alongside the other two.
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["./**/*.test.ts", "./test.helpers.ts", "./_generated/**/*.d.ts"],
+  "exclude": []
+}

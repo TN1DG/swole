@@ -99,6 +99,11 @@ function StorySlide({
   onBack?: () => void
 }) {
   const slide = STORY_SLIDES[index]
+  // Renders nothing rather than crashing if the carousel is ever pointed past
+  // the end — a blank slide with a working Next button beats an ErrorBoundary
+  // mid-onboarding.
+  if (!slide) return null
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
       <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>

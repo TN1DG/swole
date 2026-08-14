@@ -4,8 +4,9 @@ import type { SxProps, Theme } from '@mui/material'
 // Falls back to the first letter of the name, so a friend without a photo
 // still reads as a distinct person rather than a generic silhouette.
 function initial(name: string | null | undefined): string {
-  const trimmed = (name ?? '').trim()
-  return trimmed ? trimmed[0].toUpperCase() : '?'
+  // charAt rather than [0]: it returns '' for an empty string instead of
+  // undefined, so the fallback below is the only branch that has to exist.
+  return (name ?? '').trim().charAt(0).toUpperCase() || '?'
 }
 
 export function Avatar({

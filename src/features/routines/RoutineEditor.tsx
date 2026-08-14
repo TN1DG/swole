@@ -30,10 +30,16 @@ export function RoutineEditor({ initial, onClose }: Props) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   function move(index: number, delta: -1 | 1) {
-    const target = index + delta
-    if (target < 0 || target >= exercises.length) return
+    const targetIndex = index + delta
     const next = [...exercises]
-    ;[next[index], next[target]] = [next[target], next[index]]
+    const a = next[index]
+    const b = next[targetIndex]
+    // Reading both first covers the bounds check that used to be here: either
+    // end of the list, or a stale index, comes back undefined.
+    if (!a || !b) return
+
+    next[index] = b
+    next[targetIndex] = a
     setExercises(next)
   }
 
