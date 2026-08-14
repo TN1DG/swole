@@ -4,7 +4,7 @@ import type { FunctionReturnType } from 'convex/server'
 import { Box, Button, ButtonBase, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Doc } from '../../../convex/_generated/dataModel'
-import { beatsRecord, behindRecord, formatDuration } from '../../../convex/fitness'
+import { beatsRecord, behindRecord, epley1rm, formatDuration } from '../../../convex/fitness'
 import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { ExercisePicker } from './ExercisePicker'
@@ -250,6 +250,43 @@ function ExerciseCard({
   const [detailOpen, setDetailOpen] = useState(false)
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false)
 
+  /**
+   * Which single set this exercise would credit as its PR, mirroring
+   * `workouts.finish`: one record per exercise, taken from the best working
+   * set — not "every set that happens to beat the stored record".
+   *
+   * Asking `beatsRecord` per row was wrong in two ways that compound. On an
+   * account with no stored record it answers true for *every* set, because a
+   * missing record means "first PR" — so a brand-new lifter saw a trophy on
+   * all of them, including sets lighter than ones they had already logged.
+   * Even with a record, every set above it was marked, so three ascending
+   * sets showed three trophies for what the backend counts as one PR.
+   *
+   * `prs.listMine` only carries finished workouts, so the live view has to do
+   * this itself; it cannot wait for the record to appear.
+   */
+  const prSetId = useMemo(() => {
+    const working = entry.sets.filter(
+      (s) => s.completed && !s.isWarmup && s.weightKg > 0 && s.reps > 0,
+    )
+    if (working.length === 0) return null
+
+    // Same reducers, and the same first-wins tiebreak, as workouts.finish.
+    const bestByWeight = working.reduce((a, b) =>
+      b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a,
+    )
+    const bestBy1rm = working.reduce((a, b) =>
+      epley1rm(b.weightKg, b.reps) > epley1rm(a.weightKg, a.reps) ? b : a,
+    )
+
+    if (!record) return bestByWeight._id
+    if (beatsRecord(bestByWeight.weightKg, bestByWeight.reps, record)) return bestByWeight._id
+    // The record can also fall on estimated 1RM alone — a lighter set for many
+    // more reps. Credited to the set that actually did it.
+    if (beatsRecord(bestBy1rm.weightKg, bestBy1rm.reps, record)) return bestBy1rm._id
+    return null
+  }, [entry.sets, record])
+
   return (
     <GlassTile component="section" sx={{ p: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -336,6 +373,7 @@ function ExerciseCard({
             key={set._id}
             set={set}
             record={record}
+            isPr={set._id === prSetId}
             onSaveError={onSaveError}
             onSetCompleted={onSetCompleted}
           />
@@ -373,11 +411,14 @@ function ExerciseCard({
 function SetRow({
   set,
   record,
+  isPr,
   onSaveError,
   onSetCompleted,
 }: {
   set: Doc<'sets'>
   record: { bestWeightKg: number; bestEst1rm: number } | undefined
+  /** Decided by the parent, which can see the other sets — see `prSetId`. */
+  isPr: boolean
   onSaveError: () => void
   onSetCompleted: () => void
 }) {
@@ -392,11 +433,14 @@ function SetRow({
   const parsedWeight = parseFloat(weight) || 0
   const parsedReps = parseInt(reps, 10) || 0
 
-  // A completed working set that beats (or sets) the record gets a trophy.
-  const isPr = set.completed && !set.isWarmup && beatsRecord(set.weightKg, set.reps, record)
-  // …and one the record has left behind gets a red slash. The active workout
-  // is always eligible to be measured against the record (it's happening
-  // now), so unlike the history view there's no achievedAt check here.
+  // The trophy is decided one level up, where the other sets are visible: only
+  // the set that would actually become the record gets it, matching the single
+  // PR per exercise that `workouts.finish` awards.
+  //
+  // The red slash stays here, because it genuinely is per-set — any set the
+  // record has already left behind earns one. The active workout is always
+  // eligible to be measured against the record (it's happening now), so
+  // unlike the history view there's no achievedAt check here.
   const conquered =
     set.completed && !set.isWarmup && behindRecord(set.weightKg, set.reps, record)
 

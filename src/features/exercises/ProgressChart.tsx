@@ -62,10 +62,10 @@ export function ProgressChart({ points }: { points: Point[] }) {
 
       {/* first and last date labels */}
       <text x={x(0)} y={H - 6} fontSize="9" fill="var(--color-muted)">
-        {points[0].label}
+        {points.at(0)?.label}
       </text>
       <text x={x(points.length - 1)} y={H - 6} textAnchor="end" fontSize="9" fill="var(--color-muted)">
-        {points[points.length - 1].label}
+        {points.at(-1)?.label}
       </text>
     </svg>
   )

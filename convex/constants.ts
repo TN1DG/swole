@@ -25,6 +25,18 @@ export const EQUIPMENT_TYPES = [
 
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number]
 
+/**
+ * Thrown by `turnstile.spendSignupChallenge` when sign-up arrives without a
+ * solved challenge, and matched by `SignInPage` to recognise one specific
+ * situation: a client whose bundle predates Turnstile being enabled.
+ *
+ * It lives here, in the module both sides already share, rather than being
+ * written out twice — a copy on the client would silently stop matching the
+ * day someone reworded the server's copy, and the symptom would be the dead
+ * end this message exists to prevent.
+ */
+export const CHALLENGE_REQUIRED_MESSAGE = 'Please complete the challenge before signing up.'
+
 export const REASON_OPTIONS = [
   'More energy',
   'Better sleep',

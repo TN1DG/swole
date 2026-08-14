@@ -109,7 +109,12 @@ export async function reconcileWeek(
   // too, not just the changed one.
   let delta = -removedAward
   for (const [i, w] of inWeek.entries()) {
-    const next = increments[i]
+    // One increment per input workout, in the same order: `inWeek` is sorted
+    // by `startedAt` above to match the sort inside weeklyPointsIncrements, so
+    // index `i` refers to the same workout on both sides. That alignment is
+    // load-bearing — pairing a workout with someone else's increment would
+    // silently mis-award points rather than throw.
+    const next = increments[i]!
     if (w.pointsAwarded !== next) {
       delta += next - w.pointsAwarded
       await ctx.db.patch(w._id, { pointsAwarded: next })

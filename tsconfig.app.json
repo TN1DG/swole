@@ -23,6 +23,12 @@
     // `T | undefined` while it loads. Turning it on produced zero errors: the
     // code was already written to this standard, the flag just wasn't set.
     "strict": true,
+    // Indexing an array or record now yields `T | undefined`. Turning this on
+    // found 23 real spots where an out-of-range read was possible; most were
+    // fixed by making the invariant provable (a bounds check that reads the
+    // element instead of comparing lengths, a non-empty tuple type, `.at()`)
+    // rather than by asserting it away.
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
