@@ -63,7 +63,7 @@ Full list, with labels and blocking state:
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
 | [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | closed 2026-08-14, now 1.44.0 |
 | [#30](https://github.com/TN1DG/swole/issues/30) | Frontend component tests for the highest-risk flows | `ready-for-agent` |
-| [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | `ready-for-agent` |
+| [#31](https://github.com/TN1DG/swole/issues/31) | Enable `noUncheckedIndexedAccess` (23 errors) | closed 2026-08-14 |
 
 **On `npm audit`** (closed 2026-08-14, kept here because the count will grow
 again): four of those five highs were `devDependencies` — `vite` and

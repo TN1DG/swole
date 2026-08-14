@@ -282,7 +282,12 @@ export const getPost = query({
     const visibleComments = comments.filter((c) => !blocked.has(c.authorId))
     const identities = await publicIdentityMap(ctx, visibleComments.map((c) => c.authorId))
 
+    // hydrate maps over its input, so one post in means one post out. Treated
+    // as "not available" rather than asserted, since every other way this
+    // query can fail already returns null and the page handles it.
     const [hydrated] = await hydrate(ctx, userId, [post])
+    if (!hydrated) return null
+
     return {
       post: hydrated,
       comments: visibleComments.map((c) => ({

@@ -385,15 +385,33 @@ living in the build-tooling project.
 
 **Still available, measured but not applied** — these are real work, not free:
 
-| Flag | Errors |
-| --- | --- |
-| `noUncheckedIndexedAccess` | 23 |
-| `exactOptionalPropertyTypes` | 16 |
-| `noPropertyAccessFromIndexSignature` | 7 |
+| Flag | Errors | Status |
+| --- | --- | --- |
+| `noUncheckedIndexedAccess` | 23 | ✅ **on, 2026-08-14** ([#31](https://github.com/TN1DG/swole/issues/31)) |
+| `exactOptionalPropertyTypes` | 16 | available |
+| `noPropertyAccessFromIndexSignature` | 7 | available |
 
-`noUncheckedIndexedAccess` is the one worth doing next — it catches the
-`array[i]` -is-actually-possibly-undefined class of bug, which is the most
+`noUncheckedIndexedAccess` was the one worth doing next — it catches the
+`array[i]` -is-actually-possibly-undefined class of bug, which was the most
 common remaining unsoundness in an otherwise strict codebase.
+
+**How the 23 were fixed matters more than that they were.** Most became
+*provable* rather than asserted: a bounds check that reads the element and
+tests it (`convex/workouts.ts`, `RoutineEditor`) instead of comparing indices
+to `length`; a non-empty tuple type on `RELEASES` so `CURRENT_RELEASE` is a
+`Release` by construction; `.at()` in `ProgressChart`; measuring a glyph from
+the character itself in `SwoleCoin` rather than looking it up by a parallel
+index. Two sites kept a non-null assertion — `dayCurvePoints`, which clamps its
+index on the line above, and the increment/workout pairing in `points.ts` — and
+both carry a comment saying why an assertion beats a `?? 0` there: a silent
+zero would mis-award points, where a throw would not.
+
+**Tests are excluded from this one flag**, via `convex/tsconfig.test.json`.
+Enabling it there produced 155 errors fixable only by 155 non-null assertions.
+The flag exists so an out-of-range read cannot become an `undefined` that
+travels; in a test it fails on the spot, in the assertion that was going to
+catch it anyway. Tests are still fully typechecked — `npm run typecheck` now
+runs three projects.
 
 ### 4.2 Test coverage is lopsided
 
@@ -563,7 +581,9 @@ it is MUI v9 + Emotion; only stale comments still mention Tailwind), "13 tables"
    `docs/security-audit.md`, and follow the order exactly (§3.1)
 4. ~~Enable `strict` in `tsconfig.app.json`~~ — **done 2026-08-13**, zero
    fallout; `noImplicitReturns` and `tsconfig.node.json` came along free.
-   Follow-up: `noUncheckedIndexedAccess` (23 errors) is real work (§4.1)
+   Follow-up ~~`noUncheckedIndexedAccess` (23 errors)~~ — **done 2026-08-14**
+   ([#31](https://github.com/TN1DG/swole/issues/31)), tests excluded from that
+   one flag on purpose (§4.1)
 5. ~~Re-triage the 5 `npm audit` highs~~ — **done 2026-08-14**, now 0; four of
    the five were build-only `devDependencies` (§3.3)
 6. ~~Rename `npm run deploy` → `deploy:emergency`~~ — **done 2026-08-13** (§3.5)

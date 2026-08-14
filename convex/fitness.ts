@@ -254,7 +254,10 @@ export const WEEKLY_DAY_POINTS = [0, 10, 25, 45, 55, 65, 73, 80] as const
 
 export function dayCurvePoints(daysTrained: number): number {
   const days = Math.max(0, Math.min(WEEKLY_DAY_POINTS.length - 1, Math.floor(daysTrained)))
-  return WEEKLY_DAY_POINTS[days]
+  // Clamped to a valid index on the line above, so this cannot miss. `?? 0`
+  // here would be worse than the assertion: it would quietly award zero points
+  // for a whole week if the clamp were ever broken, instead of failing loudly.
+  return WEEKLY_DAY_POINTS[days]!
 }
 
 // ---------- Garnish (capped) ----------

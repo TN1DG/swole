@@ -20,9 +20,12 @@ export function computeShareStats(exercises: ExerciseEntry[], prExerciseIds: Id<
   // Per exercise: set count + heaviest set for the summary line.
   const lines = exercises.map((entry) => {
     const working = entry.sets.filter((s) => !s.isWarmup)
-    const top = working.reduce(
+    // An exercise with no sets at all leaves `top` undefined, which callers
+    // already handle (see WorkoutBreakdown). The accumulator is typed to admit
+    // that rather than pretending the seed is always present.
+    const top = working.reduce<SetLike | undefined>(
       (a, b) =>
-        b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a,
+        !a || b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a,
       working[0] ?? entry.sets[0],
     )
     return {
