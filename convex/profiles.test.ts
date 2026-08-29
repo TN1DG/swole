@@ -320,6 +320,29 @@ describe('setDailyVolumeGoal', () => {
   })
 })
 
+describe('setNutritionGoal', () => {
+  it('defaults to null', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    expect((await user.query(api.profiles.getMine, {}))!.nutritionGoal).toBeNull()
+  })
+
+  it('saves and returns the goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setNutritionGoal, { goal: 'cut' })
+    expect((await user.query(api.profiles.getMine, {}))!.nutritionGoal).toBe('cut')
+  })
+
+  it('requires sign-in', async () => {
+    const t: T = createBackend()
+    await expect(
+      t.mutation(api.profiles.setNutritionGoal, { goal: 'cut' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})
+
 describe('markReleaseSeen', () => {
   it('defaults to null', async () => {
     const t = createBackend()

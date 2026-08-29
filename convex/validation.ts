@@ -84,6 +84,15 @@ export const LIMITS = {
   // most of a year's.
   maxWagerPoints: 250,
   workoutFeedbackNoteMaxLength: 300,
+  // --- nutrition / food logging ---
+  calories: 20000, // generous ceiling for a single logged item
+  macroGrams: 2000,
+  foodDescriptionMaxLength: 200,
+  // Entries for one UTC day, checked against a count read in nutrition.ts
+  // before each insert. The rate limiter (convex/rateLimiter.ts) throttles
+  // arrival *speed*; this caps how many rows one day can accumulate at all,
+  // since a food diary has a real human ceiling — nobody logs 60 meals.
+  foodLogsPerDay: 60,
 } as const
 
 // Trimmed, non-empty, length-capped free text (feature request body, etc.).

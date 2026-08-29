@@ -12,6 +12,7 @@ import { RoutinesPage } from './features/routines/RoutinesPage'
 import { ExercisesPage } from './features/exercises/ExercisesPage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { StatsPage } from './features/stats/StatsPage'
+import { CaloricConsistencyPage } from './features/nutrition/CaloricConsistencyPage'
 import { FriendsPage } from './features/friends/FriendsPage'
 import { FriendWorkoutsPage } from './features/friends/FriendWorkoutsPage'
 import { FriendWorkoutDetailPage } from './features/friends/FriendWorkoutDetailPage'
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="/favorites" element={<Navigate to="/exercises" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/stats" element={<StatsPage />} />
+              <Route path="/nutrition/consistency" element={<CaloricConsistencyPage />} />
               <Route path="/friends" element={<FriendsPage />} />
               <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
               <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />

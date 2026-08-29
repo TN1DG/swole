@@ -28,6 +28,7 @@ import type * as identity from "../identity.js";
 import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
+import type * as nutrition from "../nutrition.js";
 import type * as pings from "../pings.js";
 import type * as points from "../points.js";
 import type * as profiles from "../profiles.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   migrations: typeof migrations;
   notifications: typeof notifications;
+  nutrition: typeof nutrition;
   pings: typeof pings;
   points: typeof points;
   profiles: typeof profiles;

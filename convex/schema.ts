@@ -80,6 +80,13 @@ export default defineSchema({
     // Uploaded + cropped on the client (see src/features/profile/
     // AvatarUploadDialog.tsx). Visible to the owner and their friends only.
     avatarStorageId: v.optional(v.id('_storage')),
+    // Chosen cut/bulk/maintain/recomp target — selected from the Stats
+    // page's goal cards (convex/fitness.ts GOALS), which is what routes into
+    // the Caloric Consistency page. Absent means the user has never picked
+    // one; callers fall back to 'maintain'.
+    nutritionGoal: v.optional(
+      v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
+    ),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -422,6 +429,28 @@ export default defineSchema({
     .index('by_challenger', ['challengerId'])
     .index('by_opponent', ['opponentId'])
     .index('by_status_endsAt', ['status', 'endsAt']),
+
+  // One logged food item for a day, from a manual entry or an AI-analyzed
+  // photo — the Caloric Consistency page's "today's information". Fields
+  // below `status` are optional because a freshly-created `pending` photo
+  // row has none of them yet; they're filled in by nutrition.ts:saveAnalysis
+  // once the AI call returns.
+  foodLogs: defineTable({
+    ownerId: v.id('users'),
+    loggedAt: v.number(), // ms since epoch; grouped into UTC days, same convention as fitness.ts:utcDayIndex
+    source: v.union(v.literal('manual'), v.literal('photo')),
+    status: v.union(v.literal('pending'), v.literal('complete'), v.literal('failed')),
+    photoStorageId: v.optional(v.id('_storage')),
+    description: v.optional(v.string()), // AI's guess at the food
+    calories: v.optional(v.number()),
+    proteinG: v.optional(v.number()),
+    carbsG: v.optional(v.number()),
+    fatG: v.optional(v.number()),
+    fiberG: v.optional(v.number()),
+  })
+    // "today's entries" (owner + a loggedAt range) and, on the owner prefix
+    // alone, "every entry this account ever created" for account deletion.
+    .index('by_owner_loggedAt', ['ownerId', 'loggedAt']),
 
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({

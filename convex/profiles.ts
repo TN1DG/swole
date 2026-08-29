@@ -157,6 +157,7 @@ export const getMine = query({
       sex: profile?.sex ?? null,
       activityLevel: profile?.activityLevel ?? null,
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
+      nutritionGoal: profile?.nutritionGoal ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
       weekPoints,
       monthPoints,
@@ -418,6 +419,20 @@ export const setDailyVolumeGoal = mutation({
     const goal = assertRange(args.dailyVolumeGoalKg, 1, LIMITS.dailyVolumeGoalKg, 'Daily goal')
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { dailyVolumeGoalKg: goal })
+  },
+})
+
+// Chosen from the Stats page's goal cards (convex/fitness.ts GOALS) — tapping
+// one saves it here and routes into the Caloric Consistency page.
+export const setNutritionGoal = mutation({
+  args: {
+    goal: v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { nutritionGoal: args.goal })
   },
 })
 
