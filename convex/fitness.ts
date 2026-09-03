@@ -176,6 +176,16 @@ export function macroTargets(calories: number, bodyWeightKg: number, goal: Goal)
   return { calories, proteinG, fatG, carbsG, fiberG }
 }
 
+// Atwater factors: 4 kcal/g for protein and carbs, 9 kcal/g for fat — the same
+// 4/4/9 split `macroTargets` works backwards from. Carbs here means total
+// carbs, so fiber isn't a separate term (its ~2 kcal/g is already inside the
+// carb number). One helper so a food log's calories and its macros can't
+// drift: the Caloric Consistency page uses it to fill in calories the user
+// didn't type.
+export function caloriesFromMacros(proteinG: number, carbsG: number, fatG: number): number {
+  return Math.round(proteinG * 4 + carbsG * 4 + fatG * 9)
+}
+
 // ---------- Swole Points: the scoring model ----------
 //
 // One currency. The points you earn each week ARE your spendable balance

@@ -7,7 +7,7 @@ import { internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
 import { rateLimiter, requireWriter } from './rateLimiter'
-import { DAY_MS, utcDayIndex } from './fitness'
+import { caloriesFromMacros, DAY_MS, utcDayIndex } from './fitness'
 
 /**
  * Food logging for the Caloric Consistency page: manual entries, and photos
@@ -244,6 +244,9 @@ export const markAnalysisFailed = internalMutation({
 
 // A hand-typed entry — no photo, complete immediately. At least one field is
 // required; any omitted macro is simply not counted toward today's totals.
+// A calorie count isn't required: if it's omitted but a macro was given, it's
+// derived from the macros (4/4/9) so the day's calorie total stays honest
+// whatever the client sent.
 export const logManualEntry = mutation({
   args: {
     calories: v.optional(v.number()),
@@ -265,6 +268,29 @@ export const logManualEntry = mutation({
       throw new ConvexError('Enter at least one value')
     }
 
+    const proteinG =
+      args.proteinG !== undefined
+        ? assertRange(args.proteinG, 0, LIMITS.macroGrams, 'Protein')
+        : undefined
+    const carbsG =
+      args.carbsG !== undefined
+        ? assertRange(args.carbsG, 0, LIMITS.macroGrams, 'Carbs')
+        : undefined
+    const fatG =
+      args.fatG !== undefined ? assertRange(args.fatG, 0, LIMITS.macroGrams, 'Fat') : undefined
+    const hasMacro = proteinG !== undefined || carbsG !== undefined || fatG !== undefined
+    const calories =
+      args.calories !== undefined
+        ? assertRange(args.calories, 0, LIMITS.calories, 'Calories')
+        : hasMacro
+          ? assertRange(
+              caloriesFromMacros(proteinG ?? 0, carbsG ?? 0, fatG ?? 0),
+              0,
+              LIMITS.calories,
+              'Calories',
+            )
+          : undefined
+
     const now = Date.now()
     await assertUnderDailyCap(ctx, userId, now)
 
@@ -273,20 +299,10 @@ export const logManualEntry = mutation({
       loggedAt: now,
       source: 'manual',
       status: 'complete',
-      calories:
-        args.calories !== undefined
-          ? assertRange(args.calories, 0, LIMITS.calories, 'Calories')
-          : undefined,
-      proteinG:
-        args.proteinG !== undefined
-          ? assertRange(args.proteinG, 0, LIMITS.macroGrams, 'Protein')
-          : undefined,
-      carbsG:
-        args.carbsG !== undefined
-          ? assertRange(args.carbsG, 0, LIMITS.macroGrams, 'Carbs')
-          : undefined,
-      fatG:
-        args.fatG !== undefined ? assertRange(args.fatG, 0, LIMITS.macroGrams, 'Fat') : undefined,
+      calories,
+      proteinG,
+      carbsG,
+      fatG,
       fiberG:
         args.fiberG !== undefined
           ? assertRange(args.fiberG, 0, LIMITS.macroGrams, 'Fiber')
