@@ -73,10 +73,16 @@ does not use. A raw high count is not a count of live risks; check the
 dependency path with `npm ls <pkg> --all` before reacting. Per-advisory
 reasoning is in `docs/project-review-2026-08-13.md` §3.3.
 
-Not an issue, because it is a runbook rather than a decision: **turning Turnstile
-on in production**. Site key is set and verified in the production bundle; only
-the Convex secret remains. See `docs/security-audit.md` → "Turning Turnstile on
-in production", and follow the order exactly.
+**Turnstile is on in production** as of 2026-08-14 — both keys set, in the
+order `docs/security-audit.md` prescribes (site key in a real build first,
+secret last), and after [#19](https://github.com/TN1DG/swole/issues/19) shipped
+so a stale cached shell gets a refresh instruction rather than a dead end.
+
+**One thing still outstanding:** nobody has completed a sign-up since. The
+design fails open, so a wrong secret looks exactly like a working one. Until
+someone signs up in a fresh browser and sees the widget render *and* the
+account get created, "enabled" describes an environment variable rather than a
+behaviour. That is the first thing to do next session.
 
 ---
 
@@ -157,7 +163,9 @@ of them.
 11. **The signup throttle is global, not per-IP.** `rateLimiter.signUp` is 20 per
     10 minutes app-wide, because a Convex action cannot see the caller's IP. That
     stops scripted floods but not a slow distributed trickle. The real fix —
-    Cloudflare Turnstile — is built and verified; see the runbook above.
+    Cloudflare Turnstile — went live on 2026-08-14; this limit stays as the
+    layer behind it, and as the only one on deployments where Turnstile is off
+    (every preview).
 
 ---
 

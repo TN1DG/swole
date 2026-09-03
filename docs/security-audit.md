@@ -173,10 +173,15 @@ Note this does not make enumeration *impossible*, only slow — 20/minute agains
 a namespace is a crawl. That is the appropriate ceiling given severity: since
 the email leak was closed, a hit reveals only that a username exists.
 
-### ~~D. Signup throttle is global, not per-IP~~ — BUILT AND VERIFIED, NEEDS KEYS
-Cloudflare Turnstile now guards sign-up (`convex/turnstile.ts`,
-`src/components/TurnstileWidget.tsx`). **It is inert until keys are set — see
-below.**
+### ~~D. Signup throttle is global, not per-IP~~ — LIVE IN PRODUCTION 2026-08-14
+Cloudflare Turnstile guards sign-up (`convex/turnstile.ts`,
+`src/components/TurnstileWidget.tsx`). Both keys are now set on production: the
+site key shipped in the PR #18 build, and `TURNSTILE_SECRET_KEY` was set on the
+production Convex deployment on 2026-08-14.
+
+**Not yet confirmed by an actual sign-up.** Enforcement fails open by design
+(see below), so a wrong secret is indistinguishable from a working one until
+someone creates an account and sees the widget render first.
 
 Why it needed two pieces: verifying a token means calling Cloudflare, and only
 a Convex *action* can `fetch`, while the hook that must reject an unverified
@@ -272,9 +277,11 @@ guards in `TurnstileWidget` constant-fold, and Rollup drops the whole
 script-loading path. (The string `turnstile` survives only as the
 `window.turnstile` property access, which minifiers don't rename.)
 
-Production is therefore in a **correct, consistent inert state** — both ends
-off, sign-up unaffected. But it means enabling has a strict order, because the
-two ends fail asymmetrically:
+Production **was** therefore in a correct, consistent inert state — both ends
+off, sign-up unaffected. **Turnstile was enabled on 2026-08-14**; the order
+below is what was followed, and is kept because it is the same order any future
+deployment (or a rebuilt production) has to use. The two ends fail
+asymmetrically:
 
 | Order | What happens |
 | --- | --- |

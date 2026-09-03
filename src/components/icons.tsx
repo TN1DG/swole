@@ -141,6 +141,26 @@ export function FlameIcon({ size = 16, color }: IconProps) {
   )
 }
 
+// Snap a food photo, for the Caloric Consistency page.
+export function CameraIcon({ size = 16, color }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+      style={{ color }}
+    >
+      <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="14" r="3.5" />
+    </svg>
+  )
+}
+
 // Friends / leaderboard.
 export function PeopleIcon({ size = 16, color }: IconProps) {
   return (

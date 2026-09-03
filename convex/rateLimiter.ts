@@ -109,6 +109,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   postComment: { kind: 'token bucket', rate: 20, period: MINUTE, capacity: 10 },
   postRepost: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 5 },
   postReport: { kind: 'token bucket', rate: 10, period: 60 * MINUTE, capacity: 3 },
+
+  // --- nutrition / food logging ---
+  // Each generated URL is a license to write a blob, same reasoning as
+  // avatarUploadUrl/postPhotoUploadUrl.
+  foodPhotoUploadUrl: { kind: 'token bucket', rate: 20, period: 60 * MINUTE, capacity: 5 },
+  // Tighter than the upload-URL mint: each analysis is a paid external AI
+  // call, not just a storage write, so this is the real cost-control point.
+  foodPhotoAnalyze: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
 })
 
 /**
