@@ -47,6 +47,41 @@ describe('logManualEntry', () => {
     expect((await user.query(api.nutrition.getToday, {})).totals.calories).toBe(500)
   })
 
+  it('derives calories from the macros when none are given', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.nutrition.logManualEntry, { proteinG: 40, carbsG: 50, fatG: 20 })
+
+    // 40*4 + 50*4 + 20*9 = 540
+    expect((await user.query(api.nutrition.getToday, {})).totals).toMatchObject({
+      calories: 540,
+      proteinG: 40,
+      carbsG: 50,
+      fatG: 20,
+    })
+  })
+
+  it('keeps an explicit calorie count over the macro math', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.nutrition.logManualEntry, { calories: 700, proteinG: 40, fatG: 20 })
+
+    expect((await user.query(api.nutrition.getToday, {})).totals.calories).toBe(700)
+  })
+
+  it('does not invent calories for a fiber-only entry', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.nutrition.logManualEntry, { fiberG: 6 })
+
+    const today = await user.query(api.nutrition.getToday, {})
+    expect(today.totals).toMatchObject({ calories: 0, fiberG: 6 })
+    expect(today.entries[0]).toMatchObject({ calories: null })
+  })
+
   it('rejects an empty entry', async () => {
     const t = createBackend()
     const user = asUser(t, await createUser(t, 'alice'))

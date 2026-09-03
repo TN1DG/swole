@@ -3,6 +3,7 @@ import {
   ACTIVITY_LEVELS,
   beatsRecord,
   behindRecord,
+  caloriesFromMacros,
   cmToFtIn,
   consistencyTier,
   GOALS,
@@ -217,6 +218,27 @@ describe('macroTargets', () => {
   it('never returns negative carbs even at very low calories', () => {
     const result = macroTargets(1200, 100, 'cut')
     expect(result.carbsG).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('caloriesFromMacros', () => {
+  it('applies 4/4/9 kcal per gram', () => {
+    expect(caloriesFromMacros(40, 50, 20)).toBe(540)
+  })
+
+  it('is zero when every macro is zero', () => {
+    expect(caloriesFromMacros(0, 0, 0)).toBe(0)
+  })
+
+  it('rounds to a whole calorie', () => {
+    expect(caloriesFromMacros(10.5, 0, 0)).toBe(42)
+  })
+
+  it('agrees with the split macroTargets works back from', () => {
+    const t = macroTargets(2259, 80, 'cut')
+    // Each macro is rounded to a gram, so the reconstruction lands within a
+    // few kcal of the original calorie figure.
+    expect(caloriesFromMacros(t.proteinG, t.carbsG, t.fatG)).toBeCloseTo(2259, -1)
   })
 })
 

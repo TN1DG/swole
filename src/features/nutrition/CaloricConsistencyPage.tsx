@@ -1,10 +1,16 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAction, useMutation, useQuery } from 'convex/react'
 import { Box, Button, IconButton, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { goalCalories, macroTargets, mifflinStJeorBmr, tdee } from '../../../convex/fitness'
+import {
+  caloriesFromMacros,
+  goalCalories,
+  macroTargets,
+  mifflinStJeorBmr,
+  tdee,
+} from '../../../convex/fitness'
 import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
 import { CameraIcon } from '../../components/icons'
@@ -15,8 +21,9 @@ const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG:
 
 // Reached by tapping a goal card on the Stats page (see StatsPage.tsx:
 // handleSelectGoal), which saves that goal first. Shows today's food-intake
-// stats against it, and the two ways to log a new item: type it in, or snap
-// a photo and let a vision model estimate it (convex/nutrition.ts).
+// stats against it, and the two ways to log a new item: enter the macros (the
+// calorie count follows from them unless you type your own), or add a photo
+// and let a vision model estimate it (convex/nutrition.ts).
 export function CaloricConsistencyPage() {
   const profile = useQuery(api.profiles.getMine)
   const today = useQuery(api.nutrition.getToday)
@@ -34,6 +41,18 @@ export function CaloricConsistencyPage() {
 
   const setField = (key: keyof FoodFields, value: string) =>
     setFields((prev) => ({ ...prev, [key]: value }))
+
+  // The calories the macros currently add up to — shown under the Calories
+  // field as its placeholder, and saved as-is when the user leaves that field
+  // blank. `null` until at least one macro is entered, so we don't flash "0".
+  const macroCalories = useMemo(() => {
+    const p = Number(fields.proteinG)
+    const c = Number(fields.carbsG)
+    const f = Number(fields.fatG)
+    if (!fields.proteinG.trim() && !fields.carbsG.trim() && !fields.fatG.trim()) return null
+    if (Number.isNaN(p) || Number.isNaN(c) || Number.isNaN(f)) return null
+    return caloriesFromMacros(p || 0, c || 0, f || 0)
+  }, [fields.proteinG, fields.carbsG, fields.fatG])
 
   if (profile === undefined || today === undefined) {
     return (
@@ -84,6 +103,8 @@ export function CaloricConsistencyPage() {
     }
     setSaving(true)
     try {
+      // Calories left blank is intentional — logManualEntry fills it in from
+      // the macros (4/4/9). Only send a number when the user typed their own.
       await logManualEntry({
         calories: fields.calories.trim() ? Number(fields.calories) : undefined,
         proteinG: fields.proteinG.trim() ? Number(fields.proteinG) : undefined,
@@ -161,17 +182,11 @@ export function CaloricConsistencyPage() {
         Log food
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        Type it in, or snap a photo and let AI estimate it.
+        Type in the macros, or add a photo and let AI estimate it.
       </Typography>
 
       <Box component="form" onSubmit={(e) => void handleLogManual(e)} sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 1.5 }}>
-          <TextField
-            label="Calories"
-            value={fields.calories}
-            onChange={(e) => setField('calories', e.target.value)}
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-          />
           <TextField
             label="Protein (g)"
             value={fields.proteinG}
@@ -197,6 +212,18 @@ export function CaloricConsistencyPage() {
             slotProps={{ htmlInput: { inputMode: 'decimal' } }}
           />
         </Box>
+        <TextField
+          label="Calories"
+          value={fields.calories}
+          onChange={(e) => setField('calories', e.target.value)}
+          placeholder={macroCalories !== null ? String(macroCalories) : undefined}
+          helperText={
+            macroCalories !== null
+              ? `≈ ${macroCalories} kcal from the macros above — leave blank to use this`
+              : 'Leave blank to total it from protein, carbs and fat'
+          }
+          slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+        />
 
         {error && (
           <Typography variant="body2" color="error">
@@ -209,18 +236,20 @@ export function CaloricConsistencyPage() {
             {saving ? 'Logging…' : 'Log'}
           </Button>
           <IconButton
-            aria-label="Take a photo of your food"
+            aria-label="Add a photo of your food"
             disabled={analyzing}
             onClick={() => fileInputRef.current?.click()}
             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
           >
             <CameraIcon size={20} />
           </IconButton>
+          {/* No `capture` attribute: on a phone this lets the user pick "Take
+              Photo" or an existing shot from their library, rather than being
+              forced straight into the camera. */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             hidden
             onChange={(e) => void handlePhotoChange(e)}
           />
