@@ -265,6 +265,49 @@ describe('analyzeFoodPhoto — not configured', () => {
   })
 })
 
+describe('analyzeFoodPhoto — ownership', () => {
+  // These exercise the check ahead of the AI_GATEWAY_API_KEY gate, so they
+  // pass with or without the key set — set here to isolate them from that
+  // other failure mode.
+  beforeEach(() => {
+    process.env.AI_GATEWAY_API_KEY = 'test-key'
+  })
+  afterEach(() => {
+    delete process.env.AI_GATEWAY_API_KEY
+  })
+
+  it("rejects analyzing someone else's entry", async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    const storageId = await storeBlob(t, jpegBlob())
+    const logged = await alice.mutation(api.nutrition.logPhotoEntry, { storageId })
+    if (!logged.ok) throw new Error('expected ok')
+
+    await expect(
+      bob.action(api.nutrition.analyzeFoodPhoto, { foodLogId: logged.foodLogId, storageId }),
+    ).rejects.toThrow(/not found/i)
+  })
+
+  it("rejects a storageId that doesn't match the entry's own photo", async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+
+    const storageId = await storeBlob(t, jpegBlob())
+    const logged = await alice.mutation(api.nutrition.logPhotoEntry, { storageId })
+    if (!logged.ok) throw new Error('expected ok')
+
+    const otherStorageId = await storeBlob(t, jpegBlob())
+    await expect(
+      alice.action(api.nutrition.analyzeFoodPhoto, {
+        foodLogId: logged.foodLogId,
+        storageId: otherStorageId,
+      }),
+    ).rejects.toThrow(/not found/i)
+  })
+})
+
 describe('account deletion', () => {
   it('frees a food photo blob', async () => {
     const t = createBackend()
