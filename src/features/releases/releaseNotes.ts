@@ -27,6 +27,16 @@ export type Release = {
 // type instead of being re-checked at every use.
 export const RELEASES: [Release, ...Release[]] = [
   {
+    version: '1.5.0',
+    releasedAt: Date.UTC(2026, 8, 4),
+    summary: 'Track what you eat, and Routines and Exercises now share one Library tab.',
+    changes: [
+      'New Nutrition tab: log food by hand, or snap a photo and let AI estimate the calories and macros. Tracked against the goal you set on My Stats.',
+      'Routines and Exercises are now one Library tab with a switch at the top — nothing you had is gone, it just freed up a nav slot for Nutrition.',
+      'A bell in the header now shows a dot when you have unread notifications, so you can check without opening a page.',
+    ],
+  },
+  {
     version: '1.4.0',
     releasedAt: Date.UTC(2026, 6, 28),
     summary: 'The feed is here — share a workout with a photo, and see what everyone else is lifting.',
