@@ -128,6 +128,37 @@ export const getThread = query({
   },
 })
 
+// Whichever of us sent the most recent ping, in either direction — for the
+// Friends-list activity preview. Two indexed point lookups (cheap, same
+// shape as latestIncomingPingAt) rather than loading the whole thread.
+export async function latestPingBetween(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+): Promise<{ ts: number; isMine: boolean; acknowledged: boolean } | null> {
+  const [mine, theirs] = await Promise.all([
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', userId).eq('toUserId', friendId))
+      .order('desc')
+      .first(),
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
+      .order('desc')
+      .first(),
+  ])
+  const latest = [mine, theirs]
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .sort((a, b) => b.sentAt - a.sentAt)[0]
+  if (!latest) return null
+  return {
+    ts: latest.sentAt,
+    isMine: latest.fromUserId === userId,
+    acknowledged: latest.acknowledgedAt !== undefined,
+  }
+}
+
 // The single most-relevant "your friend held you accountable" prompt for the
 // caller, or null. Shown only while it's still actionable: I sent it, they
 // acked it, I haven't dismissed it, it hasn't gone stale (same 24h window

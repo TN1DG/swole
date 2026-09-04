@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { api, internal } from './_generated/api'
-import type { Id } from './_generated/dataModel'
+import { pickLatestChallenge } from './challenges'
+import type { Doc, Id } from './_generated/dataModel'
 import {
   createBackend,
   createUser,
@@ -406,5 +407,64 @@ describe('getThread', () => {
     const t: T = createBackend()
     const someUserId = await createUser(t, 'ghost')
     expect(await t.query(api.challenges.getThread, { friendUserId: someUserId })).toEqual([])
+  })
+})
+
+// Pure — no backend needed. Fixtures below only set the fields
+// pickLatestChallenge actually reads.
+describe('pickLatestChallenge', () => {
+  const userId = 'user_a' as Id<'users'>
+  const friendId = 'user_b' as Id<'users'>
+  const otherId = 'user_c' as Id<'users'>
+
+  function fixture(overrides: Partial<Doc<'challenges'>>): Doc<'challenges'> {
+    return {
+      _id: 'k1' as Id<'challenges'>,
+      _creationTime: 0,
+      challengerId: userId,
+      opponentId: friendId,
+      status: 'pending',
+      weeks: 2,
+      wagerPoints: 10,
+      createdAt: 0,
+      ...overrides,
+    } as Doc<'challenges'>
+  }
+
+  it('returns null when there are none between the pair', () => {
+    expect(pickLatestChallenge([], userId, friendId)).toBeNull()
+  })
+
+  it('ignores challenges with a different friend', () => {
+    const c = fixture({ opponentId: otherId, createdAt: 100 })
+    expect(pickLatestChallenge([c], userId, friendId)).toBeNull()
+  })
+
+  it('ranks by resolvedAt ?? startedAt ?? createdAt, not creation order', () => {
+    const older = fixture({ challengerId: userId, opponentId: friendId, createdAt: 100, startedAt: 200 })
+    const newer = fixture({ challengerId: friendId, opponentId: userId, createdAt: 50, resolvedAt: 300 })
+    expect(pickLatestChallenge([older, newer], userId, friendId)).toMatchObject({ ts: 300, isMine: false })
+  })
+
+  it('computes isMine from challengerId', () => {
+    const mine = fixture({ challengerId: userId, opponentId: friendId, createdAt: 10 })
+    expect(pickLatestChallenge([mine], userId, friendId)).toMatchObject({ isMine: true })
+
+    const theirs = fixture({ challengerId: friendId, opponentId: userId, createdAt: 10 })
+    expect(pickLatestChallenge([theirs], userId, friendId)).toMatchObject({ isMine: false })
+  })
+
+  it('computes outcome only when resolved: won, lost, and tied', () => {
+    const active = fixture({ status: 'active', createdAt: 1, startedAt: 2 })
+    expect(pickLatestChallenge([active], userId, friendId)).toMatchObject({ outcome: null })
+
+    const won = fixture({ status: 'resolved', createdAt: 1, resolvedAt: 2, winnerId: userId })
+    expect(pickLatestChallenge([won], userId, friendId)).toMatchObject({ outcome: 'won' })
+
+    const lost = fixture({ status: 'resolved', createdAt: 1, resolvedAt: 2, winnerId: friendId })
+    expect(pickLatestChallenge([lost], userId, friendId)).toMatchObject({ outcome: 'lost' })
+
+    const tied = fixture({ status: 'resolved', createdAt: 1, resolvedAt: 2 })
+    expect(pickLatestChallenge([tied], userId, friendId)).toMatchObject({ outcome: 'tied' })
   })
 })
