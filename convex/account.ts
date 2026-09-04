@@ -352,6 +352,22 @@ export const purgeAccountData = internalMutation({
         .take(n),
     )
 
+    // Food log entries, same "storage blob owned by this row" shape as
+    // avatars/post photos — drain() only deletes rows, so a photo entry's
+    // blob is removed here explicitly before the row goes.
+    while (budget.left > 0) {
+      const entries = await ctx.db
+        .query('foodLogs')
+        .withIndex('by_owner_loggedAt', (q) => q.eq('ownerId', userId))
+        .take(Math.min(budget.left, 100))
+      if (entries.length === 0) break
+      for (const entry of entries) {
+        await ctx.db.delete(entry._id)
+        if (entry.photoStorageId) await ctx.storage.delete(entry.photoStorageId)
+      }
+      budget.left -= entries.length
+    }
+
     if (budget.left <= 0) {
       // More to do — pick up where this run stopped.
       await ctx.scheduler.runAfter(0, internal.account.purgeAccountData, { userId })

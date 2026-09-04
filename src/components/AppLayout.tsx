@@ -1,12 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from 'convex/react'
-import { Box, useTheme } from '@mui/material'
+import { Badge, Box, useTheme } from '@mui/material'
 import { api } from '../../convex/_generated/api'
 import { PingAckBanner } from './PingAckBanner'
 import { NotificationsBanner } from './NotificationsBanner'
 import { Avatar } from './Avatar'
 import { WhatsNewGate } from '../features/releases/WhatsNewDialog'
-import { PeopleIcon } from './icons'
+import { FlameIcon, PeopleIcon } from './icons'
 import { tokens } from '../theme/tokens'
 import { GlassCard } from './GlassCard'
 
@@ -14,9 +14,9 @@ import { GlassCard } from './GlassCard'
 const tabs = [
   { to: '/', label: 'Workout', icon: DumbbellIcon },
   { to: '/history', label: 'History', icon: ClockIcon },
+  { to: '/nutrition/consistency', label: 'Nutrition', icon: FlameIcon },
   { to: '/friends', label: 'Friends', icon: PeopleIcon },
-  { to: '/routines', label: 'Routines', icon: ListIcon },
-  { to: '/exercises', label: 'Exercises', icon: BookIcon },
+  { to: '/library', label: 'Library', icon: BookIcon },
 ]
 
 export function AppLayout() {
@@ -26,6 +26,9 @@ export function AppLayout() {
   // Already subscribed to on most screens, so this is a cache hit rather
   // than an extra round trip.
   const profile = useQuery(api.profiles.getMine)
+  // Drives the header bell's unread dot — same query the in-page banner
+  // already subscribes to, so this doesn't add a new round trip either.
+  const unreadNotifications = useQuery(api.notifications.listUnread)
 
   return (
     // App shell pinned directly to the viewport via `position: fixed; inset:
@@ -94,21 +97,13 @@ export function AppLayout() {
         >
           SWOLE
         </Box>
-        {/* Your own photo once you've set one; the generic silhouette until
-            then. Sized to match the icon's outer circle so the header height
-            doesn't shift when an avatar loads. */}
-        {profile?.avatarUrl ? (
-          <NavLink to="/profile" aria-label="Profile" style={{ display: 'flex' }}>
-            <Avatar
-              src={profile.avatarUrl}
-              name={profile.displayName ?? profile.email}
-              size={34}
-            />
-          </NavLink>
-        ) : (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Persistent entry point to the notifications inbox — previously
+              only reachable via the in-page banner's overflow link once 4+
+              notices stacked up. */}
           <NavLink
-            to="/profile"
-            aria-label="Profile"
+            to="/notifications"
+            aria-label="Notifications"
             style={({ isActive }) => ({
               display: 'flex',
               borderRadius: '9999px',
@@ -117,9 +112,41 @@ export function AppLayout() {
               color: isActive ? activeColor : mutedColor,
             })}
           >
-            <ProfileIcon />
+            <Badge
+              color="error"
+              variant="dot"
+              invisible={!unreadNotifications || unreadNotifications.length === 0}
+            >
+              <BellIcon />
+            </Badge>
           </NavLink>
-        )}
+          {/* Your own photo once you've set one; the generic silhouette until
+              then. Sized to match the icon's outer circle so the header height
+              doesn't shift when an avatar loads. */}
+          {profile?.avatarUrl ? (
+            <NavLink to="/profile" aria-label="Profile" style={{ display: 'flex' }}>
+              <Avatar
+                src={profile.avatarUrl}
+                name={profile.displayName ?? profile.email}
+                size={34}
+              />
+            </NavLink>
+          ) : (
+            <NavLink
+              to="/profile"
+              aria-label="Profile"
+              style={({ isActive }) => ({
+                display: 'flex',
+                borderRadius: '9999px',
+                border: `1px solid ${tokens.border}`,
+                padding: 8,
+                color: isActive ? activeColor : mutedColor,
+              })}
+            >
+              <ProfileIcon />
+            </NavLink>
+          )}
+        </Box>
       </Box>
 
       {/* Page content. Bottom padding clears the fixed tab bar — derived from
@@ -241,8 +268,8 @@ export function AppLayout() {
 }
 
 // --- Icons (inline SVG keeps us dependency-free) ---
-// PeopleIcon lives in ./icons.tsx (this file used to have an identical local
-// duplicate) — every other tab icon here is only used by this nav, so they
+// PeopleIcon and FlameIcon live in ./icons.tsx (shared with other pages) —
+// every other icon here (tab or header) is only used by this shell, so they
 // stay local.
 
 function DumbbellIcon() {
@@ -271,10 +298,11 @@ function ProfileIcon() {
   )
 }
 
-function ListIcon() {
+function BellIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 3 1 4.5 1.5 5.5h-15C5 12.5 6 11 6 8Z" />
+      <path d="M9.5 17a2.5 2.5 0 0 0 5 0" />
     </svg>
   )
 }

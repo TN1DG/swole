@@ -8,10 +8,10 @@ import { WorkoutsPage } from './features/workouts/WorkoutsPage'
 import { HistoryPage } from './features/history/HistoryPage'
 import { WorkoutDetailPage } from './features/history/WorkoutDetailPage'
 import { SharePage } from './features/share/SharePage'
-import { RoutinesPage } from './features/routines/RoutinesPage'
-import { ExercisesPage } from './features/exercises/ExercisesPage'
+import { LibraryPage } from './features/library/LibraryPage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { StatsPage } from './features/stats/StatsPage'
+import { CaloricConsistencyPage } from './features/nutrition/CaloricConsistencyPage'
 import { FriendsPage } from './features/friends/FriendsPage'
 import { FriendWorkoutsPage } from './features/friends/FriendWorkoutsPage'
 import { FriendWorkoutDetailPage } from './features/friends/FriendWorkoutDetailPage'
@@ -49,9 +49,10 @@ export default function App() {
               <Route path="/feed/compose/:workoutId" element={<ComposePostPage />} />
               <Route path="/feed/:postId" element={<PostDetailPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/favorites" element={<Navigate to="/exercises" replace />} />
+              <Route path="/favorites" element={<Navigate to="/library?tab=exercises&favorites=1" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/stats" element={<StatsPage />} />
+              <Route path="/nutrition/consistency" element={<CaloricConsistencyPage />} />
               <Route path="/friends" element={<FriendsPage />} />
               <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
               <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
@@ -60,8 +61,9 @@ export default function App() {
                 path="/friends/:userId/:workoutId/trophy"
                 element={<FriendTrophyPage />}
               />
-              <Route path="/routines" element={<RoutinesPage />} />
-              <Route path="/exercises" element={<ExercisesPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/routines" element={<Navigate to="/library" replace />} />
+              <Route path="/exercises" element={<Navigate to="/library?tab=exercises" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

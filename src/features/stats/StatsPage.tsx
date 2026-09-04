@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
@@ -8,6 +8,7 @@ import {
   mifflinStJeorBmr,
   tdee,
   type ActivityLevel,
+  type Goal,
   type Sex,
 } from '../../../convex/fitness'
 import { CalorieBreakdown } from './CalorieBreakdown'
@@ -23,10 +24,12 @@ import type { WeightUnit } from '../../lib/weightFormat'
 import { SegmentedControl } from '../../components/SegmentedControl'
 
 export function StatsPage() {
+  const navigate = useNavigate()
   const profile = useQuery(api.profiles.getMine)
   const updateBodyStats = useMutation(api.profiles.updateBodyStats)
   const setDailyVolumeGoal = useMutation(api.profiles.setDailyVolumeGoal)
   const setUnitPreference = useMutation(api.profiles.setUnitPreference)
+  const setNutritionGoal = useMutation(api.profiles.setNutritionGoal)
 
   // Display units only — heightCm/weightKg are always what gets stored.
   // 'kg' = metric (cm), 'lb' = imperial (ft+in). The conversion itself lives
@@ -106,6 +109,14 @@ export function StatsPage() {
     } catch (err) {
       setError(errorMessage(err, 'Could not save.'))
     }
+  }
+
+  // Tapping a goal card saves it, then hands off to the Caloric Consistency
+  // page — unlike everywhere else in the app, navigation has to wait on the
+  // mutation, so this uses useNavigate rather than a declarative <Link>.
+  async function handleSelectGoal(goal: Goal) {
+    await setNutritionGoal({ goal })
+    navigate('/nutrition/consistency')
   }
 
   async function handleSaveGoal(e: React.FormEvent<HTMLFormElement>) {
@@ -267,7 +278,13 @@ export function StatsPage() {
 
       {tdeeValue !== null && bmr !== null ? (
         <Box sx={{ mt: 3 }}>
-          <CalorieBreakdown bmr={bmr} tdeeValue={tdeeValue} weightKg={weightKg} />
+          <CalorieBreakdown
+            bmr={bmr}
+            tdeeValue={tdeeValue}
+            weightKg={weightKg}
+            selectedGoal={profile?.nutritionGoal ?? undefined}
+            onSelectGoal={(goal) => void handleSelectGoal(goal)}
+          />
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>

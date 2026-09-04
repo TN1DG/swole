@@ -196,39 +196,50 @@ rehearsal surface. Revisit when agents start owning the `dev → staging` hop.
 
 **One consequence of going public to keep in view:** this document and
 `docs/security-audit.md` are now world-readable, and they name live weaknesses
-precisely — that Turnstile is inert in production, the exact rate-limit numbers,
-and (at the time of writing) that `resolveUsername` enumeration was unthrottled.
-That disclosure only has teeth while the weaknesses are live, which makes
-§3.1/§3.2 more time-sensitive than they were this morning. The chosen answer is
-to close the findings rather than redact the writing.
+precisely — that Turnstile was inert in production, the exact rate-limit
+numbers, and (at the time of writing) that `resolveUsername` enumeration was
+unthrottled. That disclosure only has teeth while the weaknesses are live,
+which made §3.1/§3.2 time-sensitive. The chosen answer was to close the
+findings rather than redact the writing.
 
-Enumeration was closed on 2026-08-14 (issue #24). Turnstile remains the
-outstanding one.
+Both are now closed: enumeration on 2026-08-14 (issue #24), and Turnstile the
+same day (§3.1). The rate-limit numbers remain published, which is fine — they
+are a deterrent whose value does not depend on secrecy.
 
 ---
 
 ## 3. Production readiness
 
-### 3.1 Turnstile is inert in production — confirmed, not inferred
+### 3.1 ~~Turnstile is inert in production~~ — ✅ ENABLED 2026-08-14
 
-`npx convex env list --prod` returns exactly four variables:
+**`TURNSTILE_SECRET_KEY` is now set on the production Convex deployment.**
+Sign-up requires a solved challenge from this point on.
 
-```
-JWKS, JWT_PRIVATE_KEY, RESEND_API_KEY, SITE_URL
-```
+What this section previously recorded, and why it took until now: the secret
+was absent, so by the deliberate fail-open design in `docs/security-audit.md`
+(§D) enforcement was skipped entirely and production had no bot protection on
+sign-up beyond the app-wide `rateLimiter.signUp` limit of 20 per 10 minutes —
+a limit that, as the audit notes, cannot tell one abuser from everybody else.
+The work was built and tested but unshipped, which is the worst of both worlds.
 
-**`TURNSTILE_SECRET_KEY` is absent.** By the deliberate fail-open design documented
-in `docs/security-audit.md` (§D) — enforcement is conditional on the secret being
-set, so that a fresh preview deployment with zero env vars doesn't break sign-up —
-production currently has **no bot protection on sign-up** beyond the app-wide
-`rateLimiter.signUp` limit of 20 per 10 minutes.
+The enablement order in `docs/security-audit.md` was followed: the site key had
+already shipped in a genuinely new production build (PR #18), so the widget was
+in the bundle before the secret went live. Setting the secret first would have
+broken sign-up for every new user.
 
-That design tradeoff was made knowingly and the audit called out its cost: "production
-silently loses the protection if the variable ever goes missing". It has never been
-set, so the protection has never been on.
+One extra precondition, added since that runbook was written: issue #19 shipped
+in PR #42, immediately before this. A visitor on a service-worker-cached bundle
+from before the site key existed has no widget, and would otherwise have been
+told to "complete the challenge" on a page with no challenge on it. #19 turns
+that dead end into a refresh instruction. Enabling the secret before #19 was
+live would have reintroduced exactly the bug it closes.
 
-This is not urgent — the global limit still stops scripted floods — but the work is
-built, tested, and sitting unshipped, which is the worst of both worlds.
+> **Still outstanding: nobody has completed a sign-up since it was enabled.**
+> The design fails *open*, which means a wrong or missing secret looks
+> identical to everything working. Confirming it is genuinely on requires a
+> real sign-up in a fresh browser: the widget must render, and the account must
+> be created. Until someone does that, "enabled" is a claim about an
+> environment variable, not about behaviour.
 
 ### 3.2 Promotion debt — ✅ shipped 2026-08-13
 
