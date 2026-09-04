@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAction, useMutation, useQuery } from 'convex/react'
-import { Box, Button, IconButton, TextField, Typography } from '@mui/material'
+import { Box, Button, IconButton, Link as MuiLink, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import {
@@ -14,16 +14,19 @@ import {
 import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
 import { CameraIcon } from '../../components/icons'
+import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { NutrientProgress } from './NutrientProgress'
 
 type FoodFields = { calories: string; proteinG: string; carbsG: string; fatG: string; fiberG: string }
 const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' }
 
-// Reached by tapping a goal card on the Stats page (see StatsPage.tsx:
-// handleSelectGoal), which saves that goal first. Shows today's food-intake
-// stats against it, and the two ways to log a new item: enter the macros (the
-// calorie count follows from them unless you type your own), or add a photo
-// and let a vision model estimate it (convex/nutrition.ts).
+// The Nutrition tab. Falls back to `nutritionGoal ?? 'maintain'` when the
+// user hasn't picked a goal on the Stats page yet (see StatsPage.tsx:
+// handleSelectGoal), so it works fine reached directly from the nav rather
+// than only via a goal card. Shows today's food-intake stats against that
+// goal, and the two ways to log a new item: enter the macros (the calorie
+// count follows from them unless you type your own), or add a photo and let
+// a vision model estimate it (convex/nutrition.ts).
 export function CaloricConsistencyPage() {
   const profile = useQuery(api.profiles.getMine)
   const today = useQuery(api.nutrition.getToday)
@@ -72,11 +75,8 @@ export function CaloricConsistencyPage() {
   ) {
     return (
       <Box>
-        <Typography component={Link} to="/stats" variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
-          ← Stats
-        </Typography>
-        <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold' }}>
-          Caloric Consistency
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          Nutrition
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
           Finish your body stats first — that's what the calorie targets below are based on.
@@ -158,14 +158,15 @@ export function CaloricConsistencyPage() {
 
   return (
     <Box>
-      <Typography component={Link} to="/stats" variant="body2" color="text.secondary" sx={{ textDecoration: 'none' }}>
-        ← Stats
+      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+        Nutrition
       </Typography>
-      <Typography variant="h5" sx={{ mt: 1, fontWeight: 'bold' }}>
-        Caloric Consistency
-      </Typography>
+      <FirstVisitTip tabKey="nutrition" />
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        Today, against your {goal} goal.
+        Today, against your {goal} goal ·{' '}
+        <MuiLink component={Link} to="/stats" color="primary.main">
+          Edit stats
+        </MuiLink>
       </Typography>
 
       <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
