@@ -12,7 +12,7 @@ import { ExerciseForm } from './ExerciseForm'
 import { GlassTile } from '../../components/GlassTile'
 import { noScrollbarSx } from '../../theme/noScrollbar'
 
-export function ExercisesPage() {
+export function ExercisesTab({ initialFavoritesOnly = false }: { initialFavoritesOnly?: boolean }) {
   // Reactive: re-renders automatically whenever exercises change on the server.
   const exercises = useQuery(api.exercises.list)
 
@@ -30,7 +30,7 @@ export function ExercisesPage() {
 
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [favoritesOnly, setFavoritesOnly] = useState(initialFavoritesOnly)
   const [formOpen, setFormOpen] = useState(false)
   const [selected, setSelected] = useState<Doc<'exercises'> | null>(null)
 
@@ -48,11 +48,8 @@ export function ExercisesPage() {
   })).filter((s) => s.items.length > 0)
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Exercises
-        </Typography>
+    <Box sx={{ mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button variant="contained" size="small" onClick={() => setFormOpen(true)}>
           + New
         </Button>

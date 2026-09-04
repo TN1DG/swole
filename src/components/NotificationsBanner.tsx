@@ -9,9 +9,9 @@ import { InlineNotice } from './InlineNotice'
 
 type Notification = FunctionReturnType<typeof api.notifications.listUnread>[number]
 
-// How many stack at once. There's no notifications *page* yet, so the rest
-// stay unread until these are cleared and the next ones surface — see
-// docs/new-features-progress.md for why that's the accepted v1 tradeoff.
+// How many stack at once. The rest stay unread until these are cleared and
+// the next ones surface, or until the reader taps the header bell / "See
+// all" link to open the full /notifications inbox instead.
 const MAX_VISIBLE = 3
 
 // What each kind says and where tapping it goes. Kept as one lookup rather

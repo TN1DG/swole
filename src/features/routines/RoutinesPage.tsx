@@ -8,7 +8,7 @@ import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { GlassTile } from '../../components/GlassTile'
 import { RoutineEditor, type RoutineDraft } from './RoutineEditor'
 
-export function RoutinesPage() {
+export function RoutinesTab() {
   const routines = useQuery(api.routines.list)
   const startFromRoutine = useMutation(api.routines.startFromRoutine)
   const navigate = useNavigate()
@@ -37,11 +37,8 @@ export function RoutinesPage() {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Routines
-        </Typography>
+    <Box sx={{ mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button variant="contained" size="small" onClick={() => setEditing('new')}>
           + New
         </Button>

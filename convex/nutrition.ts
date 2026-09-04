@@ -2,7 +2,14 @@ import { v, ConvexError } from 'convex/values'
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { action, internalMutation, mutation, query, type MutationCtx } from './_generated/server'
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+} from './_generated/server'
 import { internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
@@ -139,6 +146,20 @@ export const analyzeFoodPhoto = action({
     if (userId === null) throw new ConvexError('Not signed in')
     await rateLimiter.limit(ctx, 'foodPhotoAnalyze', { key: userId, throws: true })
 
+    // Actions have no ctx.db, so ownership is checked via an internal query
+    // rather than a direct get — same "bind the args to each other and to
+    // the caller" shape saveAnalysis/markAnalysisFailed already use below,
+    // just applied before the read+external-call instead of only at the
+    // write. Without this, any signed-in caller could point storageId at a
+    // blob outside their own upload and get it described by the vision
+    // model on the app's dime.
+    const entry = await ctx.runQuery(internal.nutrition.getEntryForAnalysis, {
+      foodLogId: args.foodLogId,
+    })
+    if (!entry || entry.ownerId !== userId || entry.photoStorageId !== args.storageId) {
+      throw new ConvexError('Entry not found')
+    }
+
     // Not configured on this deployment (e.g. a fresh preview — see
     // docs/domain-and-environments-plan.md for the same trap with auth env
     // vars) — fail with a message the UI can show, not an opaque error.
@@ -203,6 +224,12 @@ export const analyzeFoodPhoto = action({
     })
     return { ...clamped, confidence: analysis.confidence }
   },
+})
+
+/** Ownership lookup for analyzeFoodPhoto. Internal: actions have no ctx.db. */
+export const getEntryForAnalysis = internalQuery({
+  args: { foodLogId: v.id('foodLogs') },
+  handler: async (ctx, args) => await ctx.db.get(args.foodLogId),
 })
 
 /** Writes a completed analysis. Internal: only analyzeFoodPhoto may call it. */
