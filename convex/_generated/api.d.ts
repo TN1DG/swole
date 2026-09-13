@@ -14,6 +14,7 @@ import type * as challenges from "../challenges.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as emailAuth from "../emailAuth.js";
+import type * as env from "../env.js";
 import type * as exercises from "../exercises.js";
 import type * as favorites from "../favorites.js";
 import type * as featureRequests from "../featureRequests.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   crons: typeof crons;
   emailAuth: typeof emailAuth;
+  env: typeof env;
   exercises: typeof exercises;
   favorites: typeof favorites;
   featureRequests: typeof featureRequests;

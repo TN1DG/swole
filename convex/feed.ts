@@ -11,13 +11,6 @@ import { cleanText, LIMITS } from './validation'
 // Bigger than an avatar: feed photos are 4:5 at up to 1440px.
 const MAX_POST_PHOTO_BYTES = 8 * 1024 * 1024
 
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
-}
-
 /** Everyone this user has blocked, for filtering both feed streams. */
 async function blockedIds(ctx: QueryCtx, userId: Id<'users'>): Promise<Set<Id<'users'>>> {
   const rows = await ctx.db
@@ -307,7 +300,7 @@ export const getPost = query({
 export const generatePostPhotoUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postPhotoUploadUrl', { key: userId, throws: true })
     return await ctx.storage.generateUploadUrl()
   },
@@ -335,7 +328,7 @@ export const createPost = mutation({
     ctx,
     args,
   ): Promise<{ ok: true; postId: Id<'posts'> } | { ok: false; error: string }> => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postCreate', { key: userId, throws: true })
 
     const workout = await ctx.db.get(args.workoutId)
@@ -399,7 +392,7 @@ export const createPost = mutation({
 export const toggleLike = mutation({
   args: { postId: v.id('posts') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postLike', { key: userId, throws: true })
 
     const post = await ctx.db.get(args.postId)
@@ -436,7 +429,7 @@ export const toggleLike = mutation({
 export const addComment = mutation({
   args: { postId: v.id('posts'), text: v.string() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postComment', { key: userId, throws: true })
 
     const post = await ctx.db.get(args.postId)
@@ -472,7 +465,7 @@ export const addComment = mutation({
 export const deleteComment = mutation({
   args: { commentId: v.id('postComments') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const comment = await ctx.db.get(args.commentId)
     if (!comment) throw new ConvexError('Comment not found')
 
@@ -503,7 +496,7 @@ export const deleteComment = mutation({
 export const repost = mutation({
   args: { postId: v.id('posts'), caption: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postRepost', { key: userId, throws: true })
 
     const target = await ctx.db.get(args.postId)
@@ -556,7 +549,7 @@ export const repost = mutation({
 export const deletePost = mutation({
   args: { postId: v.id('posts') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const post = await ctx.db.get(args.postId)
     if (!post || post.authorId !== userId) throw new ConvexError('Post not found')
 
@@ -567,7 +560,7 @@ export const deletePost = mutation({
 export const reportPost = mutation({
   args: { postId: v.id('posts'), reason: v.string() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'postReport', { key: userId, throws: true })
 
     const post = await ctx.db.get(args.postId)
@@ -585,7 +578,7 @@ export const reportPost = mutation({
 export const blockUser = mutation({
   args: { userId: v.id('users') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     if (args.userId === userId) throw new ConvexError("You can't block yourself")
 
     const existing = await ctx.db
@@ -615,7 +608,7 @@ export const blockUser = mutation({
 export const unblockUser = mutation({
   args: { userId: v.id('users') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const existing = await ctx.db
       .query('blockedUsers')
       .withIndex('by_user_blocked', (q) =>

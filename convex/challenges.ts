@@ -16,14 +16,6 @@ import { areFriends } from './friendships'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
-}
-
-
 // Every challenge I'm a party to (either side), unfiltered — the shared fetch
 // behind both openChallengeBetween and challengesBetween, and (via
 // pickLatestChallenge) the Friends-list activity preview. Callers filter/rank
@@ -99,7 +91,7 @@ async function workoutStartedAts(ctx: QueryCtx | MutationCtx, ownerId: Id<'users
 export const propose = mutation({
   args: { opponentId: v.id('users'), weeks: v.number(), wagerPoints: v.number() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'challengePropose', { key: userId, throws: true })
     if (userId === args.opponentId) throw new Error("Can't challenge yourself")
     if (!(await areFriends(ctx, userId, args.opponentId))) {
@@ -129,7 +121,7 @@ export const propose = mutation({
 export const accept = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.opponentId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('No longer pending')
@@ -147,7 +139,7 @@ export const accept = mutation({
 export const decline = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.opponentId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('No longer pending')
@@ -160,7 +152,7 @@ export const decline = mutation({
 export const cancel = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.challengerId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('Can only cancel a pending challenge')
