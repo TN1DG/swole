@@ -152,10 +152,17 @@ of them.
    under a running app. #19 called that out as deserving its own decision, and
    it still does — it is the single change that would have prevented both of
    these.
-9. **Bundle is ~229KB gzipped**, with a >500KB chunk warning. Code splitting was
-   deliberately skipped: the weight is MUI + Convex client + React, needed by
-   every route, and this is a PWA that precaches the whole bundle. Revisit only
-   if initial load becomes a *measured* problem.
+9. ~~Bundle is ~229KB gzipped, with a >500KB chunk warning. Code splitting was
+   deliberately skipped...~~ **Superseded 2026-09-13.** The main chunk grew to
+   946.84KB (284.47KB gzip) and tripped the build's own 500KB warning — the
+   "measured problem" this item said to wait for. `App.tsx` now lazy-loads
+   every routed page via `React.lazy()` behind one `Suspense` boundary
+   (`AppLayout`/`OnboardingGate`/`SignInPage` stay eager for first paint).
+   Main chunk is back down to 488.52KB (151.26KB gzip); each route is its own
+   chunk fetched on first visit. The PWA still precaches everything
+   (`generateSW` lists every chunk), so this doesn't change what an installed
+   app has offline — it only changes what a fresh visit has to download
+   before the first paint.
 10. **Preview `--preview-run` logs no output on reuse builds**, where a fresh
     deployment logs `"Seeded 70 exercises."`. Seeded state is correct either way;
     the first-deploy path is the one that matters for a new branch. Look here if a
