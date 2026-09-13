@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import { Button } from '@mui/material'
+import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '../../convex/_generated/api'
 import { InlineNotice } from './InlineNotice'
 
@@ -17,8 +18,6 @@ export function PingAckBanner() {
   const [hidden, setHidden] = useState(false)
   const [starting, setStarting] = useState(false)
 
-  if (!prompt || hidden) return null
-
   async function handleStart() {
     if (!prompt) return
     setStarting(true)
@@ -30,19 +29,32 @@ export function PingAckBanner() {
     navigate('/')
   }
 
+  const visible = prompt && !hidden
+
   return (
-    <InlineNotice
-      onDismiss={() => {
-        setHidden(true)
-        void dismiss({ pingId: prompt.pingId })
-      }}
-      action={
-        <Button variant="contained" size="small" disabled={starting} onClick={() => void handleStart()}>
-          Start
-        </Button>
-      }
-    >
-      Your friend held you accountable — start your workout?
-    </InlineNotice>
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+        >
+          <InlineNotice
+            onDismiss={() => {
+              setHidden(true)
+              void dismiss({ pingId: prompt.pingId })
+            }}
+            action={
+              <Button variant="contained" size="small" disabled={starting} onClick={() => void handleStart()}>
+                Start
+              </Button>
+            }
+          >
+            Your friend held you accountable — start your workout?
+          </InlineNotice>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

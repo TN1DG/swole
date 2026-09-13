@@ -82,6 +82,19 @@ describe('logManualEntry', () => {
     expect(today.entries[0]).toMatchObject({ calories: null })
   })
 
+  // Set when a manual entry comes from the FoodPicker (a food-database pick)
+  // rather than hand-typed macros, so "Today's entries" shows its name
+  // instead of the generic "Manual entry" fallback.
+  it('saves an optional description', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.nutrition.logManualEntry, { description: 'Banana', calories: 105 })
+
+    const today = await user.query(api.nutrition.getToday, {})
+    expect(today.entries[0]).toMatchObject({ description: 'Banana' })
+  })
+
   it('rejects an empty entry', async () => {
     const t = createBackend()
     const user = asUser(t, await createUser(t, 'alice'))

@@ -452,6 +452,20 @@ export default defineSchema({
     // alone, "every entry this account ever created" for account deletion.
     .index('by_owner_loggedAt', ['ownerId', 'loggedAt']),
 
+  // A reference food with known macros, seeded once from
+  // convex/foodSeedData.ts (see foods.ts:seed) so manual logging can search
+  // for a food by name instead of typing its macros from scratch — a free
+  // alternative to the AI photo-estimate path for common items.
+  foodDatabase: defineTable({
+    name: v.string(),
+    category: v.string(),
+    calories: v.number(),
+    proteinG: v.number(),
+    carbsG: v.number(),
+    fatG: v.number(),
+    fiberG: v.number(),
+  }),
+
   // Cached best-ever numbers per user+exercise so PR checks are one read.
   personalRecords: defineTable({
     ownerId: v.id('users'),

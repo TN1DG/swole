@@ -17,11 +17,13 @@ const branch = process.env.VERCEL_GIT_COMMIT_REF ?? 'preview'
 // fails here first, rather than sailing through a clean slate.
 //
 // A preview deployment still starts empty the *first* time, so the built-in
-// exercise library needs seeding. `--preview-run` runs after the schema push,
-// is ignored on production, and `exercises:seed` is a no-op once seeded.
+// exercise library and food database need seeding. `--preview-run` runs after
+// the schema push, is ignored on production, and only accepts one function
+// name — `seed:seedAll` fans out to every table's own idempotent seed
+// mutation (see convex/seed.ts), so it's a no-op for tables already seeded.
 const cmd = isProduction
   ? `npx convex deploy --cmd "npm run build"`
-  : `npx convex deploy --cmd "npm run build" --preview-name "${branch}" --preview-run exercises:seed`
+  : `npx convex deploy --cmd "npm run build" --preview-name "${branch}" --preview-run seed:seedAll`
 
 console.log(`[vercel-build] VERCEL_ENV=${process.env.VERCEL_ENV ?? 'unset'} -> ${cmd}`)
 execSync(cmd, { stdio: 'inherit' })

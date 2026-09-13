@@ -15,6 +15,9 @@ import { SwoleCoin } from '../../components/SwoleCoin'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
 import { FeedTab } from '../feed/FeedTab'
+import { formatLastActivity } from './activityLabel'
+
+type LastActivity = FunctionReturnType<typeof api.friendThread.lastActivity>[number]
 
 type Friends = FunctionReturnType<typeof api.friends.myFriends>
 type IncomingRequests = FunctionReturnType<typeof api.friends.myIncomingRequests>
@@ -266,25 +269,36 @@ function LeaderboardTab() {
 function FriendRow({
   friend,
   hasUnread,
+  activity,
   onRemove,
 }: {
   friend: Friends[number]
   hasUnread: boolean
+  activity: LastActivity | undefined
   onRemove: () => void
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const preview = activity ? formatLastActivity(activity) : null
 
   return (
     <GlassTile sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
       <Avatar src={friend.avatarUrl} name={friend.displayName} size={36} />
-      <Typography
-        component={Link}
-        to={`/friends/${friend.userId}`}
-        noWrap
-        sx={{ minWidth: 0, flex: 1, fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
-      >
-        {friend.displayName}
-      </Typography>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography
+          component={Link}
+          to={`/friends/${friend.userId}`}
+          noWrap
+          sx={{ display: 'block', fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
+        >
+          {friend.displayName}
+        </Typography>
+        {preview && (
+          <Typography noWrap variant="body2" color="text.secondary">
+            {preview.icon ? `${preview.icon} ` : ''}
+            {preview.text}
+          </Typography>
+        )}
+      </Box>
       <Badge color="error" variant="dot" invisible={!hasUnread} sx={{ flexShrink: 0 }}>
         <IconButton
           component={Link}
@@ -335,6 +349,8 @@ function FriendsTab({
   // doesn't pay for unread computation it never shows.
   const unreadIds = useQuery(api.friendThread.unreadFriendIds)
   const unread = new Set(unreadIds ?? [])
+  const lastActivity = useQuery(api.friendThread.lastActivity)
+  const activityByFriend = new Map((lastActivity ?? []).map((a) => [a.friendId, a]))
 
   return (
     <>
@@ -415,6 +431,7 @@ function FriendsTab({
               key={f.userId}
               friend={f}
               hasUnread={unread.has(f.userId)}
+              activity={activityByFriend.get(f.userId)}
               onRemove={() => runAction(() => removeFriend({ friendId: f.userId }))}
             />
           ))}

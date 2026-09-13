@@ -226,6 +226,114 @@ describe('unread tracking', () => {
   })
 })
 
+describe('lastActivity', () => {
+  it('is empty with no activity, and requires sign-in', async () => {
+    const t = createBackend()
+    const { alice } = await twoFriends(t)
+
+    expect(await alice.user.query(api.friendThread.lastActivity, {})).toEqual([])
+    expect(await t.query(api.friendThread.lastActivity, {})).toEqual([])
+  })
+
+  it('picks a message over an older ping', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+
+    await bob.user.mutation(api.pings.send, { toUserId: alice.userId })
+    await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'hey' })
+
+    // Same clock hazard the thread-ordering tests above call out: pin the
+    // ping firmly in the past so the message is unambiguously newer.
+    await t.run(async (ctx) => {
+      const [ping] = await ctx.db.query('gymPings').collect()
+      await ctx.db.patch(ping._id, { sentAt: Date.now() - 60_000 })
+    })
+
+    const activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([
+      { friendId: bob.userId, kind: 'message', isMine: true, text: 'hey' },
+    ])
+  })
+
+  it('picks a ping over an older message, reflecting direction and ack state', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+
+    await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'hey' })
+    await bob.user.mutation(api.pings.send, { toUserId: alice.userId })
+
+    await t.run(async (ctx) => {
+      const [message] = await ctx.db.query('messages').collect()
+      await ctx.db.patch(message._id, { sentAt: Date.now() - 60_000 })
+    })
+
+    let activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([
+      { friendId: bob.userId, kind: 'ping', isMine: false, acknowledged: false },
+    ])
+
+    const [ping] = await alice.user.query(api.pings.getThread, { friendUserId: bob.userId })
+    await alice.user.mutation(api.pings.acknowledge, { pingId: ping._id })
+
+    activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([{ kind: 'ping', isMine: false, acknowledged: true }])
+
+    // Same ping, seen from the sender's side.
+    const bobActivity = await bob.user.query(api.friendThread.lastActivity, {})
+    expect(bobActivity).toMatchObject([{ kind: 'ping', isMine: true, acknowledged: true }])
+  })
+
+  it('reflects a challenge through pending -> active -> resolved, ranked over older activity', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await givePoints(t, alice.userId, 500)
+    await givePoints(t, bob.userId, 500)
+
+    await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'hi' })
+    await alice.user.mutation(api.challenges.propose, {
+      opponentId: bob.userId,
+      weeks: 2,
+      wagerPoints: 10,
+    })
+
+    await t.run(async (ctx) => {
+      const [message] = await ctx.db.query('messages').collect()
+      await ctx.db.patch(message._id, { sentAt: Date.now() - 60_000 })
+    })
+
+    let activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([
+      { friendId: bob.userId, kind: 'challenge', isMine: true, status: 'pending', outcome: null },
+    ])
+
+    const [challenge] = await bob.user.query(api.challenges.getThread, { friendUserId: alice.userId })
+    await bob.user.mutation(api.challenges.accept, { challengeId: challenge._id })
+
+    activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([{ kind: 'challenge', status: 'active', outcome: null }])
+
+    // Resolve with alice (the challenger) winning.
+    await t.run(async (ctx) => {
+      const [c] = await ctx.db.query('challenges').collect()
+      await ctx.db.patch(c._id, { status: 'resolved', resolvedAt: Date.now(), winnerId: alice.userId })
+    })
+
+    activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([{ kind: 'challenge', status: 'resolved', outcome: 'won' }])
+    expect(await bob.user.query(api.friendThread.lastActivity, {})).toMatchObject([
+      { kind: 'challenge', status: 'resolved', outcome: 'lost' },
+    ])
+
+    // A tie: no winnerId at all.
+    await t.run(async (ctx) => {
+      const [c] = await ctx.db.query('challenges').collect()
+      await ctx.db.patch(c._id, { winnerId: undefined })
+    })
+    activity = await alice.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject([{ kind: 'challenge', status: 'resolved', outcome: 'tied' }])
+  })
+})
+
 describe('account deletion', () => {
   it('removes messages in both directions and my read markers', async () => {
     const t = createBackend()
