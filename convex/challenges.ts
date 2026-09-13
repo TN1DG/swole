@@ -16,13 +16,20 @@ import { areFriends } from './friendships'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
+// Every challenge I'm a party to (either side), unfiltered — the shared fetch
+// behind both openChallengeBetween and challengesBetween, and (via
+// pickLatestChallenge) the Friends-list activity preview. Callers filter/rank
+// in memory rather than each re-querying, since userId is fixed per request.
+export async function myChallengesRaw(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<'users'>,
+): Promise<Doc<'challenges'>[]> {
+  const [asChallenger, asOpponent] = await Promise.all([
+    ctx.db.query('challenges').withIndex('by_challenger', (q) => q.eq('challengerId', userId)).collect(),
+    ctx.db.query('challenges').withIndex('by_opponent', (q) => q.eq('opponentId', userId)).collect(),
+  ])
+  return [...asChallenger, ...asOpponent]
 }
-
 
 // One open (pending or active) challenge per friend pair at a time — keeps a
 // balance meaning "what's actually spendable right now" without needing to
@@ -32,15 +39,44 @@ async function openChallengeBetween(
   a: Id<'users'>,
   b: Id<'users'>,
 ) {
-  const [asChallenger, asOpponent] = await Promise.all([
-    ctx.db.query('challenges').withIndex('by_challenger', (q) => q.eq('challengerId', a)).collect(),
-    ctx.db.query('challenges').withIndex('by_opponent', (q) => q.eq('opponentId', a)).collect(),
-  ])
-  return [...asChallenger, ...asOpponent].find(
+  const mine = await myChallengesRaw(ctx, a)
+  return mine.find(
     (c) =>
       (c.opponentId === b || c.challengerId === b) &&
       (c.status === 'pending' || c.status === 'active'),
   )
+}
+
+// Pure — no ctx, no DB reads. Picks the most recently-relevant challenge
+// between `userId` and `friendId` out of an already-fetched batch (see
+// myChallengesRaw), for the Friends-list activity preview. Ranked the same
+// way friendThread.ts positions a challenge in the unified thread —
+// resolvedAt ?? startedAt ?? createdAt — and deliberately skips the live
+// forwardStreakWeeks computation challengesBetween does: a one-line preview
+// doesn't need it, and it's the expensive part of that helper.
+export function pickLatestChallenge(
+  all: Doc<'challenges'>[],
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+): {
+  ts: number
+  isMine: boolean
+  status: Doc<'challenges'>['status']
+  outcome: 'won' | 'lost' | 'tied' | null
+} | null {
+  const candidates = all
+    .filter((c) => c.challengerId === friendId || c.opponentId === friendId)
+    .map((c) => ({ c, ts: c.resolvedAt ?? c.startedAt ?? c.createdAt }))
+    .sort((a, b) => b.ts - a.ts)
+  if (candidates.length === 0) return null
+
+  const { c, ts } = candidates[0]!
+  const isMine = c.challengerId === userId
+  let outcome: 'won' | 'lost' | 'tied' | null = null
+  if (c.status === 'resolved') {
+    outcome = c.winnerId === undefined ? 'tied' : c.winnerId === userId ? 'won' : 'lost'
+  }
+  return { ts, isMine, status: c.status, outcome }
 }
 
 async function workoutStartedAts(ctx: QueryCtx | MutationCtx, ownerId: Id<'users'>) {
@@ -55,7 +91,7 @@ async function workoutStartedAts(ctx: QueryCtx | MutationCtx, ownerId: Id<'users
 export const propose = mutation({
   args: { opponentId: v.id('users'), weeks: v.number(), wagerPoints: v.number() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'challengePropose', { key: userId, throws: true })
     if (userId === args.opponentId) throw new Error("Can't challenge yourself")
     if (!(await areFriends(ctx, userId, args.opponentId))) {
@@ -85,7 +121,7 @@ export const propose = mutation({
 export const accept = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.opponentId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('No longer pending')
@@ -103,7 +139,7 @@ export const accept = mutation({
 export const decline = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.opponentId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('No longer pending')
@@ -116,7 +152,7 @@ export const decline = mutation({
 export const cancel = mutation({
   args: { challengeId: v.id('challenges') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const challenge = await ctx.db.get(args.challengeId)
     if (!challenge || challenge.challengerId !== userId) throw new Error('Not found')
     if (challenge.status !== 'pending') throw new Error('Can only cancel a pending challenge')
@@ -136,12 +172,9 @@ export async function challengesBetween(
   userId: Id<'users'>,
   friendId: Id<'users'>,
 ) {
-  const [asChallenger, asOpponent] = await Promise.all([
-    ctx.db.query('challenges').withIndex('by_challenger', (q) => q.eq('challengerId', userId)).collect(),
-    ctx.db.query('challenges').withIndex('by_opponent', (q) => q.eq('opponentId', userId)).collect(),
-  ])
+  const mine = await myChallengesRaw(ctx, userId)
 
-  const all = [...asChallenger, ...asOpponent]
+  const all = mine
     .filter((c) => c.challengerId === friendId || c.opponentId === friendId)
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 10)

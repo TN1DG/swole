@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import {
   Box,
   Button,
@@ -7,13 +7,15 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
+  Slider,
   Typography,
 } from '@mui/material'
+import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { errorMessage } from '../../lib/errors'
 import { SwoleCoin } from '../../components/SwoleCoin'
+import { LIMITS } from '../../../convex/validation'
 
 // The propose form, lifted out of what used to be a card pinned above the
 // ping thread (see FriendChatPage). It's a dialog now so the thread itself
@@ -28,8 +30,12 @@ export function ChallengeComposeDialog({
   onClose: () => void
 }) {
   const propose = useMutation(api.challenges.propose)
-  const [weeks, setWeeks] = useState('2')
-  const [wager, setWager] = useState('20')
+  const profile = useQuery(api.profiles.getMine)
+  const myBalance = profile?.pointsBalance ?? LIMITS.maxWagerPoints
+  const maxWager = Math.max(1, Math.min(LIMITS.maxWagerPoints, myBalance))
+
+  const [weeks, setWeeks] = useState(2)
+  const [wager, setWager] = useState(Math.min(20, maxWager))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -38,11 +44,7 @@ export function ChallengeComposeDialog({
     setError(null)
     setBusy(true)
     try {
-      await propose({
-        opponentId: friendId,
-        weeks: parseInt(weeks, 10),
-        wagerPoints: parseInt(wager, 10),
-      })
+      await propose({ opponentId: friendId, weeks, wagerPoints: wager })
       onClose()
     } catch (err) {
       setError(errorMessage(err, 'Could not propose.'))
@@ -59,38 +61,66 @@ export function ChallengeComposeDialog({
             Whoever keeps the longer streak wins the pot. Your wager is held
             until the challenge resolves.
           </Typography>
-          <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Weeks
-              </Typography>
-              <TextField
+
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="caption" color="text.secondary">
+              Weeks
+            </Typography>
+            <Box sx={{ px: 1 }}>
+              <Slider
                 value={weeks}
-                onChange={(e) => setWeeks(e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ mt: 0.5 }}
-                slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': 'Weeks' } }}
-              />
-            </Box>
-            <Box>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-              >
-                Wager <SwoleCoin size={14} title="points" />
-              </Typography>
-              <TextField
-                value={wager}
-                onChange={(e) => setWager(e.target.value)}
-                size="small"
-                fullWidth
-                sx={{ mt: 0.5 }}
-                slotProps={{ htmlInput: { inputMode: 'numeric', 'aria-label': 'Wager points' } }}
+                onChange={(_, v) => setWeeks(v as number)}
+                min={LIMITS.challengeMinWeeks}
+                max={LIMITS.challengeMaxWeeks}
+                step={1}
+                marks
+                valueLabelDisplay="auto"
+                aria-label="Weeks"
               />
             </Box>
           </Box>
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              Wager <SwoleCoin size={14} title="points" />
+            </Typography>
+            <Box sx={{ px: 1 }}>
+              <Slider
+                value={wager}
+                onChange={(_, v) => setWager(v as number)}
+                min={1}
+                max={maxWager}
+                step={Math.max(1, Math.round(maxWager / 50))}
+                valueLabelDisplay="auto"
+                aria-label="Wager points"
+              />
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              You have {myBalance} <SwoleCoin size={12} title="points" />
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              mt: 2,
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: 'rgb(193 84 31 / 0.08)',
+              border: '1px solid rgb(193 84 31 / 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+            }}
+          >
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              You wager <PopNumber value={wager} /> <SwoleCoin size={14} title="points" />
+            </Typography>
+            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              Winner takes <PopNumber value={wager * 2} /> <SwoleCoin size={14} title="points" />
+            </Typography>
+          </Box>
+
           {error && (
             <Typography variant="body2" color="error" sx={{ mt: 1.5 }}>
               {error}
@@ -107,5 +137,23 @@ export function ChallengeComposeDialog({
         </DialogActions>
       </Box>
     </Dialog>
+  )
+}
+
+// A small pop whenever the number changes, so dragging the sliders feels
+// tactile rather than the pot summary just silently re-rendering.
+function PopNumber({ value }: { value: number }) {
+  return (
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.span
+        key={value}
+        initial={{ y: -6, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.15 }}
+        style={{ display: 'inline-block', fontWeight: 700 }}
+      >
+        {value}
+      </motion.span>
+    </AnimatePresence>
   )
 }

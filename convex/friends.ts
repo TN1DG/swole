@@ -1,6 +1,6 @@
 import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { mutation, query, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { eligibleRecordsFor, getWorkoutExercises, summarizeWorkout } from './history'
 import {
@@ -23,13 +23,6 @@ import { cleanUsername, LIMITS } from './validation'
 import { consumeUsernameLookup, rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
 import { areFriends } from './friendships'
-
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
-}
 
 // The profile row behind a user's public identity. The leaderboard and
 // friends list call this once per friend, so anything read here is read
@@ -117,7 +110,7 @@ async function ownerConsistency(ctx: QueryCtx, ownerId: Id<'users'>, now: number
 export const resolveUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await consumeUsernameLookup(ctx, userId)
 
     const username = args.username.trim().toLowerCase()
@@ -366,7 +359,7 @@ export const getFriendWorkoutDetail = query({
 export const sendFriendRequest = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'sendFriendRequest', { key: userId, throws: true })
     const username = cleanUsername(args.username)
 
@@ -417,7 +410,7 @@ export const sendFriendRequest = mutation({
 export const declineFriendRequest = mutation({
   args: { requestId: v.id('friendRequests') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const request = await ctx.db.get(args.requestId)
     if (!request || (request.fromUserId !== userId && request.toUserId !== userId)) {
       throw new Error('Request not found')
@@ -432,7 +425,7 @@ export const declineFriendRequest = mutation({
 export const acceptFriendRequest = mutation({
   args: { requestId: v.id('friendRequests') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const request = await ctx.db.get(args.requestId)
     if (!request || request.toUserId !== userId) throw new Error('Request not found')
 
@@ -463,7 +456,7 @@ export const acceptFriendRequest = mutation({
 export const removeFriend = mutation({
   args: { friendId: v.id('users') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
 
     const mine = await ctx.db
       .query('friendships')

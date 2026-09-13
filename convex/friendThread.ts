@@ -3,9 +3,9 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query } from './_generated/server'
 import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
-import { latestIncomingMessageAt, messagesBetween } from './messages'
-import { latestIncomingPingAt, pingsBetween } from './pings'
-import { challengesBetween } from './challenges'
+import { latestIncomingMessageAt, latestMessageBetween, messagesBetween } from './messages'
+import { latestIncomingPingAt, latestPingBetween, pingsBetween } from './pings'
+import { challengesBetween, myChallengesRaw, pickLatestChallenge } from './challenges'
 
 // Newest N entries across all three kinds. Each source is already bounded on
 // its own; this caps the merged result the client renders.
@@ -127,5 +127,57 @@ export const unreadFriendIds = query({
     )
 
     return flags.filter((id): id is Id<'users'> => id !== null)
+  },
+})
+
+/**
+ * The single most recent thing that happened between me and each friend —
+ * a message, a ping, or a challenge update, whichever is newest — for the
+ * one-line activity preview under a friend's name on the Friends list.
+ *
+ * Deliberately separate from myFriends for the same reason as
+ * unreadFriendIds: myFriends is loaded by screens that don't need this.
+ *
+ * Cheap by construction: the message/ping lookups are two indexed point
+ * reads each (see latestMessageBetween/latestPingBetween), and the
+ * challenge fetch is hoisted out of the per-friend loop — myChallengesRaw
+ * runs once for the caller, then pickLatestChallenge filters/ranks it in
+ * memory per friend for free, rather than re-querying per friend the way a
+ * naive "latest challenge between" helper would.
+ */
+export const lastActivity = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return []
+
+    const friendships = await ctx.db
+      .query('friendships')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect()
+
+    const myChallenges = await myChallengesRaw(ctx, userId)
+
+    const entries = await Promise.all(
+      friendships.map(async (f) => {
+        const [message, ping] = await Promise.all([
+          latestMessageBetween(ctx, userId, f.friendId),
+          latestPingBetween(ctx, userId, f.friendId),
+        ])
+        const challenge = pickLatestChallenge(myChallenges, userId, f.friendId)
+
+        const candidates = [
+          message && { ...message, kind: 'message' as const },
+          ping && { ...ping, kind: 'ping' as const },
+          challenge && { ...challenge, kind: 'challenge' as const },
+        ].filter((c): c is NonNullable<typeof c> => c !== null && c !== undefined)
+
+        if (candidates.length === 0) return null
+        const latest = candidates.sort((a, b) => b.ts - a.ts)[0]!
+        return { friendId: f.friendId, ...latest }
+      }),
+    )
+
+    return entries.filter((e): e is NonNullable<typeof e> => e !== null)
   },
 })

@@ -3,6 +3,7 @@ import { ConvexError } from 'convex/values'
 import { action, internalMutation, type MutationCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { CHALLENGE_REQUIRED_MESSAGE } from './constants'
+import { envVar } from './env'
 
 /**
  * Cloudflare Turnstile, guarding sign-up.
@@ -32,22 +33,6 @@ import { CHALLENGE_REQUIRED_MESSAGE } from './constants'
  */
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
-
-/**
- * Read a Convex deployment environment variable.
- *
- * Reached through `globalThis` rather than the bare `process` global on
- * purpose. This module exports a *public* action, which puts it in the `api`
- * type surface that `src` imports — so it gets type-checked by
- * tsconfig.app.json, whose `types` is `["vite/client"]` with no node types.
- * (convex/emailAuth.ts uses `process.env` directly and is fine precisely
- * because it only exports internal functions and never enters that graph.)
- */
-function envVar(name: string): string | undefined {
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[
-    name
-  ]
-}
 
 // Long enough to finish typing a password and hit submit; short enough that a
 // solved challenge is worthless to bank in bulk.

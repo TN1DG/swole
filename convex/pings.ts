@@ -1,24 +1,17 @@
 import { v, ConvexError } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { mutation, query, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
 import { areFriends } from './friendships'
-
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export const send = mutation({
   args: { toUserId: v.id('users') },
   handler: async (ctx, args) => {
-    const fromUserId = await requireUserId(ctx)
+    const fromUserId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'pingSend', { key: fromUserId, throws: true })
     if (fromUserId === args.toUserId) throw new Error("Can't ping yourself")
 
@@ -53,7 +46,7 @@ export const send = mutation({
 export const acknowledge = mutation({
   args: { pingId: v.id('gymPings') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const ping = await ctx.db.get(args.pingId)
     if (!ping) throw new Error('Ping not found')
     if (ping.toUserId !== userId) throw new Error('Not authorized')
@@ -128,6 +121,37 @@ export const getThread = query({
   },
 })
 
+// Whichever of us sent the most recent ping, in either direction — for the
+// Friends-list activity preview. Two indexed point lookups (cheap, same
+// shape as latestIncomingPingAt) rather than loading the whole thread.
+export async function latestPingBetween(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+): Promise<{ ts: number; isMine: boolean; acknowledged: boolean } | null> {
+  const [mine, theirs] = await Promise.all([
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', userId).eq('toUserId', friendId))
+      .order('desc')
+      .first(),
+    ctx.db
+      .query('gymPings')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
+      .order('desc')
+      .first(),
+  ])
+  const latest = [mine, theirs]
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .sort((a, b) => b.sentAt - a.sentAt)[0]
+  if (!latest) return null
+  return {
+    ts: latest.sentAt,
+    isMine: latest.fromUserId === userId,
+    acknowledged: latest.acknowledgedAt !== undefined,
+  }
+}
+
 // The single most-relevant "your friend held you accountable" prompt for the
 // caller, or null. Shown only while it's still actionable: I sent it, they
 // acked it, I haven't dismissed it, it hasn't gone stale (same 24h window
@@ -163,7 +187,7 @@ export const getAckPrompt = query({
 export const dismissPrompt = mutation({
   args: { pingId: v.id('gymPings') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const ping = await ctx.db.get(args.pingId)
     if (!ping) throw new Error('Ping not found')
     if (ping.fromUserId !== userId) throw new Error('Not authorized')

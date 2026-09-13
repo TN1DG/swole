@@ -50,6 +50,33 @@ export async function latestIncomingMessageAt(
   return latest?.sentAt ?? 0
 }
 
+// Whichever of us sent the most recent message, in either direction — for
+// the Friends-list activity preview. Two indexed point lookups (cheap, same
+// shape as latestIncomingMessageAt) rather than loading the whole thread.
+export async function latestMessageBetween(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+  friendId: Id<'users'>,
+): Promise<{ ts: number; isMine: boolean; text: string } | null> {
+  const [mine, theirs] = await Promise.all([
+    ctx.db
+      .query('messages')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', userId).eq('toUserId', friendId))
+      .order('desc')
+      .first(),
+    ctx.db
+      .query('messages')
+      .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
+      .order('desc')
+      .first(),
+  ])
+  const latest = [mine, theirs]
+    .filter((m): m is NonNullable<typeof m> => m !== null)
+    .sort((a, b) => b.sentAt - a.sentAt)[0]
+  if (!latest) return null
+  return { ts: latest.sentAt, isMine: latest.fromUserId === userId, text: latest.text }
+}
+
 export const send = mutation({
   args: { toUserId: v.id('users'), text: v.string() },
   handler: async (ctx, args) => {

@@ -5,13 +5,6 @@ import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { cleanName, LIMITS } from './validation'
 
-// Mutation-only: every write in this module goes through here, so it is the
-// single place to charge the per-user write budget. Queries in this file call
-// `getAuthUserId` directly — the limiter writes, so a query cannot consume it.
-async function requireUserId(ctx: MutationCtx) {
-  return await requireWriter(ctx)
-}
-
 // Exercises must exist and be visible to the caller (built-in or their own).
 async function validateExercises(
   ctx: MutationCtx,
@@ -79,7 +72,7 @@ export const list = query({
 export const create = mutation({
   args: { name: v.string(), notes: v.optional(v.string()), exercises: exercisesArg },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const name = cleanName(args.name, 80, 'Routine name')
     await validateExercises(ctx, userId, args.exercises)
 
@@ -116,7 +109,7 @@ export const update = mutation({
     exercises: exercisesArg,
   },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const routine = await ctx.db.get(args.routineId)
     if (!routine || routine.ownerId !== userId) throw new Error('Routine not found')
 
@@ -145,7 +138,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { routineId: v.id('routines') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const routine = await ctx.db.get(args.routineId)
     if (!routine || routine.ownerId !== userId) throw new Error('Routine not found')
 
@@ -202,7 +195,7 @@ async function lastPerformance(
 export const startFromRoutine = mutation({
   args: { routineId: v.id('routines') },
   handler: async (ctx, args) => {
-    const userId = await requireUserId(ctx)
+    const userId = await requireWriter(ctx)
     const routine = await ctx.db.get(args.routineId)
     if (!routine || routine.ownerId !== userId) throw new Error('Routine not found')
 
