@@ -128,6 +128,35 @@ describe('CaloricConsistencyPage — log food', () => {
     )
   })
 
+  it('fills the form from a picked food and logs it with its name as the description', async () => {
+    state.queries.set(getFunctionName(api.foods.list), [
+      {
+        _id: 'food1',
+        name: 'Banana',
+        category: 'Fruit',
+        calories: 105,
+        proteinG: 1.3,
+        carbsG: 27,
+        fatG: 0.4,
+        fiberG: 3.1,
+      },
+    ])
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Search the food database' }))
+    await user.click(screen.getByText('Banana'))
+
+    expect(screen.getByLabelText('Protein (g)')).toHaveValue('1.3')
+    expect(screen.getByText(/Logging:/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Log' }))
+
+    expect(state.mutations.get(getFunctionName(api.nutrition.logManualEntry))).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Banana', proteinG: 1.3 }),
+    )
+  })
+
   it('deletes an entry', async () => {
     setToday({
       entries: [

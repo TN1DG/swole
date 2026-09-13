@@ -276,6 +276,7 @@ export const markAnalysisFailed = internalMutation({
 // whatever the client sent.
 export const logManualEntry = mutation({
   args: {
+    description: v.optional(v.string()),
     calories: v.optional(v.number()),
     proteinG: v.optional(v.number()),
     carbsG: v.optional(v.number()),
@@ -326,6 +327,9 @@ export const logManualEntry = mutation({
       loggedAt: now,
       source: 'manual',
       status: 'complete',
+      description: args.description?.trim()
+        ? args.description.trim().slice(0, LIMITS.foodDescriptionMaxLength)
+        : undefined,
       calories,
       proteinG,
       carbsG,
