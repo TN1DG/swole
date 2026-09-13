@@ -15,6 +15,7 @@ import type { Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { caloriesFromMacros, DAY_MS, utcDayIndex } from './fitness'
+import { envVar } from './env'
 
 /**
  * Food logging for the Caloric Consistency page: manual entries, and photos
@@ -35,18 +36,6 @@ const MAX_FOOD_PHOTO_BYTES = 8 * 1024 * 1024
 // a one-line change — check `curl https://ai-gateway.vercel.sh/v1/models`
 // for what's current before changing it.
 const FOOD_PHOTO_MODEL = 'anthropic/claude-haiku-4.5'
-
-/**
- * Read a Convex deployment environment variable.
- * See convex/turnstile.ts:envVar for why this goes through `globalThis`
- * rather than the bare `process` global — this file exports a public action,
- * which puts it in the `api` surface `src` imports (no Node types there).
- */
-function envVar(name: string): string | undefined {
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[
-    name
-  ]
-}
 
 const FoodAnalysisSchema = z.object({
   description: z.string(),
