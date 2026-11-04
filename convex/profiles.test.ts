@@ -343,6 +343,45 @@ describe('setNutritionGoal', () => {
   })
 })
 
+describe('setCalorieTarget', () => {
+  it('stores a rounded target, and null goes back to following the goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400.4 })
+    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBe(2400)
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: null })
+    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBeNull()
+  })
+
+  it.each([999, 10001, Number.NaN])('rejects %s', async (calories) => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await expect(user.mutation(api.profiles.setCalorieTarget, { calories })).rejects.toThrow(
+      /calorie target/i,
+    )
+  })
+
+  it('is cleared by choosing a goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400 })
+    await user.mutation(api.profiles.setNutritionGoal, { goal: 'bulk' })
+
+    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBeNull()
+  })
+
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    await expect(t.mutation(api.profiles.setCalorieTarget, { calories: 2400 })).rejects.toThrow(
+      /not signed in/i,
+    )
+  })
+})
+
 describe('markReleaseSeen', () => {
   it('defaults to null', async () => {
     const t = createBackend()

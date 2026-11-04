@@ -96,6 +96,50 @@ describe('CaloricConsistencyPage — targets', () => {
     renderPage()
 
     expect(screen.getByText(/Today, against your maintain goal/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Choose your goal' })).toBeInTheDocument()
+  })
+
+  it('measures against a self-set target and says so', () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), {
+      ...COMPLETE_PROFILE,
+      calorieTargetOverride: 2400,
+    })
+    renderPage()
+
+    expect(screen.getByText('0 / 2400 kcal')).toBeInTheDocument()
+    expect(screen.getByText(/Custom target/)).toBeInTheDocument()
+  })
+
+  it('edits the target from the Calories tile', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const field = screen.getByLabelText('Calories per day')
+    await user.clear(field)
+    await user.type(field, '2500')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).toHaveBeenCalledWith({
+      calories: 2500,
+    })
+  })
+
+  it('offers a way back to the goal number only when a target is custom', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), {
+      ...COMPLETE_PROFILE,
+      calorieTargetOverride: 2400,
+    })
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: "Use goal's number" }))
+
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).toHaveBeenCalledWith({
+      calories: null,
+    })
   })
 })
 

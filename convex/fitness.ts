@@ -139,10 +139,21 @@ const GOAL_CALORIE_OFFSET: Record<Goal, number> = {
 }
 
 // Never suggest less than this, regardless of how low TDEE - offset lands.
-const MIN_SAFE_CALORIES = 1200
+export const MIN_SAFE_CALORIES = 1200
 
 export function goalCalories(tdeeValue: number, goal: Goal): number {
   return Math.max(MIN_SAFE_CALORIES, Math.round(tdeeValue + GOAL_CALORIE_OFFSET[goal]))
+}
+
+// The daily target actually in force: a number the user set for themselves
+// wins over what their goal would suggest. Every screen showing a target reads
+// it through here, so they can't disagree about which number applies.
+export function resolveCalorieTarget(
+  tdeeValue: number,
+  goal: Goal,
+  override: number | null | undefined,
+): number {
+  return override ?? goalCalories(tdeeValue, goal)
 }
 
 // Grams of protein per kg of bodyweight, by goal — sets protein directly off

@@ -158,6 +158,7 @@ export const getMine = query({
       activityLevel: profile?.activityLevel ?? null,
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
       nutritionGoal: profile?.nutritionGoal ?? null,
+      calorieTargetOverride: profile?.calorieTargetOverride ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
       weekPoints,
       monthPoints,
@@ -422,8 +423,10 @@ export const setDailyVolumeGoal = mutation({
   },
 })
 
-// Chosen from the Stats page's goal cards (convex/fitness.ts GOALS) — tapping
-// one saves it here and routes into the Caloric Consistency page.
+// Chosen during onboarding or from the Stats page's goal cards (convex/fitness.ts
+// GOALS). Clears any self-set calorie target: picking a card is picking that
+// card's number, and leaving the old override in force would make the card and
+// the Nutrition page disagree.
 export const setNutritionGoal = mutation({
   args: {
     goal: v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
@@ -432,7 +435,32 @@ export const setNutritionGoal = mutation({
     const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
-    await ctx.db.patch(profile._id, { nutritionGoal: args.goal })
+    await ctx.db.patch(profile._id, {
+      nutritionGoal: args.goal,
+      calorieTargetOverride: undefined,
+    })
+  },
+})
+
+// A self-set daily calorie target. `null` goes back to following the goal.
+export const setCalorieTarget = mutation({
+  args: { calories: v.union(v.number(), v.null()) },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+
+    const calories =
+      args.calories === null
+        ? undefined
+        : Math.round(
+            assertRange(
+              args.calories,
+              LIMITS.calorieTargetMin,
+              LIMITS.calorieTargetMax,
+              'Calorie target',
+            ),
+          )
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { calorieTargetOverride: calories })
   },
 })
 

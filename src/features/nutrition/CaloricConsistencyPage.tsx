@@ -9,6 +9,7 @@ import {
   goalCalories,
   macroTargets,
   mifflinStJeorBmr,
+  resolveCalorieTarget,
   tdee,
 } from '../../../convex/fitness'
 import { errorMessage } from '../../lib/errors'
@@ -19,6 +20,7 @@ import { CameraIcon, SearchIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { NutrientProgress } from './NutrientProgress'
 import { FoodPicker, type PickedFood } from './FoodPicker'
+import { CalorieTargetDialog } from './CalorieTargetDialog'
 
 type FoodFields = { calories: string; proteinG: string; carbsG: string; fatG: string; fiberG: string }
 const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' }
@@ -43,6 +45,7 @@ export function CaloricConsistencyPage() {
   const [fields, setFields] = useState<FoodFields>(EMPTY_FIELDS)
   const [description, setDescription] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [editingTarget, setEditingTarget] = useState(false)
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,7 +99,8 @@ export function CaloricConsistencyPage() {
   const bmr = mifflinStJeorBmr(profile.weightKg, profile.heightCm, profile.age, profile.sex)
   const tdeeValue = tdee(bmr, profile.activityLevel)
   const goal = profile.nutritionGoal ?? 'maintain'
-  const targetCalories = goalCalories(tdeeValue, goal)
+  const targetCalories = resolveCalorieTarget(tdeeValue, goal, profile.calorieTargetOverride)
+  const hasCustomTarget = profile.calorieTargetOverride != null
   const targets = macroTargets(targetCalories, profile.weightKg, goal)
 
   async function handleLogManual(e: React.FormEvent<HTMLFormElement>) {
@@ -191,8 +195,28 @@ export function CaloricConsistencyPage() {
         </MuiLink>
       </Typography>
 
+      {/* Only accounts that predate the onboarding goal step can land here
+          without one; they're still being measured against "maintain". */}
+      {profile.nutritionGoal == null && (
+        <GlassTile sx={{ mt: 2, p: 1.5 }}>
+          <Typography variant="body2">
+            You haven't chosen a goal yet, so these numbers assume you're maintaining.{' '}
+            <MuiLink component={Link} to="/stats" color="primary.main">
+              Choose your goal
+            </MuiLink>
+          </Typography>
+        </GlassTile>
+      )}
+
       <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <NutrientProgress label="Calories" unit="kcal" consumed={today.totals.calories} target={targetCalories} />
+        <NutrientProgress
+          label="Calories"
+          unit="kcal"
+          consumed={today.totals.calories}
+          target={targetCalories}
+          note={hasCustomTarget ? 'Custom target' : undefined}
+          onEdit={() => setEditingTarget(true)}
+        />
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 1 }}>
           <NutrientProgress label="Protein" unit="g" consumed={today.totals.proteinG} target={targets.proteinG} />
           <NutrientProgress label="Carbs" unit="g" consumed={today.totals.carbsG} target={targets.carbsG} />
@@ -200,6 +224,16 @@ export function CaloricConsistencyPage() {
           <NutrientProgress label="Fiber" unit="g" consumed={today.totals.fiberG} target={targets.fiberG} />
         </Box>
       </Box>
+
+      {editingTarget && (
+        <CalorieTargetDialog
+          current={targetCalories}
+          goalLabel={goal}
+          goalCalories={goalCalories(tdeeValue, goal)}
+          isCustom={hasCustomTarget}
+          onClose={() => setEditingTarget(false)}
+        />
+      )}
 
       <Typography variant="h6" sx={{ mt: 4, fontWeight: 'bold' }}>
         Log food

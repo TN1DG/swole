@@ -15,6 +15,7 @@ import {
   formatDuration,
   ftInToCm,
   goalCalories,
+  resolveCalorieTarget,
   kgToLb,
   lbToKg,
   macroTargets,
@@ -186,6 +187,17 @@ describe('display constants carry no baked-in units', () => {
   it('exposes the cut rate as a number for the UI to convert', () => {
     const cut = GOALS.find((g) => g.value === 'cut')!
     expect(cut).toHaveProperty('rateKgPerWeek', 0.5)
+  })
+})
+
+describe('resolveCalorieTarget', () => {
+  it("follows the goal's number when nothing was set by hand", () => {
+    expect(resolveCalorieTarget(2759, 'cut', null)).toBe(2259)
+    expect(resolveCalorieTarget(2759, 'cut', undefined)).toBe(2259)
+  })
+
+  it('uses a self-set target over the goal', () => {
+    expect(resolveCalorieTarget(2759, 'cut', 2400)).toBe(2400)
   })
 })
 

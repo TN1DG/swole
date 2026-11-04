@@ -87,6 +87,10 @@ export default defineSchema({
     nutritionGoal: v.optional(
       v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
     ),
+    // A daily calorie target the user typed themselves, replacing what their
+    // goal would suggest (fitness.ts:resolveCalorieTarget). Absent means follow
+    // the goal; choosing a goal clears it.
+    calorieTargetOverride: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
