@@ -1,47 +1,155 @@
 import { useState } from 'react'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
-import { Box, Button, Typography, alpha, useTheme } from '@mui/material'
+import { Box, Button, Typography } from '@mui/material'
 import { motion, useReducedMotion } from 'framer-motion'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
-import { ProgressRing } from '../../components/ProgressRing'
+import { Avatar } from '../../components/Avatar'
 import { GlassTile } from '../../components/GlassTile'
 import { SwoleCoin } from '../../components/SwoleCoin'
-import { tokens } from '../../theme/tokens'
+import {
+  challengeOutcome,
+  closedLabel,
+  leadLabel,
+  myAndTheirStreak,
+  timeLeftLabel,
+} from './challengeDisplay'
 
 type ThreadEntry = FunctionReturnType<typeof api.friendThread.getThread>[number]
 export type ChallengeEntry = Extract<ThreadEntry, { type: 'challenge' }>['challenge']
 
-const PARTICLE_OFFSETS = [
-  { x: -28, y: -18 },
-  { x: 28, y: -22 },
-  { x: -18, y: 16 },
-  { x: 22, y: 14 },
-  { x: 0, y: -30 },
-]
+type Tone = 'accent' | 'live' | 'gold' | 'neutral'
 
-// One card per challenge, showing its CURRENT status — the thread has no
-// per-transition event log (see convex/friendThread.ts). Every status used
-// to render inside an identical, uniformly-tinted GlassTile with the same
-// muted typography — no color-coding for who's ahead or who won. This gives
-// each status its own visual identity instead.
+const TONE_STYLES: Record<Tone, { color: string; bgcolor: string }> = {
+  // Solid, because this one is asking you to do something.
+  accent: { color: 'primary.contrastText', bgcolor: 'primary.main' },
+  live: { color: 'success.main', bgcolor: 'rgb(122 154 82 / 0.16)' },
+  gold: { color: 'pr.main', bgcolor: 'rgb(217 164 65 / 0.16)' },
+  neutral: { color: 'text.secondary', bgcolor: 'surface2.main' },
+}
+
+function StatusPill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        ...TONE_STYLES[tone],
+        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.5,
+        px: 1,
+        py: 0.25,
+        borderRadius: '999px',
+        fontSize: '0.6875rem',
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+      }}
+    >
+      {tone === 'live' && (
+        <Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'success.main' }} />
+      )}
+      {children}
+    </Box>
+  )
+}
+
+// One segment per week of the challenge, which says "2 of 4 weeks" at a glance.
+function WeekPips({ filled, total, color }: { filled: number; total: number; color: string }) {
+  return (
+    <Box aria-hidden sx={{ display: 'flex', gap: '3px', width: '100%', maxWidth: 88 }}>
+      {Array.from({ length: total }, (_, i) => (
+        <Box
+          key={i}
+          sx={{ flex: 1, height: 4, borderRadius: '2px', bgcolor: i < filled ? color : 'surface2.main' }}
+        />
+      ))}
+    </Box>
+  )
+}
+
+function Player({
+  name,
+  avatarUrl,
+  score,
+  weeks,
+  barColor,
+  emphasized,
+}: {
+  name: string
+  avatarUrl?: string | null
+  // Absent until the challenge has started, when there's nothing to score.
+  score?: number
+  weeks: number
+  barColor: string
+  emphasized: boolean
+}) {
+  return (
+    <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+      <Avatar src={avatarUrl} name={name} size={44} />
+      <Typography
+        noWrap
+        variant="caption"
+        color={emphasized ? 'text.primary' : 'text.secondary'}
+        sx={{ maxWidth: '100%', fontWeight: emphasized ? 700 : 500 }}
+      >
+        {name}
+      </Typography>
+      {score !== undefined && (
+        <>
+          <Typography
+            component="p"
+            aria-label={`${name}: ${score} of ${weeks} weeks`}
+            sx={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}
+          >
+            {score}
+            <Typography component="span" color="text.secondary" sx={{ fontSize: '0.8125rem', fontWeight: 500 }}>
+              /{weeks}
+            </Typography>
+          </Typography>
+          <WeekPips filled={score} total={weeks} color={barColor} />
+        </>
+      )}
+    </Box>
+  )
+}
+
+function Pot({ amount, tone = 'neutral' }: { amount: number; tone?: 'neutral' | 'gold' }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+      <SwoleCoin size={tone === 'gold' ? 30 : 26} title="points" />
+      <Typography sx={{ fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        {amount}
+      </Typography>
+      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1 }}>
+        Pot
+      </Typography>
+    </Box>
+  )
+}
+
+const weeksText = (weeks: number) => `${weeks} week${weeks === 1 ? '' : 's'}`
+
+// One card per challenge, showing its CURRENT status: the thread has no
+// per-transition event log (see convex/friendThread.ts).
 export function ChallengeCard({
   challenge,
   friendName,
+  friendAvatarUrl,
 }: {
   challenge: ChallengeEntry
   friendName: string
+  friendAvatarUrl?: string | null
 }) {
+  const me = useQuery(api.profiles.getMine)
   const accept = useMutation(api.challenges.accept)
   const decline = useMutation(api.challenges.decline)
   const cancelChallenge = useMutation(api.challenges.cancel)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const prefersReducedMotion = useReducedMotion()
-  const theme = useTheme()
-  const accent = (opacity: number) => alpha(theme.palette.primary.main, opacity)
 
   async function respond(action: 'accept' | 'decline' | 'cancel') {
     setError(null)
@@ -57,230 +165,191 @@ export function ChallengeCard({
     }
   }
 
-  const header = (
-    <Typography
-      variant="overline"
-      color={challenge.status === 'pending' ? undefined : 'text.secondary'}
+  // Never started, so there's nothing left to show but the fact it happened.
+  if (challenge.status === 'declined' || challenge.status === 'cancelled') {
+    return (
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        component="p"
+        sx={{ textAlign: 'center', py: 0.5 }}
+      >
+        ⚔️ {closedLabel(challenge.status, challenge.isMine, friendName)} ·{' '}
+        {challenge.wagerPoints * 2} pot · {weeksText(challenge.weeks)}
+      </Typography>
+    )
+  }
+
+  const pot = challenge.wagerPoints * 2
+  const outcome = challengeOutcome(challenge)
+  const started = challenge.status !== 'pending'
+  const { mine, theirs } = myAndTheirStreak(challenge)
+  const yourMove = challenge.status === 'pending' && !challenge.isMine
+  const won = outcome === 'won'
+
+  const pill =
+    challenge.status === 'pending' ? (
+      yourMove ? <StatusPill tone="accent">Your move</StatusPill> : <StatusPill tone="neutral">Waiting</StatusPill>
+    ) : challenge.status === 'active' ? (
+      <StatusPill tone="live">Live</StatusPill>
+    ) : won ? (
+      <StatusPill tone="gold">Won</StatusPill>
+    ) : outcome === 'lost' ? (
+      <StatusPill tone="neutral">Lost</StatusPill>
+    ) : (
+      <StatusPill tone="neutral">Tied</StatusPill>
+    )
+
+  const leaderColor = won ? 'pr.main' : 'primary.main'
+  const trailingColor = 'text.secondary'
+
+  const card = (
+    <GlassTile
       sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0.5,
-        ...(challenge.status === 'pending' && { color: tokens.accent }),
+        width: '100%',
+        maxWidth: 400,
+        mx: 'auto',
+        overflow: 'hidden',
+        ...(yourMove && { borderColor: 'rgb(var(--color-accent-rgb) / 0.5)' }),
+        ...(won && { borderColor: 'rgb(217 164 65 / 0.5)', bgcolor: 'rgb(217 164 65 / 0.06)' }),
       }}
     >
-      Challenge · {challenge.wagerPoints} <SwoleCoin size={13} title="points" /> · {challenge.weeks}w
-    </Typography>
-  )
+      <Box sx={{ px: 1.5, pt: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          ⚔️ Streak challenge
+        </Typography>
+        {pill}
+      </Box>
 
-  if (challenge.status === 'pending') {
-    const glow = prefersReducedMotion
-      ? { boxShadow: `0 0 0 1px ${accent(0.35)}, 0 0 10px ${accent(0.25)}` }
-      : undefined
-
-    return (
-      <motion.div
-        style={glow}
-        animate={
-          prefersReducedMotion
-            ? undefined
-            : {
-                boxShadow: [
-                  `0 0 0 1px ${accent(0.25)}, 0 0 4px ${accent(0.1)}`,
-                  `0 0 0 1px ${accent(0.5)}, 0 0 16px ${accent(0.35)}`,
-                  `0 0 0 1px ${accent(0.25)}, 0 0 4px ${accent(0.1)}`,
-                ],
-              }
-        }
-        transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+      <Box
+        sx={{
+          px: 1.5,
+          pt: 1.5,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+          alignItems: 'start',
+          columnGap: 1,
+        }}
       >
-        <GlassTile sx={{ p: 2, borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }}>
-          {header}
-          {challenge.isMine ? (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                Waiting for {friendName} to accept…
-              </Typography>
-              <Button
-                variant="outlined"
-                color="inherit"
-                size="small"
-                disabled={busy}
-                sx={{ mt: 1 }}
-                onClick={() => void respond('cancel')}
-              >
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Typography variant="body2">
-                {friendName} challenged you — longer streak wins.
-              </Typography>
-              <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                <Button variant="contained" size="small" fullWidth disabled={busy} onClick={() => void respond('accept')}>
+        <Player
+          name="You"
+          avatarUrl={me?.avatarUrl}
+          score={started ? mine : undefined}
+          weeks={challenge.weeks}
+          barColor={mine >= theirs ? leaderColor : trailingColor}
+          emphasized={started && mine >= theirs}
+        />
+        <Pot amount={pot} tone={won ? 'gold' : 'neutral'} />
+        <Player
+          name={friendName}
+          avatarUrl={friendAvatarUrl}
+          score={started ? theirs : undefined}
+          weeks={challenge.weeks}
+          barColor={theirs >= mine ? (outcome === 'lost' ? 'primary.main' : leaderColor) : trailingColor}
+          emphasized={started && theirs >= mine}
+        />
+      </Box>
+
+      <Box sx={{ px: 1.5, pt: 1.5, pb: 1.5 }}>
+        {challenge.status === 'pending' && (
+          <>
+            <Typography variant="body2" sx={{ textAlign: 'center', fontWeight: 700 }}>
+              {yourMove ? `${friendName} challenged you` : `Waiting for ${friendName} to accept`}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.25, textAlign: 'center' }}>
+              {weeksText(challenge.weeks)}, longer streak takes the pot.{' '}
+              {yourMove
+                ? `Accepting holds ${challenge.wagerPoints} of your points until it ends.`
+                : `Your ${challenge.wagerPoints} points are held, and come back if they decline.`}
+            </Typography>
+            {yourMove ? (
+              <Box sx={{ mt: 1.25, display: 'flex', gap: 1 }}>
+                <Button variant="contained" fullWidth disabled={busy} onClick={() => void respond('accept')}>
                   Accept
                 </Button>
-                <Button variant="outlined" color="inherit" size="small" fullWidth disabled={busy} onClick={() => void respond('decline')}>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  fullWidth
+                  disabled={busy}
+                  sx={{ borderColor: 'divider', color: 'text.secondary' }}
+                  onClick={() => void respond('decline')}
+                >
                   Decline
                 </Button>
               </Box>
-            </>
-          )}
-          {error && (
-            <Typography variant="body2" color="error" sx={{ mt: 0.5 }}>
-              {error}
-            </Typography>
-          )}
-        </GlassTile>
-      </motion.div>
-    )
-  }
-
-  if (challenge.status === 'active') {
-    const youName = 'You'
-    const challengerName = challenge.isMine ? youName : friendName
-    const opponentName = challenge.isMine ? friendName : youName
-    const challengerStreak = challenge.liveChallengerStreak ?? 0
-    const opponentStreak = challenge.liveOpponentStreak ?? 0
-    const challengerAhead = challengerStreak > opponentStreak
-    const opponentAhead = opponentStreak > challengerStreak
-
-    return (
-      <GlassTile sx={{ p: 2 }}>
-        {header}
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          In progress — ends {challenge.endsAt !== undefined ? formatShortDate(challenge.endsAt) : '…'}
-        </Typography>
-        <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
-          <RingSide
-            name={challengerName}
-            streak={challengerStreak}
-            weeks={challenge.weeks}
-            ahead={challengerAhead}
-          />
-          <Typography color="text.secondary">vs</Typography>
-          <RingSide
-            name={opponentName}
-            streak={opponentStreak}
-            weeks={challenge.weeks}
-            ahead={opponentAhead}
-          />
-        </Box>
-      </GlassTile>
-    )
-  }
-
-  // resolved / declined / cancelled
-  const won =
-    challenge.status === 'resolved' &&
-    challenge.winnerId !== undefined &&
-    challenge.isMine === (challenge.winnerId === challenge.challengerId)
-  const lost =
-    challenge.status === 'resolved' &&
-    challenge.winnerId !== undefined &&
-    challenge.isMine !== (challenge.winnerId === challenge.challengerId)
-  const declinedOrCancelled = challenge.status === 'declined' || challenge.status === 'cancelled'
-
-  const body = (
-    <GlassTile
-      sx={{
-        p: 2,
-        ...(won && { borderColor: 'rgb(217 164 65 / 0.45)', bgcolor: 'rgb(217 164 65 / 0.06)' }),
-        ...(lost && { opacity: 0.75 }),
-        ...(declinedOrCancelled && { opacity: 0.6 }),
-      }}
-    >
-      {header}
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-      >
-        {challenge.status === 'declined' ? (
-          '🚫 Challenge declined.'
-        ) : challenge.status === 'cancelled' ? (
-          '🚫 Challenge cancelled.'
-        ) : challenge.winnerId === undefined ? (
-          '⚖️ Tied — points returned.'
-        ) : won ? (
-          <>
-            You won!{' '}
-            <motion.span
-              initial={prefersReducedMotion ? undefined : { scale: 0 }}
-              animate={prefersReducedMotion ? undefined : { scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 12 }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-            >
-              +{challenge.wagerPoints} <SwoleCoin size={14} title="points" />
-            </motion.span>
+            ) : (
+              <Button
+                variant="text"
+                color="inherit"
+                size="small"
+                fullWidth
+                disabled={busy}
+                sx={{ mt: 0.75, color: 'text.secondary' }}
+                onClick={() => void respond('cancel')}
+              >
+                Cancel challenge
+              </Button>
+            )}
           </>
-        ) : (
-          `${friendName} won.`
         )}
-      </Typography>
+
+        {challenge.status === 'active' && (
+          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+              {leadLabel(mine, theirs, friendName)}
+            </Typography>
+            {challenge.endsAt !== undefined && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                title={`Ends ${formatShortDate(challenge.endsAt)}`}
+                sx={{ flexShrink: 0 }}
+              >
+                {timeLeftLabel(challenge.endsAt, Date.now())}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {outcome !== null && (
+          <>
+            <Typography
+              variant="body2"
+              sx={{ textAlign: 'center', fontWeight: 700, color: won ? 'pr.main' : 'text.primary' }}
+            >
+              {outcome === 'won'
+                ? `You won the ${pot} pot`
+                : outcome === 'lost'
+                  ? `${friendName} won the ${pot} pot`
+                  : 'Tied, so both stakes were returned'}
+            </Typography>
+            {challenge.resolvedAt !== undefined && (
+              <Typography variant="caption" color="text.secondary" component="p" sx={{ textAlign: 'center' }}>
+                Finished {formatShortDate(challenge.resolvedAt)}
+              </Typography>
+            )}
+          </>
+        )}
+
+        {error && (
+          <Typography variant="body2" color="error" sx={{ mt: 0.75, textAlign: 'center' }}>
+            {error}
+          </Typography>
+        )}
+      </Box>
     </GlassTile>
   )
 
-  if (!won) return body
+  if (!won || prefersReducedMotion) return card
 
   return (
     <motion.div
-      style={{ position: 'relative' }}
-      initial={prefersReducedMotion ? undefined : { scale: 0.92, opacity: 0 }}
-      animate={prefersReducedMotion ? undefined : { scale: 1, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+      initial={{ scale: 0.96, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 20 }}
     >
-      {body}
-      {!prefersReducedMotion && (
-        <Box sx={{ position: 'absolute', top: '20%', left: '20%', pointerEvents: 'none' }} aria-hidden>
-          {PARTICLE_OFFSETS.map((offset, i) => (
-            <motion.span
-              key={i}
-              style={{ position: 'absolute', fontSize: '0.9rem' }}
-              initial={{ x: 0, y: 0, opacity: 1 }}
-              animate={{ x: offset.x, y: offset.y, opacity: 0 }}
-              transition={{ duration: 0.8, delay: 0.15 }}
-            >
-              ✨
-            </motion.span>
-          ))}
-        </Box>
-      )}
+      {card}
     </motion.div>
-  )
-}
-
-function RingSide({
-  name,
-  streak,
-  weeks,
-  ahead,
-}: {
-  name: string
-  streak: number
-  weeks: number
-  ahead: boolean
-}) {
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-      <Box
-        sx={
-          ahead
-            ? { filter: 'drop-shadow(0 0 6px rgb(var(--color-accent-rgb) / 0.5))' }
-            : undefined
-        }
-      >
-        <ProgressRing
-          progress={streak / weeks}
-          color={ahead ? tokens.accent : tokens.muted}
-          size={48}
-          label={String(streak)}
-          animate
-        />
-      </Box>
-      <Typography variant="caption" color={ahead ? 'text.primary' : 'text.secondary'} sx={{ fontWeight: ahead ? 600 : 400 }}>
-        {name}
-      </Typography>
-    </Box>
   )
 }

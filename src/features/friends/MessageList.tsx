@@ -20,6 +20,7 @@ export function MessageList({
   thread,
   pending,
   friendName,
+  friendAvatarUrl,
   friendReadAt,
   friendTyping,
   canLoadOlder,
@@ -32,6 +33,7 @@ export function MessageList({
   thread: ThreadEntry[] | undefined
   pending: PendingMessage[]
   friendName: string
+  friendAvatarUrl?: string | null
   friendReadAt: number | null
   friendTyping: boolean
   canLoadOlder: boolean
@@ -132,7 +134,11 @@ export function MessageList({
             if (entry.type === 'challenge') {
               return (
                 <Box key={item.key} sx={{ mt: spacing }}>
-                  <ChallengeCard challenge={entry.challenge} friendName={friendName} />
+                  <ChallengeCard
+                    challenge={entry.challenge}
+                    friendName={friendName}
+                    friendAvatarUrl={friendAvatarUrl}
+                  />
                 </Box>
               )
             }
