@@ -108,7 +108,7 @@ export function FriendChatPage() {
           position: 'sticky',
           top: 0,
           zIndex: (t) => t.zIndex.appBar - 1,
-          bgcolor: 'rgb(30 28 25 / 0.9)',
+          bgcolor: 'rgb(var(--color-surface-rgb) / 0.9)',
           backdropFilter: 'blur(4px)',
         }}
       >
@@ -189,7 +189,7 @@ export function FriendChatPage() {
           pr: 'var(--app-gutter-right)',
           pb: 1,
           pt: 1,
-          bgcolor: 'rgb(30 28 25 / 0.9)',
+          bgcolor: 'rgb(var(--color-surface-rgb) / 0.9)',
           backdropFilter: 'blur(4px)',
         }}
       >
@@ -273,7 +273,7 @@ function Bubble({
         sx={
           isMine
             ? { borderRadius: '16px', px: 2, py: 1.25, bgcolor: 'primary.main', color: 'primary.contrastText' }
-            : { borderRadius: '16px', px: 2, py: 1.25, bgcolor: tokens.surface2Glass, border: '1px solid rgb(69 61 53 / 0.3)' }
+            : { borderRadius: '16px', px: 2, py: 1.25, bgcolor: tokens.surface2Glass, border: '1px solid rgb(var(--color-border-rgb) / 0.3)' }
         }
       >
         {children}

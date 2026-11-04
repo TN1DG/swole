@@ -382,6 +382,93 @@ describe('setCalorieTarget', () => {
   })
 })
 
+describe('setThemePreset', () => {
+  it('saves a known theme, defaulting to none', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    expect((await user.query(api.profiles.getMine, {}))!.themePreset).toBeNull()
+
+    await user.mutation(api.profiles.setThemePreset, { themePreset: 'ocean' })
+
+    expect((await user.query(api.profiles.getMine, {}))!.themePreset).toBe('ocean')
+  })
+
+  it('rejects an unknown theme', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await expect(
+      user.mutation(api.profiles.setThemePreset, { themePreset: 'nonsense' }),
+    ).rejects.toThrow(/unknown theme/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    await expect(
+      t.mutation(api.profiles.setThemePreset, { themePreset: 'ocean' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('changing names', () => {
+  it('lets a username change, and frees the old one for others', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.setUsername, { username: 'alice_one' })
+    await alice.mutation(api.profiles.setUsername, { username: 'alice_two' })
+    expect((await alice.query(api.profiles.getMine, {}))!.username).toBe('alice_two')
+
+    await bob.mutation(api.profiles.setUsername, { username: 'alice_one' })
+    expect((await bob.query(api.profiles.getMine, {}))!.username).toBe('alice_one')
+  })
+
+  it('refuses a username someone else holds', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.setUsername, { username: 'taken_name' })
+    await expect(
+      bob.mutation(api.profiles.setUsername, { username: 'taken_name' }),
+    ).rejects.toThrow(/taken/i)
+  })
+
+  it('rate-limits repeated username changes', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    for (const username of ['name_one', 'name_two', 'name_three']) {
+      await user.mutation(api.profiles.setUsername, { username })
+    }
+    await expect(
+      user.mutation(api.profiles.setUsername, { username: 'name_four' }),
+    ).rejects.toThrow()
+  })
+
+  it('does not spend the allowance when the username is unchanged', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setUsername, { username: 'same_name' })
+    for (let i = 0; i < 5; i++) {
+      await user.mutation(api.profiles.setUsername, { username: 'same_name' })
+    }
+    expect((await user.query(api.profiles.getMine, {}))!.username).toBe('same_name')
+  })
+
+  it('accepts emoji in a display name, and an empty one clears it', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.updateDisplayName, { displayName: 'Alice 💪' })
+    expect((await user.query(api.profiles.getMine, {}))!.displayName).toBe('Alice 💪')
+
+    await user.mutation(api.profiles.updateDisplayName, { displayName: '   ' })
+    expect((await user.query(api.profiles.getMine, {}))!.displayName).toBeNull()
+  })
+})
+
 describe('markReleaseSeen', () => {
   it('defaults to null', async () => {
     const t = createBackend()

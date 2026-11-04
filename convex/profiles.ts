@@ -14,6 +14,7 @@ import {
   WEEK_MS,
 } from './fitness'
 import { rateLimiter, requireWriter } from './rateLimiter'
+import { isThemePresetId } from './themePresets'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
 // tab, generous headroom for future tabs without growing unbounded.
@@ -159,6 +160,7 @@ export const getMine = query({
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
       nutritionGoal: profile?.nutritionGoal ?? null,
       calorieTargetOverride: profile?.calorieTargetOverride ?? null,
+      themePreset: profile?.themePreset ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
       weekPoints,
       monthPoints,
@@ -172,8 +174,9 @@ export const getMine = query({
   },
 })
 
-// One-time (well, changeable) handle — how friends find you. Lowercase and
-// unique; the friends feature is unusable until this is set.
+// Your handle — how friends find you. Lowercase and unique. Changeable anytime,
+// but rate-limited: a released handle is immediately claimable by anyone, so
+// churning through them would let an account squat or impersonate at speed.
 export const setUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
@@ -185,9 +188,12 @@ export const setUsername = mutation({
       .query('profiles')
       .withIndex('by_username', (q) => q.eq('username', username))
       .unique()
-    if (existing && existing.userId !== userId) {
+    if (existing?.userId === userId) return // unchanged, so nothing to ration
+    if (existing) {
       throw new ConvexError('That username is taken — try another one')
     }
+
+    await rateLimiter.limit(ctx, 'usernameChange', { key: userId, throws: true })
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { username })
@@ -470,12 +476,24 @@ export const updateDisplayName = mutation({
   handler: async (ctx, args) => {
     const userId = await requireWriter(ctx)
 
-    const trimmed = args.displayName.trim()
-    if (trimmed.length > 40) {
-      throw new ConvexError('Display name is too long (max 40 characters)')
-    }
+    const displayName = args.displayName.trim()
+      ? cleanName(args.displayName, 40, 'Display name')
+      : undefined
 
     const profile = await getOrCreateProfile(ctx, userId)
-    await ctx.db.patch(profile._id, { displayName: trimmed || undefined })
+    await ctx.db.patch(profile._id, { displayName })
+  },
+})
+
+// The user's colour theme. Purely their own view of the app; nobody else ever
+// sees it.
+export const setThemePreset = mutation({
+  args: { themePreset: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+    if (!isThemePresetId(args.themePreset)) throw new ConvexError('Unknown theme')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { themePreset: args.themePreset })
   },
 })

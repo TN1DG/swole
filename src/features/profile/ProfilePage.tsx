@@ -22,14 +22,17 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { AvatarUploadDialog } from './AvatarUploadDialog'
+import { ThemePicker } from './ThemePicker'
 import { useAvatarPicker } from './useAvatarPicker'
 import { WhatsNewDialog } from '../releases/WhatsNewDialog'
 import { CURRENT_RELEASE } from '../releases/releaseNotes'
 import { TIER_LABELS } from '../../lib/tierLabels'
+import { LIMITS } from '../../../convex/validation'
 
 export function ProfilePage() {
   const profile = useQuery(api.profiles.getMine)
   const updateDisplayName = useMutation(api.profiles.updateDisplayName)
+  const setUsername = useMutation(api.profiles.setUsername)
   const setWorkoutsPublic = useMutation(api.profiles.setWorkoutsPublic)
   const submitFeatureRequest = useMutation(api.featureRequests.submit)
   const deleteAccount = useMutation(api.account.deleteAccount)
@@ -37,6 +40,7 @@ export function ProfilePage() {
 
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
+  const [username, setUsernameDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const [featureText, setFeatureText] = useState('')
@@ -63,6 +67,9 @@ export function ProfilePage() {
     e.preventDefault()
     setError(null)
     try {
+      // Username first: it's the one that can be refused (taken, rate-limited),
+      // and failing there should leave both names as they were.
+      if (username.trim()) await setUsername({ username })
       await updateDisplayName({ displayName: name })
       setEditing(false)
     } catch (err) {
@@ -109,9 +116,19 @@ export function ProfilePage() {
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Display name"
+              label="Display name"
               size="small"
               fullWidth
+              slotProps={{ htmlInput: { maxLength: 40 } }}
+            />
+            <TextField
+              value={username}
+              onChange={(e) => setUsernameDraft(e.target.value)}
+              label="Username"
+              size="small"
+              fullWidth
+              helperText="How friends find you. Lowercase letters, numbers and underscores."
+              slotProps={{ htmlInput: { maxLength: LIMITS.usernameMaxLength, autoCapitalize: 'none' } }}
             />
             {error && (
               <Typography variant="body2" color="error">
@@ -172,6 +189,7 @@ export function ProfilePage() {
                 color="inherit"
                 onClick={() => {
                   setName(profile?.displayName ?? '')
+                  setUsernameDraft(profile?.username ?? '')
                   setEditing(true)
                 }}
               >
@@ -192,6 +210,8 @@ export function ProfilePage() {
           </Stack>
         )}
       </GlassCard>
+
+      <ThemePicker />
 
       <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <ConsistencyRing streakWeeks={profile!.streakWeeks} size={52} />

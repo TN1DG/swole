@@ -239,7 +239,7 @@ export function AppLayout() {
                       '& svg': { width: 20, height: 20 },
                       ...(isActive && {
                         bgcolor: tokens.surface2Glass,
-                        borderColor: 'rgb(69 61 53 / 0.3)',
+                        borderColor: 'rgb(var(--color-border-rgb) / 0.3)',
                       }),
                     }}
                   >

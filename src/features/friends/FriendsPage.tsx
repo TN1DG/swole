@@ -215,7 +215,7 @@ function LeaderboardTab() {
                   px: 1.5,
                   py: 1.5,
                   color: 'text.primary',
-                  ...(entry.isMe && { borderColor: 'rgb(193 84 31 / 0.4)' }),
+                  ...(entry.isMe && { borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }),
                 }}
               >
                 <Typography sx={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">

@@ -5,6 +5,7 @@ import { Box } from '@mui/material'
 import { AppLayout } from './components/AppLayout'
 import { OnboardingGate } from './features/onboarding/OnboardingGate'
 import { SignInPage } from './features/auth/SignInPage'
+import { ThemeSync } from './theme/AppThemeProvider'
 
 // Route-level code splitting: everything below is its own chunk, fetched
 // only once its route is actually visited, instead of all ~16 pages (plus
@@ -104,6 +105,7 @@ export default function App() {
 
       {/* Signed in -> the welcome carousel first-run, then the actual app. */}
       <Authenticated>
+        <ThemeSync />
         <OnboardingGate>
           <Suspense fallback={<RouteFallback />}>
             <Routes>

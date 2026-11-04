@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Button, Typography, alpha, useTheme } from '@mui/material'
 import { motion, useReducedMotion } from 'framer-motion'
 import { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
@@ -40,6 +40,8 @@ export function ChallengeCard({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const prefersReducedMotion = useReducedMotion()
+  const theme = useTheme()
+  const accent = (opacity: number) => alpha(theme.palette.primary.main, opacity)
 
   async function respond(action: 'accept' | 'decline' | 'cancel') {
     setError(null)
@@ -72,7 +74,7 @@ export function ChallengeCard({
 
   if (challenge.status === 'pending') {
     const glow = prefersReducedMotion
-      ? { boxShadow: '0 0 0 1px rgb(193 84 31 / 0.35), 0 0 10px rgb(193 84 31 / 0.25)' }
+      ? { boxShadow: `0 0 0 1px ${accent(0.35)}, 0 0 10px ${accent(0.25)}` }
       : undefined
 
     return (
@@ -83,15 +85,15 @@ export function ChallengeCard({
             ? undefined
             : {
                 boxShadow: [
-                  '0 0 0 1px rgb(193 84 31 / 0.25), 0 0 4px rgb(193 84 31 / 0.1)',
-                  '0 0 0 1px rgb(193 84 31 / 0.5), 0 0 16px rgb(193 84 31 / 0.35)',
-                  '0 0 0 1px rgb(193 84 31 / 0.25), 0 0 4px rgb(193 84 31 / 0.1)',
+                  `0 0 0 1px ${accent(0.25)}, 0 0 4px ${accent(0.1)}`,
+                  `0 0 0 1px ${accent(0.5)}, 0 0 16px ${accent(0.35)}`,
+                  `0 0 0 1px ${accent(0.25)}, 0 0 4px ${accent(0.1)}`,
                 ],
               }
         }
         transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
       >
-        <GlassTile sx={{ p: 2, borderColor: 'rgb(193 84 31 / 0.4)' }}>
+        <GlassTile sx={{ p: 2, borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }}>
           {header}
           {challenge.isMine ? (
             <>
@@ -264,7 +266,7 @@ function RingSide({
       <Box
         sx={
           ahead
-            ? { filter: 'drop-shadow(0 0 6px rgb(193 84 31 / 0.5))' }
+            ? { filter: 'drop-shadow(0 0 6px rgb(var(--color-accent-rgb) / 0.5))' }
             : undefined
         }
       >

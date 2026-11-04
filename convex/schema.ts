@@ -91,6 +91,10 @@ export default defineSchema({
     // goal would suggest (fitness.ts:resolveCalorieTarget). Absent means follow
     // the goal; choosing a goal clears it.
     calorieTargetOverride: v.optional(v.number()),
+    // One of convex/themePresets.ts. A plain string rather than a union so that
+    // adding a preset never needs a schema change; setThemePreset validates it,
+    // and the client falls back to the default for anything it doesn't know.
+    themePreset: v.optional(v.string()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),

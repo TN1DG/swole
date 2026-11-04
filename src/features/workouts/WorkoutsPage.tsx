@@ -43,7 +43,7 @@ export function WorkoutsPage() {
       <FirstVisitTip tabKey="workout" />
 
       {summary && (
-        <GlassCard sx={{ mt: 2, borderColor: 'rgb(193 84 31 / 0.4)' }}>
+        <GlassCard sx={{ mt: 2, borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }}>
           {summary.discarded ? (
             <Typography color="text.secondary">Empty workout discarded.</Typography>
           ) : (

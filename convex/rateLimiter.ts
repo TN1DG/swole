@@ -92,6 +92,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // turning an unbounded enumeration into a crawl.
   usernameLookup: { kind: 'token bucket', rate: 20, period: MINUTE, capacity: 10 },
 
+  // Handle changes, keyed by caller userId. Plenty for someone settling on a new
+  // name; too slow to squat handles or hop between them to impersonate people.
+  usernameChange: { kind: 'token bucket', rate: 5, period: 60 * MINUTE, capacity: 3 },
+
   // Avatar upload URLs, keyed by caller userId. Each generated URL is a
   // licence to write a blob into file storage, and a client that requests one
   // but never calls setAvatar leaves an orphan behind — so the mint rate is
