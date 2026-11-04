@@ -64,6 +64,9 @@ export const LIMITS = {
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
   releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"
   // --- social feed ---
+  // Plausibility ceiling for client-reported image dimensions. They only ever
+  // size a placeholder, so this just keeps the numbers sane.
+  imageMaxEdge: 10000,
   postCaptionMaxLength: 500,
   postCommentMaxLength: 500,
   commentsPerPost: 500,

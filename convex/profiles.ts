@@ -286,10 +286,10 @@ export const setWorkoutsPublic = mutation({
   },
 })
 
-// Largest avatar blob we'll keep. The client crops to a small square JPEG
-// (see src/lib/cropImage.ts), so anything near this ceiling means the upload
-// didn't come from our own UI.
-const MAX_AVATAR_BYTES = 5 * 1024 * 1024
+// Largest avatar blob we'll keep. The client crops to a ~40KB square (see
+// src/lib/cropImage.ts), so anything near this ceiling means the upload didn't
+// come from our own UI.
+const MAX_AVATAR_BYTES = 1024 * 1024
 
 // Step 1 of the avatar flow: mint a one-shot upload URL. Rate-limited because
 // each call is permission to write a blob, and a client that never follows up
@@ -333,7 +333,7 @@ export const setAvatar = mutation({
       metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
     if (wrongType || metadata.size > MAX_AVATAR_BYTES) {
       await ctx.storage.delete(args.storageId)
-      return { ok: false, error: 'That file needs to be an image under 5MB' }
+      return { ok: false, error: 'That file needs to be an image under 1MB' }
     }
 
     const profile = await getOrCreateProfile(ctx, userId)

@@ -108,6 +108,10 @@ export default defineSchema({
     visibility: v.union(v.literal('public'), v.literal('friends')),
     caption: v.optional(v.string()),
     photoStorageId: v.optional(v.id('_storage')),
+    // Measured on the client after optimizing (src/lib/optimizeImage.ts), so a
+    // photo's space is reserved before it loads. Absent on older posts.
+    photoWidth: v.optional(v.number()),
+    photoHeight: v.optional(v.number()),
 
     // Optional because a repost has no workout of its own, and because
     // history.deleteWorkout unlinks rather than destroying the post.
@@ -440,6 +444,8 @@ export default defineSchema({
     loggedAt: v.number(), // ms since epoch; grouped into UTC days, same convention as fitness.ts:utcDayIndex
     source: v.union(v.literal('manual'), v.literal('photo')),
     status: v.union(v.literal('pending'), v.literal('complete'), v.literal('failed')),
+    // Only while `pending`. Nothing ever displays a food photo, so the blob is
+    // freed as soon as analysis finishes either way (see nutrition.ts).
     photoStorageId: v.optional(v.id('_storage')),
     description: v.optional(v.string()), // AI's guess at the food
     calories: v.optional(v.number()),

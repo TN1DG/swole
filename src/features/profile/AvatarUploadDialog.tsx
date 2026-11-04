@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import { useMutation } from 'convex/react'
+import { ConvexError } from 'convex/values'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Slider, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
 import { cropToSquareBlob, type CropArea } from '../../lib/cropImage'
 import { errorMessage } from '../../lib/errors'
+import { uploadBlob } from '../../lib/uploadBlob'
 
 export function AvatarUploadDialog({
   imageSrc,
@@ -33,18 +34,11 @@ export function AvatarUploadDialog({
     setSaving(true)
     try {
       const blob = await cropToSquareBlob(imageSrc, area)
-      const uploadUrl = await generateUploadUrl({})
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': blob.type },
-        body: blob,
-      })
-      if (!response.ok) throw new Error('Upload failed — check your connection')
-      const { storageId } = (await response.json()) as { storageId: Id<'_storage'> }
+      const storageId = await uploadBlob(() => generateUploadUrl({}), blob)
       // Rejections come back as a result rather than a thrown error so the
       // server can clean up the bad blob — see profiles.ts:setAvatar.
       const result = await setAvatar({ storageId })
-      if (!result.ok) throw new Error(result.error)
+      if (!result.ok) throw new ConvexError(result.error)
       onClose()
     } catch (err) {
       setError(errorMessage(err, 'Could not save that photo.'))

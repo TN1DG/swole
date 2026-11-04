@@ -10,6 +10,7 @@ import { errorMessage } from '../../lib/errors'
 import { useWeightUnit } from '../../lib/useWeightUnit'
 import { Avatar } from '../../components/Avatar'
 import { GlassTile } from '../../components/GlassTile'
+import { StoredImage } from '../../components/StoredImage'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { tokens } from '../../theme/tokens'
 
@@ -103,11 +104,11 @@ export function PostCard({ post }: { post: FeedPost }) {
       )}
 
       {post.photoUrl && (
-        <Box
-          component="img"
+        <StoredImage
           src={post.photoUrl}
-          alt=""
-          sx={{ mt: 1, width: '100%', borderRadius: '12px', display: 'block' }}
+          width={post.photoWidth}
+          height={post.photoHeight}
+          sx={{ mt: 1 }}
         />
       )}
 
@@ -133,11 +134,12 @@ export function PostCard({ post }: { post: FeedPost }) {
             </Typography>
           )}
           {original.photoUrl && (
-            <Box
-              component="img"
+            <StoredImage
               src={original.photoUrl}
-              alt=""
-              sx={{ mt: 1, width: '100%', borderRadius: '8px', display: 'block' }}
+              width={original.photoWidth}
+              height={original.photoHeight}
+              radius="8px"
+              sx={{ mt: 1 }}
             />
           )}
           <StatLine post={original} />

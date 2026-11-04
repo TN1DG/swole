@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAction, useMutation, useQuery } from 'convex/react'
+import { ConvexError } from 'convex/values'
 import { Box, Button, IconButton, Link as MuiLink, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
 import {
   caloriesFromMacros,
   goalCalories,
@@ -12,6 +12,8 @@ import {
   tdee,
 } from '../../../convex/fitness'
 import { errorMessage } from '../../lib/errors'
+import { optimizeImage } from '../../lib/optimizeImage'
+import { uploadBlob } from '../../lib/uploadBlob'
 import { GlassTile } from '../../components/GlassTile'
 import { CameraIcon, SearchIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
@@ -20,32 +22,6 @@ import { FoodPicker, type PickedFood } from './FoodPicker'
 
 type FoodFields = { calories: string; proteinG: string; carbsG: string; fatG: string; fiberG: string }
 const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' }
-
-// Re-encodes any browser-decodable image (HEIC included, on platforms whose
-// OS codecs the browser defers to — notably iOS Safari) as a JPEG blob.
-// `imageOrientation: 'from-image'` bakes in the EXIF rotation phone photos
-// carry, since a canvas has no EXIF metadata of its own to preserve it.
-// Throws if the browser can't decode the source format at all.
-async function toUploadableJpeg(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  try {
-    const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Could not process that photo')
-    ctx.drawImage(bitmap, 0, 0)
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Could not process that photo'))),
-        'image/jpeg',
-        0.9,
-      )
-    })
-  } finally {
-    bitmap.close()
-  }
-}
 
 // The Nutrition tab. Falls back to `nutritionGoal ?? 'maintain'` when the
 // user hasn't picked a goal on the Stats page yet (see StatsPage.tsx:
@@ -180,25 +156,12 @@ export function CaloricConsistencyPage() {
       // usually comes back already normalized to JPEG, which is why this
       // only bites on gallery picks. Re-encoding through a canvas here
       // fixes that, corrects EXIF rotation, and shrinks oversized originals
-      // toward the upload cap, regardless of source format.
-      let upload: Blob
-      try {
-        upload = await toUploadableJpeg(file)
-      } catch {
-        throw new Error("That photo's format isn't supported — try a different one.")
-      }
-
-      const uploadUrl = await generateUploadUrl({})
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': upload.type },
-        body: upload,
-      })
-      if (!response.ok) throw new Error('Upload failed — check your connection')
-      const { storageId } = (await response.json()) as { storageId: Id<'_storage'> }
+      // well under the upload cap, regardless of source format.
+      const { blob } = await optimizeImage(file, 'food')
+      const storageId = await uploadBlob(() => generateUploadUrl({}), blob)
 
       const logged = await logPhotoEntry({ storageId })
-      if (!logged.ok) throw new Error(logged.error)
+      if (!logged.ok) throw new ConvexError(logged.error)
 
       const analysis = await analyzeFoodPhoto({ foodLogId: logged.foodLogId, storageId })
       setFields({
