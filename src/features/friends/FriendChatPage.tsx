@@ -83,6 +83,14 @@ export function FriendChatPage() {
   const hasPendingOutgoingPing =
     thread?.some((e) => e.type === 'ping' && e.isMine && e.ping.acknowledgedAt === null) ?? false
 
+  // Only one can be open at a time, so don't offer what the server would refuse.
+  const hasOpenChallenge =
+    thread?.some(
+      (e) =>
+        e.type === 'challenge' &&
+        (e.challenge.status === 'pending' || e.challenge.status === 'active'),
+    ) ?? false
+
   const canLoadOlder =
     thread !== undefined && thread.length >= limit && limit < LIMITS.threadEntriesMax
 
@@ -136,6 +144,7 @@ export function FriendChatPage() {
         thread={thread}
         pending={pending}
         friendName={friendName}
+        friendAvatarUrl={friend?.avatarUrl}
         friendReadAt={friendReadAt ?? null}
         friendTyping={friend !== undefined && presence.typing}
         canLoadOlder={canLoadOlder}
@@ -168,6 +177,7 @@ export function FriendChatPage() {
         <Composer
           disabled={friend === undefined}
           canPing={!hasPendingOutgoingPing}
+          canChallenge={!hasOpenChallenge}
           pingFlareKey={pingFlareKey}
           onSend={send}
           onPing={() =>

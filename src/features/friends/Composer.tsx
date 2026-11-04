@@ -18,6 +18,7 @@ function enterSends(): boolean {
 export function Composer({
   disabled,
   canPing,
+  canChallenge,
   pingFlareKey,
   onSend,
   onPing,
@@ -26,6 +27,7 @@ export function Composer({
 }: {
   disabled: boolean
   canPing: boolean
+  canChallenge: boolean
   pingFlareKey: number
   onSend: (text: string, attachment: Attachment | null) => void
   onPing: () => void
@@ -268,6 +270,7 @@ export function Composer({
           🏋️ Gym ping
         </MenuItem>
         <MenuItem
+          disabled={!canChallenge}
           onClick={() => {
             setMenuAnchor(null)
             onChallenge()
