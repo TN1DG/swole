@@ -2,6 +2,7 @@
 import { vi } from 'vitest'
 import { convexTest, type TestConvex } from 'convex-test'
 import { register as registerRateLimiter } from '@convex-dev/rate-limiter/test'
+import { register as registerPresence } from '@convex-dev/presence/test'
 import schema from './schema'
 import { api } from './_generated/api'
 import type { Id } from './_generated/dataModel'
@@ -25,6 +26,7 @@ export type T = TestConvex<typeof schema>
 export function createBackend(): T {
   const t = convexTest(schema, modules)
   registerRateLimiter(t)
+  registerPresence(t)
   return t
 }
 

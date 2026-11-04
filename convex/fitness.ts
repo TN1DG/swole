@@ -139,10 +139,21 @@ const GOAL_CALORIE_OFFSET: Record<Goal, number> = {
 }
 
 // Never suggest less than this, regardless of how low TDEE - offset lands.
-const MIN_SAFE_CALORIES = 1200
+export const MIN_SAFE_CALORIES = 1200
 
 export function goalCalories(tdeeValue: number, goal: Goal): number {
   return Math.max(MIN_SAFE_CALORIES, Math.round(tdeeValue + GOAL_CALORIE_OFFSET[goal]))
+}
+
+// The daily target actually in force: a number the user set for themselves
+// wins over what their goal would suggest. Every screen showing a target reads
+// it through here, so they can't disagree about which number applies.
+export function resolveCalorieTarget(
+  tdeeValue: number,
+  goal: Goal,
+  override: number | null | undefined,
+): number {
+  return override ?? goalCalories(tdeeValue, goal)
 }
 
 // Grams of protein per kg of bodyweight, by goal — sets protein directly off
@@ -174,6 +185,35 @@ export function macroTargets(calories: number, bodyWeightKg: number, goal: Goal)
   const carbsG = Math.max(0, Math.round(remainingCalories / 4))
   const fiberG = Math.round((calories / 1000) * 14)
   return { calories, proteinG, fatG, carbsG, fiberG }
+}
+
+export type MacroOverride = {
+  proteinG?: number
+  carbsG?: number
+  fatG?: number
+  fiberG?: number
+}
+
+// The breakdown actually in force: whatever the user set by hand, and the
+// suggestion for this calorie target for the rest. Carbs fill whatever calories
+// protein and fat leave, the same way macroTargets gets them, so overriding
+// either one rebalances the carbs rather than breaking the total.
+export function resolveMacroTargets(
+  calories: number,
+  bodyWeightKg: number,
+  goal: Goal,
+  override: MacroOverride | null | undefined,
+): MacroTargets {
+  const suggested = macroTargets(calories, bodyWeightKg, goal)
+  const proteinG = override?.proteinG ?? suggested.proteinG
+  const fatG = override?.fatG ?? suggested.fatG
+  return {
+    calories,
+    proteinG,
+    fatG,
+    carbsG: override?.carbsG ?? Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4)),
+    fiberG: override?.fiberG ?? suggested.fiberG,
+  }
 }
 
 // Atwater factors: 4 kcal/g for protein and carbs, 9 kcal/g for fat — the same

@@ -52,4 +52,9 @@ if (!isProduction) {
 
   console.log(`[vercel-build] ${authCmd}`)
   execSync(authCmd, { stdio: 'inherit' })
+
+  // Same reasoning for push. Production's pair is also set once, by hand.
+  const pushCmd = `node scripts/setup-push-env.mjs --preview-name="${branch}" --if-absent`
+  console.log(`[vercel-build] ${pushCmd}`)
+  execSync(pushCmd, { stdio: 'inherit' })
 }

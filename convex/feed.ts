@@ -6,10 +6,11 @@ import { publicIdentityMap } from './identity'
 import { areFriends } from './friendships'
 import { notify } from './notifications'
 import { rateLimiter, requireWriter } from './rateLimiter'
-import { cleanText, LIMITS } from './validation'
+import { assertRange, cleanText, LIMITS } from './validation'
 
-// Bigger than an avatar: feed photos are 4:5 at up to 1440px.
-const MAX_POST_PHOTO_BYTES = 8 * 1024 * 1024
+// The client optimizes to ~400KB at up to 1440px (src/lib/optimizeImage.ts), so
+// anything near this ceiling didn't come through our own UI.
+const MAX_POST_PHOTO_BYTES = 2 * 1024 * 1024
 
 /** Everyone this user has blocked, for filtering both feed streams. */
 async function blockedIds(ctx: QueryCtx, userId: Id<'users'>): Promise<Set<Id<'users'>>> {
@@ -70,6 +71,8 @@ async function hydrate(ctx: QueryCtx, viewerId: Id<'users'>, posts: Doc<'posts'>
     prCount: p.prCount ?? null,
     exerciseNames: p.exerciseNames ?? [],
     photoUrl: p.photoStorageId ? await ctx.storage.getUrl(p.photoStorageId) : null,
+    photoWidth: p.photoWidth ?? null,
+    photoHeight: p.photoHeight ?? null,
   })
 
   return Promise.all(
@@ -323,6 +326,8 @@ export const createPost = mutation({
     visibility: v.union(v.literal('public'), v.literal('friends')),
     caption: v.optional(v.string()),
     storageId: v.optional(v.id('_storage')),
+    photoWidth: v.optional(v.number()),
+    photoHeight: v.optional(v.number()),
   },
   handler: async (
     ctx,
@@ -346,6 +351,15 @@ export const createPost = mutation({
         ? cleanText(args.caption, LIMITS.postCaptionMaxLength, 'Caption')
         : undefined
 
+    const photoWidth =
+      args.photoWidth !== undefined
+        ? assertRange(args.photoWidth, 1, LIMITS.imageMaxEdge, 'Photo width')
+        : undefined
+    const photoHeight =
+      args.photoHeight !== undefined
+        ? assertRange(args.photoHeight, 1, LIMITS.imageMaxEdge, 'Photo height')
+        : undefined
+
     // --- everything below this line may touch storage ---
     if (args.storageId) {
       const metadata = await ctx.db.system.get('_storage', args.storageId)
@@ -354,7 +368,7 @@ export const createPost = mutation({
         metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
       if (wrongType || metadata.size > MAX_POST_PHOTO_BYTES) {
         await ctx.storage.delete(args.storageId)
-        return { ok: false, error: 'That file needs to be an image under 8MB' }
+        return { ok: false, error: 'That file needs to be an image under 2MB' }
       }
     }
 
@@ -371,7 +385,11 @@ export const createPost = mutation({
       createdAt: Date.now(),
       visibility: args.visibility,
       ...(caption !== undefined && { caption }),
-      ...(args.storageId !== undefined && { photoStorageId: args.storageId }),
+      ...(args.storageId !== undefined && {
+        photoStorageId: args.storageId,
+        ...(photoWidth !== undefined && { photoWidth }),
+        ...(photoHeight !== undefined && { photoHeight }),
+      }),
       workoutId: args.workoutId,
       workoutName: workout.name,
       workoutStartedAt: workout.startedAt,

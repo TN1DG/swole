@@ -6,9 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../../convex/_generated/api'
 
 // Same "answer by function name" shape as ActiveWorkout.test.tsx, extended to
-// mutations/actions too: this page calls four of them (logManualEntry,
-// deleteEntry, generateFoodPhotoUploadUrl via logPhotoEntry, analyzeFoodPhoto)
-// and the assertions below need to tell which one a given call landed on.
+// mutations too: the assertions below need to tell which one a given call
+// landed on (logManualEntry, deleteEntry, setCalorieTarget).
 const state = vi.hoisted(() => ({
   queries: new Map<string, unknown>(),
   mutations: new Map<string, ReturnType<typeof import('vitest').vi.fn>>(),
@@ -96,12 +95,141 @@ describe('CaloricConsistencyPage — targets', () => {
     renderPage()
 
     expect(screen.getByText(/Today, against your maintain goal/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Choose your goal' })).toBeInTheDocument()
+  })
+
+  it('measures against a self-set target and says so', () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), {
+      ...COMPLETE_PROFILE,
+      calorieTargetOverride: 2400,
+    })
+    renderPage()
+
+    expect(screen.getByText('0 / 2400 kcal')).toBeInTheDocument()
+    expect(screen.getByText(/Custom target/)).toBeInTheDocument()
+  })
+
+  it('edits the target from the Calories tile', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const field = screen.getByLabelText('Calories per day')
+    await user.clear(field)
+    await user.type(field, '2500')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).toHaveBeenCalledWith({
+      calories: 2500,
+    })
+  })
+
+  it('suggests a breakdown for the calories being typed, as placeholders', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const calories = screen.getByLabelText('Calories per day')
+    await user.clear(calories)
+    await user.type(calories, '3000')
+
+    // From fitness.ts for an 80kg cut: protein 2.2g/kg, fat 25% of calories,
+    // carbs the remainder, fiber 14g per 1000 kcal.
+    expect(screen.getByLabelText('Protein target (g)')).toHaveAttribute('placeholder', '176')
+    expect(screen.getByLabelText('Fat target (g)')).toHaveAttribute('placeholder', '83')
+    expect(screen.getByLabelText('Carbs target (g)')).toHaveAttribute('placeholder', '387')
+    expect(screen.getByLabelText('Fiber target (g)')).toHaveAttribute('placeholder', '42')
+
+    await user.clear(calories)
+    await user.type(calories, '2000')
+    expect(screen.getByLabelText('Carbs target (g)')).toHaveAttribute('placeholder', '198')
+  })
+
+  it('rebalances suggested carbs around a typed macro, and saves only what was typed', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const calories = screen.getByLabelText('Calories per day')
+    await user.clear(calories)
+    await user.type(calories, '3000')
+    await user.type(screen.getByLabelText('Protein target (g)'), '220')
+
+    expect(screen.getByLabelText('Carbs target (g)')).toHaveAttribute('placeholder', '343')
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).toHaveBeenCalledWith({
+      calories: 3000,
+      macros: { proteinG: 220 },
+    })
+  })
+
+  it('points out macros that no longer add up to the calories', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.type(screen.getByLabelText('Carbs target (g)'), '50')
+
+    expect(screen.getByText(/under your target/)).toBeInTheDocument()
+  })
+
+  it('catches a bad macro before saving', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.type(screen.getByLabelText('Fat target (g)'), 'lots')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByText(/grams between 0 and 2000/)).toBeInTheDocument()
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).not.toHaveBeenCalled()
+  })
+
+  it('tracks today against a hand-set breakdown', () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), {
+      ...COMPLETE_PROFILE,
+      calorieTargetOverride: 2400,
+      macroTargetOverride: { proteinG: 199 },
+    })
+    renderPage()
+
+    expect(screen.getByText('0 / 199 g')).toBeInTheDocument()
+  })
+
+  it('offers a way back to the goal number only when a target is custom', async () => {
+    state.queries.set(getFunctionName(api.profiles.getMine), {
+      ...COMPLETE_PROFILE,
+      calorieTargetOverride: 2400,
+    })
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: "Use goal's numbers" }))
+
+    expect(state.mutations.get(getFunctionName(api.profiles.setCalorieTarget))).toHaveBeenCalledWith({
+      calories: null,
+    })
   })
 })
 
 describe('CaloricConsistencyPage — log food', () => {
   beforeEach(() => {
     state.queries.set(getFunctionName(api.profiles.getMine), COMPLETE_PROFILE)
+  })
+
+  // Photo estimates aren't connected yet, so nothing should offer them.
+  it('offers no photo option', () => {
+    renderPage()
+
+    expect(screen.queryByRole('button', { name: /photo/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/photo/i)).not.toBeInTheDocument()
   })
 
   it('previews the calorie total from macros as the Calories placeholder', async () => {

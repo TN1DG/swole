@@ -1,4 +1,9 @@
 // Shared between backend (validation, seeding) and frontend (filters, forms).
+// The quick reactions on a chat message. An allow-list, so a reaction is always
+// one small known glyph rather than arbitrary text attached to someone else's
+// message.
+export const REACTION_EMOJIS = ['🔥', '💪', '😂', '❤️', '👍', '😮'] as const
+
 export const MUSCLE_GROUPS = [
   'Chest',
   'Back',

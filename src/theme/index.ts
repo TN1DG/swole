@@ -1,5 +1,6 @@
 import { createTheme } from '@mui/material/styles'
-import { tokens } from './tokens'
+import type { ThemePreset } from './presets'
+import { fixedTokens } from './tokens'
 
 // Two palette slots the default MUI palette has no home for: the secondary
 // "surface2" tile background, and the brass "PR gold" accent used for
@@ -15,17 +16,17 @@ declare module '@mui/material/styles' {
   }
 }
 
-export const theme = createTheme({
+export const buildTheme = (preset: ThemePreset) => createTheme({
   palette: {
     mode: 'dark',
-    background: { default: tokens.bg, paper: tokens.surface },
-    text: { primary: tokens.text, secondary: tokens.muted },
-    primary: { main: tokens.accent, contrastText: tokens.accentFg },
-    success: { main: tokens.success },
-    error: { main: tokens.error },
-    divider: tokens.border,
-    surface2: { main: tokens.surface2 },
-    pr: { main: tokens.pr },
+    background: { default: preset.bg, paper: preset.surface },
+    text: { primary: preset.text, secondary: preset.muted },
+    primary: { main: preset.accent, contrastText: preset.accentFg },
+    success: { main: fixedTokens.success },
+    error: { main: fixedTokens.error },
+    divider: preset.border,
+    surface2: { main: preset.surface2 },
+    pr: { main: fixedTokens.pr },
   },
   typography: {
     fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif',
@@ -73,9 +74,9 @@ export const theme = createTheme({
           // class added by hand at each call site.
           ...(ownerState.variant === 'contained' &&
             ownerState.color === 'primary' && {
-              boxShadow: '0 0 0 1px rgb(193 84 31 / 0.4), 0 4px 20px -4px rgb(193 84 31 / 0.45)',
+              boxShadow: '0 0 0 1px rgb(var(--color-accent-rgb) / 0.4), 0 4px 20px -4px rgb(var(--color-accent-rgb) / 0.45)',
               '&:hover': {
-                boxShadow: '0 0 0 1px rgb(193 84 31 / 0.5), 0 4px 24px -4px rgb(193 84 31 / 0.55)',
+                boxShadow: '0 0 0 1px rgb(var(--color-accent-rgb) / 0.5), 0 4px 24px -4px rgb(var(--color-accent-rgb) / 0.55)',
               },
             }),
         }),

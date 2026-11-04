@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { DAY_MS } from './fitness'
 import { LIMITS } from './validation'
@@ -234,7 +234,7 @@ describe('logPhotoEntry', () => {
     const t = createBackend()
     const user = asUser(t, await createUser(t, 'alice'))
 
-    const storageId = await storeBlob(t, jpegBlob(8 * 1024 * 1024 + 1))
+    const storageId = await storeBlob(t, jpegBlob(2 * 1024 * 1024 + 1))
     const result = await user.mutation(api.nutrition.logPhotoEntry, { storageId })
     expect(result).toMatchObject({ ok: false })
     expect(await storedFileCount(t)).toBe(0)
@@ -275,6 +275,35 @@ describe('analyzeFoodPhoto — not configured', () => {
 
     const today = await user.query(api.nutrition.getToday, {})
     expect(today.entries[0]).toMatchObject({ status: 'failed' })
+    // Nothing will ever read this photo again, so it isn't kept.
+    expect(await storedFileCount(t)).toBe(0)
+  })
+})
+
+describe('saveAnalysis', () => {
+  it('completes the entry and frees the photo, which nothing displays', async () => {
+    const t = createBackend()
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+
+    const storageId = await storeBlob(t, jpegBlob())
+    const logged = await user.mutation(api.nutrition.logPhotoEntry, { storageId })
+    if (!logged.ok) throw new Error('expected ok')
+
+    await t.mutation(internal.nutrition.saveAnalysis, {
+      foodLogId: logged.foodLogId,
+      ownerId: userId,
+      description: 'Oats',
+      calories: 300,
+      proteinG: 10,
+      carbsG: 50,
+      fatG: 5,
+      fiberG: 8,
+    })
+
+    const today = await user.query(api.nutrition.getToday, {})
+    expect(today.entries[0]).toMatchObject({ status: 'complete', description: 'Oats' })
+    expect(await storedFileCount(t)).toBe(0)
   })
 })
 

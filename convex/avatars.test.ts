@@ -50,7 +50,7 @@ describe('setAvatar', () => {
     const t = createBackend()
     const user = asUser(t, await createUser(t, 'alice'))
 
-    const storageId = await storeBlob(t, pngBlob(5 * 1024 * 1024 + 1))
+    const storageId = await storeBlob(t, pngBlob(1024 * 1024 + 1))
     const result = await user.mutation(api.profiles.setAvatar, { storageId })
     expect(result).toMatchObject({ ok: false })
 

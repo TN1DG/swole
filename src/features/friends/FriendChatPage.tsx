@@ -1,286 +1,218 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
-import { Box, Button, IconButton, TextField, Typography } from '@mui/material'
-import { motion } from 'framer-motion'
+import usePresence from '@convex-dev/presence/react'
+import { Box, Dialog, Typography } from '@mui/material'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { api } from '../../../convex/_generated/api'
-import { formatWorkoutDate } from '../../lib/dates'
+import { chatRoomId } from '../../../convex/chatRoom'
+import { LIMITS } from '../../../convex/validation'
 import { errorMessage } from '../../lib/errors'
-import { Avatar } from '../../components/Avatar'
-import { PingSendFlare } from '../../components/PingSendFlare'
 import { ChallengeComposeDialog } from './ChallengeComposeDialog'
-import { PingBubble } from './PingBubble'
-import { ChallengeCard } from './ChallengeCard'
-import { tokens } from '../../theme/tokens'
+import { ChatShell } from './ChatShell'
+import { Composer } from './Composer'
+import { MessageList } from './MessageList'
+import { PushPrompt } from '../notifications/PushPrompt'
+import { useMessageQueue } from './useMessageQueue'
 
-const MotionButton = motion.create(Button)
+const THREAD_PAGE = 60
+
+type FriendPresence = { online: boolean; typing: boolean }
+const OFFLINE: FriendPresence = { online: false, typing: false }
+
+// A component rather than a hook call in the page because hooks can't be
+// conditional, and it must only run for an actual friend: the server refuses
+// anyone else's heartbeat.
+function PresenceWatcher({
+  myId,
+  friendId,
+  onChange,
+}: {
+  myId: string
+  friendId: string
+  onChange: (presence: FriendPresence) => void
+}) {
+  const state = usePresence(api.presence, chatRoomId(myId, friendId), myId)
+  const friend = state?.find((s) => s.userId === friendId)
+  const online = friend?.online ?? false
+  const typing = online && (friend?.data as { typing?: boolean } | undefined)?.typing === true
+
+  useEffect(() => {
+    onChange({ online, typing })
+  }, [online, typing, onChange])
+
+  return null
+}
 
 export function FriendChatPage() {
   const { userId } = useParams<{ userId: string }>()
   const friendId = userId as Id<'users'>
+  const navigate = useNavigate()
 
-  const thread = useQuery(api.friendThread.getThread, { friendUserId: friendId })
+  const [limit, setLimit] = useState(THREAD_PAGE)
+  const liveThread = useQuery(api.friendThread.getThread, { friendUserId: friendId, limit })
+  const me = useQuery(api.profiles.getMine)
   const friends = useQuery(api.friends.myFriends)
+  const friendReadAt = useQuery(api.friendThread.friendReadAt, { friendUserId: friendId })
+  const partnerName = useQuery(api.friendThread.partnerName, { friendUserId: friendId })
   const sendPing = useMutation(api.pings.send)
-  const sendMessage = useMutation(api.messages.send)
   const markRead = useMutation(api.friendThread.markRead)
+  const toggleReaction = useMutation(api.messages.toggleReaction)
+  const setTyping = useMutation(api.presence.setTyping)
+  const { pending, send, retry, discard } = useMessageQueue(friendId)
 
-  const bottomRef = useRef<HTMLDivElement>(null)
+  // Raising `limit` makes useQuery return undefined until the larger result
+  // lands. Showing the last result meanwhile is what stops the whole conversation
+  // blinking out each time older messages load. Tagged with the friend, so
+  // switching chats can't show the previous person's messages.
+  const lastThread = useRef<{ friendId: string; thread: NonNullable<typeof liveThread> } | null>(null)
+  if (liveThread !== undefined) lastThread.current = { friendId, thread: liveThread }
+  const thread =
+    liveThread ?? (lastThread.current?.friendId === friendId ? lastThread.current.thread : undefined)
+
   const friend = friends?.find((f) => f.userId === friendId)
+  const friendName = friend?.displayName ?? partnerName ?? 'them'
+  const notFriends = friends !== undefined && friend === undefined
 
-  const [draft, setDraft] = useState('')
-  const [sending, setSending] = useState(false)
+  const [presence, setPresence] = useState<FriendPresence>(OFFLINE)
   const [composingChallenge, setComposingChallenge] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pingFlareKey, setPingFlareKey] = useState(0)
+  const [viewingImage, setViewingImage] = useState<string | null>(null)
 
   const hasPendingOutgoingPing =
     thread?.some((e) => e.type === 'ping' && e.isMine && e.ping.acknowledgedAt === null) ?? false
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [thread?.length])
+  const canLoadOlder =
+    thread !== undefined && thread.length >= limit && limit < LIMITS.threadEntriesMax
 
-  // Clear this friend's unread badge whenever the thread is open and changes
-  // — not just on mount, so a message arriving while you're already looking
-  // at the thread still counts as read. Keyed on `thread` itself (a fresh
-  // array identity on every reactive update); this can't feed back into
-  // itself because getThread doesn't read threadReads.
+  // Only marks read while actually on screen: a chat left open in a background
+  // tab must not tell the friend their message was read. Skipped when nothing new
+  // has come in, so your own sends don't each cost a write.
+  const markedUpTo = useRef(0)
   useEffect(() => {
-    if (thread === undefined) return
-    void markRead({ friendUserId: friendId })
+    markedUpTo.current = 0
+  }, [friendId])
+  useEffect(() => {
+    if (!thread) return
+    const latestIncoming = thread.reduce((latest, e) => (e.isMine ? latest : Math.max(latest, e.ts)), 0)
+    function markIfVisible() {
+      if (document.visibilityState !== 'visible') return
+      if (latestIncoming === 0 || latestIncoming <= markedUpTo.current) return
+      markedUpTo.current = latestIncoming
+      void markRead({ friendUserId: friendId })
+    }
+    markIfVisible()
+    document.addEventListener('visibilitychange', markIfVisible)
+    return () => document.removeEventListener('visibilitychange', markIfVisible)
   }, [thread, friendId, markRead])
 
   async function run(action: () => Promise<unknown>) {
     setError(null)
-    setSending(true)
     try {
       await action()
     } catch (err) {
       setError(errorMessage(err, 'Something went wrong.'))
-    } finally {
-      setSending(false)
     }
   }
 
-  async function handleSendMessage(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const text = draft.trim()
-    if (!text) return
-    setDraft('')
-    await run(async () => {
-      try {
-        await sendMessage({ toUserId: friendId, text })
-      } catch (err) {
-        setDraft(text) // don't lose what they typed
-        throw err
-      }
-    })
-  }
-
-  async function handleSendPing() {
-    await run(async () => {
-      await sendPing({ toUserId: friendId })
-      setPingFlareKey((k) => k + 1)
-    })
-  }
-
   return (
-    <Box>
-      {/* Sticks to the top of the page's own scroll region — AppLayout's
-          `main` is the scrolling element (the app header/nav are fixed
-          layout chrome outside it), so `top: 0` here means flush against
-          the top of the visible content area, not the viewport. */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          ml: 'calc(-1 * var(--app-gutter-left))',
-          mr: 'calc(-1 * var(--app-gutter-right))',
-          mt: -2,
-          pl: 'var(--app-gutter-left)',
-          pr: 'var(--app-gutter-right)',
-          py: 1.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          position: 'sticky',
-          top: 0,
-          zIndex: (t) => t.zIndex.appBar - 1,
-          bgcolor: 'rgb(30 28 25 / 0.9)',
-          backdropFilter: 'blur(4px)',
-        }}
-      >
-        <Typography component={Link} to="/friends" color="text.secondary" sx={{ fontWeight: 500, textDecoration: 'none' }}>
-          ←
-        </Typography>
-        <Avatar src={friend?.avatarUrl} name={friend?.displayName} size={32} />
-        <Typography
-          component={Link}
-          to={`/friends/${friendId}`}
-          sx={{ fontWeight: 600, color: 'text.primary', textDecoration: 'none' }}
-        >
-          {friend?.displayName ?? '…'}
-        </Typography>
-      </Box>
+    <ChatShell
+      friendId={friendId}
+      friendName={friend?.displayName ?? partnerName ?? '…'}
+      avatarUrl={friend?.avatarUrl}
+      isFriend={friend !== undefined}
+      // The watcher only runs for a friend, so without one its last report is stale.
+      status={!friend ? null : presence.typing ? 'typing…' : presence.online ? 'Active now' : null}
+      onLeave={() => navigate('/friends?tab=chats')}
+    >
+      {friend && me && (
+        <PresenceWatcher key={friendId} myId={me.userId} friendId={friendId} onChange={setPresence} />
+      )}
 
-      {/* svh, not vh: on mobile Safari `vh` is the *largest* viewport height
-          (toolbars hidden), so 50vh reserved more empty space than the thread
-          could ever occupy on a short thread. */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 2, minHeight: '50svh' }}>
-        {thread === undefined ? (
-          <Typography sx={{ textAlign: 'center' }} color="text.secondary">
-            Loading…
-          </Typography>
-        ) : thread.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-            Nothing here yet — say hi, send a ping, or start a challenge.
-          </Typography>
-        ) : (
-          thread.map((entry) => {
-            if (entry.type === 'challenge') {
-              return (
-                <ChallengeCard
-                  key={entry.key}
-                  challenge={entry.challenge}
-                  friendName={friend?.displayName ?? 'them'}
-                />
-              )
-            }
-            if (entry.type === 'ping') {
-              return <PingBubble key={entry.key} ping={entry.ping} />
-            }
-            return (
-              <Bubble key={entry.key} isMine={entry.isMine} ts={entry.ts}>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {entry.message.text}
-                </Typography>
-              </Bubble>
-            )
-          })
-        )}
-        <div ref={bottomRef} />
-      </Box>
+      {friend && <PushPrompt friendName={friend.displayName} />}
+
+      <MessageList
+        thread={thread}
+        pending={pending}
+        friendName={friendName}
+        friendReadAt={friendReadAt ?? null}
+        friendTyping={friend !== undefined && presence.typing}
+        canLoadOlder={canLoadOlder}
+        onLoadOlder={() => setLimit((l) => Math.min(l + THREAD_PAGE, LIMITS.threadEntriesMax))}
+        onReact={(messageId, emoji) => void run(() => toggleReaction({ messageId, emoji }))}
+        onOpenImage={setViewingImage}
+        onRetry={retry}
+        onDiscard={discard}
+      />
 
       {error && (
-        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+        <Typography
+          variant="body2"
+          color="error"
+          sx={{ flexShrink: 0, pl: 'var(--app-gutter-left)', pr: 'var(--app-gutter-right)', pb: 0.5 }}
+        >
           {error}
         </Typography>
       )}
 
-      {/* Composer: Ping and Challenge side by side, then the message row —
-          the message box sits closest to the thumb, where the thing you do
-          most often belongs.
-
-          Sticks to the bottom of the page's own scroll region (see the
-          header comment above — `main` is what scrolls, the nav is fixed
-          layout chrome outside it, so `bottom: 0` is flush against the
-          content area, not the viewport). Full-bleed (negative gutter
-          margins) so the blur covers the whole strip instead of leaving
-          message text visible in the side gutters. */}
-      <Box
-        sx={{
-          position: 'sticky',
-          bottom: 0,
-          ml: 'calc(-1 * var(--app-gutter-left))',
-          mr: 'calc(-1 * var(--app-gutter-right))',
-          pl: 'var(--app-gutter-left)',
-          pr: 'var(--app-gutter-right)',
-          pb: 1,
-          pt: 1,
-          bgcolor: 'rgb(30 28 25 / 0.9)',
-          backdropFilter: 'blur(4px)',
-        }}
-      >
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Box sx={{ position: 'relative', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
-            <MotionButton
-              variant="contained"
-              fullWidth
-              disabled={sending || hasPendingOutgoingPing}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => void handleSendPing()}
-            >
-              Ping 🏋️
-            </MotionButton>
-            <PingSendFlare triggerKey={pingFlareKey} />
-          </Box>
-          <Button
-            variant="outlined"
-            color="inherit"
-            fullWidth
-            sx={{ color: 'text.secondary' }}
-            onClick={() => setComposingChallenge(true)}
-          >
-            Challenge ⚔️
-          </Button>
-        </Box>
-        <Box component="form" onSubmit={handleSendMessage} sx={{ mt: 1, display: 'flex', gap: 1 }}>
-          <TextField
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Message…"
-            size="small"
-            fullWidth
-            slotProps={{ htmlInput: { maxLength: 1000, 'aria-label': 'Message' } }}
-          />
-          <IconButton
-            type="submit"
-            aria-label="Send message"
-            disabled={sending || !draft.trim()}
-            sx={{ flexShrink: 0, color: 'primary.main' }}
-          >
-            ➤
-          </IconButton>
-        </Box>
-      </Box>
+      {notFriends ? (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ flexShrink: 0, textAlign: 'center', pt: 2, pb: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
+          You're no longer friends, so you can't send messages here.
+        </Typography>
+      ) : (
+        <Composer
+          disabled={friend === undefined}
+          canPing={!hasPendingOutgoingPing}
+          pingFlareKey={pingFlareKey}
+          onSend={send}
+          onPing={() =>
+            void run(async () => {
+              await sendPing({ toUserId: friendId })
+              setPingFlareKey((k) => k + 1)
+            })
+          }
+          onChallenge={() => setComposingChallenge(true)}
+          onTypingChange={(typing) => void setTyping({ friendUserId: friendId, typing })}
+        />
+      )}
 
       {composingChallenge && (
         <ChallengeComposeDialog
           friendId={friendId}
-          friendName={friend?.displayName ?? 'them'}
+          friendName={friendName}
           onClose={() => setComposingChallenge(false)}
         />
       )}
-    </Box>
-  )
-}
 
-// ---------- plain message bubble ----------
-
-function Bubble({
-  isMine,
-  ts,
-  children,
-}: {
-  isMine: boolean
-  ts: number
-  children: React.ReactNode
-}) {
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.5,
-        maxWidth: '80%',
-        alignSelf: isMine ? 'flex-end' : 'flex-start',
-        alignItems: isMine ? 'flex-end' : 'flex-start',
-      }}
-    >
-      <Box
-        sx={
-          isMine
-            ? { borderRadius: '16px', px: 2, py: 1.25, bgcolor: 'primary.main', color: 'primary.contrastText' }
-            : { borderRadius: '16px', px: 2, py: 1.25, bgcolor: tokens.surface2Glass, border: '1px solid rgb(69 61 53 / 0.3)' }
-        }
-      >
-        {children}
-      </Box>
-      <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
-        {formatWorkoutDate(ts)}
-      </Typography>
-    </Box>
+      <Dialog fullScreen open={viewingImage !== null} onClose={() => setViewingImage(null)}>
+        <Box
+          role="button"
+          aria-label="Close photo"
+          onClick={() => setViewingImage(null)}
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#000',
+          }}
+        >
+          {viewingImage && (
+            <Box
+              component="img"
+              src={viewingImage}
+              alt="Photo"
+              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            />
+          )}
+        </Box>
+      </Dialog>
+    </ChatShell>
   )
 }

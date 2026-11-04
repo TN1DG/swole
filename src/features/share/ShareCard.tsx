@@ -7,7 +7,7 @@ import { BarbellIcon } from '../../components/icons'
 import { computeShareStats } from './shareStats'
 import { WorkoutBreakdown } from './WorkoutBreakdown'
 import { TRANSPARENT_ICON_SX, TRANSPARENT_TEXT_SX, type CardVariant } from './cardVariant'
-import { tokens } from '../../theme/tokens'
+import { brandTokens as tokens } from '../../theme/tokens'
 
 type Detail = NonNullable<FunctionReturnType<typeof api.history.getDetail>>
 

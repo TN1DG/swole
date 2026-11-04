@@ -1,0 +1,21 @@
+{
+  // The service worker runs in a worker, not a page, so it gets the WebWorker lib
+  // instead of DOM. The two declare conflicting globals and can't share a project.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "WebWorker"],
+    "module": "esnext",
+    "types": [],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src/sw.ts", "src/pushPayload.ts", "src/lib/photoCache.ts"]
+}

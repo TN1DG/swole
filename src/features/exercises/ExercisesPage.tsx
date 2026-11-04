@@ -161,7 +161,7 @@ export function ExercisesTab({ initialFavoritesOnly = false }: { initialFavorite
                       <Chip
                         label="Custom"
                         size="small"
-                        sx={{ flexShrink: 0, bgcolor: 'rgb(193 84 31 / 0.2)', color: 'primary.main' }}
+                        sx={{ flexShrink: 0, bgcolor: 'rgb(var(--color-accent-rgb) / 0.2)', color: 'primary.main' }}
                       />
                     )}
                   </Box>

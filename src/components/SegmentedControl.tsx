@@ -24,7 +24,7 @@ export function SegmentedControl<T extends string>({
       onChange={(_, next: T | null) => next !== null && onChange(next)}
       sx={{
         backgroundColor: tokens.surface2Glass,
-        border: '1px solid rgb(69 61 53 / 0.3)',
+        border: '1px solid rgb(var(--color-border-rgb) / 0.3)',
         borderRadius: '12px',
         p: 0.5,
         gap: 0.5,

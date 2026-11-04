@@ -7,11 +7,11 @@ const ts = 0
 
 describe('formatLastActivity', () => {
   it('formats a message with no icon, prefixing "You: " only for my own', () => {
-    expect(formatLastActivity({ friendId, ts, kind: 'message', isMine: true, text: 'hey' })).toEqual({
+    expect(formatLastActivity({ friendId, ts, kind: 'message', isMine: true, text: 'hey', hasImage: false })).toEqual({
       icon: null,
       text: 'You: hey',
     })
-    expect(formatLastActivity({ friendId, ts, kind: 'message', isMine: false, text: 'hey' })).toEqual({
+    expect(formatLastActivity({ friendId, ts, kind: 'message', isMine: false, text: 'hey', hasImage: false })).toEqual({
       icon: null,
       text: 'hey',
     })

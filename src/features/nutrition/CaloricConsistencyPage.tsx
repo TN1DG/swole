@@ -1,74 +1,47 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAction, useMutation, useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { Box, Button, IconButton, Link as MuiLink, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
 import {
   caloriesFromMacros,
   goalCalories,
-  macroTargets,
   mifflinStJeorBmr,
+  resolveCalorieTarget,
+  resolveMacroTargets,
   tdee,
 } from '../../../convex/fitness'
 import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
-import { CameraIcon, SearchIcon } from '../../components/icons'
+import { SearchIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { NutrientProgress } from './NutrientProgress'
 import { FoodPicker, type PickedFood } from './FoodPicker'
+import { CalorieTargetDialog } from './CalorieTargetDialog'
 
 type FoodFields = { calories: string; proteinG: string; carbsG: string; fatG: string; fiberG: string }
 const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' }
-
-// Re-encodes any browser-decodable image (HEIC included, on platforms whose
-// OS codecs the browser defers to — notably iOS Safari) as a JPEG blob.
-// `imageOrientation: 'from-image'` bakes in the EXIF rotation phone photos
-// carry, since a canvas has no EXIF metadata of its own to preserve it.
-// Throws if the browser can't decode the source format at all.
-async function toUploadableJpeg(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  try {
-    const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Could not process that photo')
-    ctx.drawImage(bitmap, 0, 0)
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Could not process that photo'))),
-        'image/jpeg',
-        0.9,
-      )
-    })
-  } finally {
-    bitmap.close()
-  }
-}
 
 // The Nutrition tab. Falls back to `nutritionGoal ?? 'maintain'` when the
 // user hasn't picked a goal on the Stats page yet (see StatsPage.tsx:
 // handleSelectGoal), so it works fine reached directly from the nav rather
 // than only via a goal card. Shows today's food-intake stats against that
-// goal, and the two ways to log a new item: enter the macros (the calorie
-// count follows from them unless you type your own), or add a photo and let
-// a vision model estimate it (convex/nutrition.ts).
+// goal, and the ways to log a new item: enter the macros (the calorie count
+// follows from them unless you type your own), or search the food database.
+//
+// The photo-estimate path (convex/nutrition.ts) has no entry point here until
+// it's connected: the backend is intact, only the button was removed.
 export function CaloricConsistencyPage() {
   const profile = useQuery(api.profiles.getMine)
   const today = useQuery(api.nutrition.getToday)
   const logManualEntry = useMutation(api.nutrition.logManualEntry)
   const deleteEntry = useMutation(api.nutrition.deleteEntry)
-  const generateUploadUrl = useMutation(api.nutrition.generateFoodPhotoUploadUrl)
-  const logPhotoEntry = useMutation(api.nutrition.logPhotoEntry)
-  const analyzeFoodPhoto = useAction(api.nutrition.analyzeFoodPhoto)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [fields, setFields] = useState<FoodFields>(EMPTY_FIELDS)
   const [description, setDescription] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [editingTarget, setEditingTarget] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const setField = (key: keyof FoodFields, value: string) =>
@@ -120,8 +93,14 @@ export function CaloricConsistencyPage() {
   const bmr = mifflinStJeorBmr(profile.weightKg, profile.heightCm, profile.age, profile.sex)
   const tdeeValue = tdee(bmr, profile.activityLevel)
   const goal = profile.nutritionGoal ?? 'maintain'
-  const targetCalories = goalCalories(tdeeValue, goal)
-  const targets = macroTargets(targetCalories, profile.weightKg, goal)
+  const targetCalories = resolveCalorieTarget(tdeeValue, goal, profile.calorieTargetOverride)
+  const hasCustomTarget = profile.calorieTargetOverride != null
+  const targets = resolveMacroTargets(
+    targetCalories,
+    profile.weightKg,
+    goal,
+    profile.calorieTargetOverride != null ? profile.macroTargetOverride : null,
+  )
 
   async function handleLogManual(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -165,56 +144,6 @@ export function CaloricConsistencyPage() {
     setPickerOpen(false)
   }
 
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    // Reset so picking the same file twice still fires a change event.
-    e.target.value = ''
-    if (!file) return
-
-    setError(null)
-    setAnalyzing(true)
-    try {
-      // Photos picked from a phone's gallery are frequently HEIC/HEIF (the
-      // iOS default), which the vision model can't read — only JPEG, PNG,
-      // GIF and WEBP. A photo taken through "Take Photo" on the same input
-      // usually comes back already normalized to JPEG, which is why this
-      // only bites on gallery picks. Re-encoding through a canvas here
-      // fixes that, corrects EXIF rotation, and shrinks oversized originals
-      // toward the upload cap, regardless of source format.
-      let upload: Blob
-      try {
-        upload = await toUploadableJpeg(file)
-      } catch {
-        throw new Error("That photo's format isn't supported — try a different one.")
-      }
-
-      const uploadUrl = await generateUploadUrl({})
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': upload.type },
-        body: upload,
-      })
-      if (!response.ok) throw new Error('Upload failed — check your connection')
-      const { storageId } = (await response.json()) as { storageId: Id<'_storage'> }
-
-      const logged = await logPhotoEntry({ storageId })
-      if (!logged.ok) throw new Error(logged.error)
-
-      const analysis = await analyzeFoodPhoto({ foodLogId: logged.foodLogId, storageId })
-      setFields({
-        calories: String(Math.round(analysis.calories)),
-        proteinG: String(Math.round(analysis.proteinG)),
-        carbsG: String(Math.round(analysis.carbsG)),
-        fatG: String(Math.round(analysis.fatG)),
-        fiberG: String(Math.round(analysis.fiberG)),
-      })
-    } catch (err) {
-      setError(errorMessage(err, 'Could not analyze that photo — log it manually instead.'))
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
   return (
     <Box>
       <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
@@ -228,8 +157,28 @@ export function CaloricConsistencyPage() {
         </MuiLink>
       </Typography>
 
+      {/* Only accounts that predate the onboarding goal step can land here
+          without one; they're still being measured against "maintain". */}
+      {profile.nutritionGoal == null && (
+        <GlassTile sx={{ mt: 2, p: 1.5 }}>
+          <Typography variant="body2">
+            You haven't chosen a goal yet, so these numbers assume you're maintaining.{' '}
+            <MuiLink component={Link} to="/stats" color="primary.main">
+              Choose your goal
+            </MuiLink>
+          </Typography>
+        </GlassTile>
+      )}
+
       <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <NutrientProgress label="Calories" unit="kcal" consumed={today.totals.calories} target={targetCalories} />
+        <NutrientProgress
+          label="Calories"
+          unit="kcal"
+          consumed={today.totals.calories}
+          target={targetCalories}
+          note={hasCustomTarget ? 'Custom target' : undefined}
+          onEdit={() => setEditingTarget(true)}
+        />
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 1 }}>
           <NutrientProgress label="Protein" unit="g" consumed={today.totals.proteinG} target={targets.proteinG} />
           <NutrientProgress label="Carbs" unit="g" consumed={today.totals.carbsG} target={targets.carbsG} />
@@ -238,11 +187,23 @@ export function CaloricConsistencyPage() {
         </Box>
       </Box>
 
+      {editingTarget && (
+        <CalorieTargetDialog
+          current={targetCalories}
+          currentMacros={profile.macroTargetOverride}
+          goal={goal}
+          goalCalories={goalCalories(tdeeValue, goal)}
+          weightKg={profile.weightKg}
+          isCustom={hasCustomTarget}
+          onClose={() => setEditingTarget(false)}
+        />
+      )}
+
       <Typography variant="h6" sx={{ mt: 4, fontWeight: 'bold' }}>
         Log food
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        Type in the macros, search the food database, or add a photo and let AI estimate it.
+        Type in the macros, or search the food database.
       </Typography>
 
       <Box component="form" onSubmit={(e) => void handleLogManual(e)} sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -302,41 +263,17 @@ export function CaloricConsistencyPage() {
         )}
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button type="submit" variant="contained" fullWidth disabled={saving || analyzing}>
+          <Button type="submit" variant="contained" fullWidth disabled={saving}>
             {saving ? 'Logging…' : 'Log'}
           </Button>
           <IconButton
             aria-label="Search the food database"
-            disabled={analyzing}
             onClick={() => setPickerOpen(true)}
             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
           >
             <SearchIcon size={20} />
           </IconButton>
-          <IconButton
-            aria-label="Add a photo of your food"
-            disabled={analyzing}
-            onClick={() => fileInputRef.current?.click()}
-            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
-          >
-            <CameraIcon size={20} />
-          </IconButton>
-          {/* No `capture` attribute: on a phone this lets the user pick "Take
-              Photo" or an existing shot from their library, rather than being
-              forced straight into the camera. */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => void handlePhotoChange(e)}
-          />
         </Box>
-        {analyzing && (
-          <Typography variant="body2" color="text.secondary">
-            Analyzing photo…
-          </Typography>
-        )}
       </Box>
 
       <Typography variant="h6" sx={{ mt: 4, fontWeight: 'bold' }}>

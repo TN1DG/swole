@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
+import { ConvexError } from 'convex/values'
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { errorMessage } from '../../lib/errors'
+import { optimizeImage, type OptimizedImage } from '../../lib/optimizeImage'
+import { uploadBlob } from '../../lib/uploadBlob'
 import { GlassTile } from '../../components/GlassTile'
+import { StoredImage } from '../../components/StoredImage'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { LIMITS } from '../../../convex/validation'
 
@@ -20,7 +24,8 @@ export function ComposePostPage() {
   const createPost = useMutation(api.feed.createPost)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null)
+  const [photo, setPhoto] = useState<(OptimizedImage & { url: string }) | null>(null)
+  const [processing, setProcessing] = useState(false)
   // Friends-only is the default on purpose — the safer of the two, and the
   // one that matches how the rest of the app already behaves.
   const [visibility, setVisibility] = useState<Visibility>('friends')
@@ -28,12 +33,24 @@ export function ComposePostPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  // Optimized as soon as it's picked rather than at post time: the preview then
+  // shows exactly what will be published, an unreadable format fails right away
+  // instead of after writing the caption, and Post only has the upload to wait on.
+  async function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = '' // allow re-picking the same file
     if (!file) return
-    if (photo) URL.revokeObjectURL(photo.url)
-    setPhoto({ file, url: URL.createObjectURL(file) })
+    setError(null)
+    setProcessing(true)
+    try {
+      const optimized = await optimizeImage(file, 'post')
+      if (photo) URL.revokeObjectURL(photo.url)
+      setPhoto({ ...optimized, url: URL.createObjectURL(optimized.blob) })
+    } catch (err) {
+      setError(errorMessage(err, 'Could not read that photo.'))
+    } finally {
+      setProcessing(false)
+    }
   }
 
   async function handlePost() {
@@ -41,17 +58,7 @@ export function ComposePostPage() {
     setBusy(true)
     setError(null)
     try {
-      let storageId: Id<'_storage'> | undefined
-      if (photo) {
-        const uploadUrl = await generateUploadUrl({})
-        const response = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': photo.file.type },
-          body: photo.file,
-        })
-        if (!response.ok) throw new Error('Upload failed — check your connection')
-        storageId = ((await response.json()) as { storageId: Id<'_storage'> }).storageId
-      }
+      const storageId = photo ? await uploadBlob(() => generateUploadUrl({}), photo.blob) : undefined
 
       // Blob rejections come back as a result rather than a thrown error, so
       // the server can delete the bad upload — see convex/feed.ts:createPost.
@@ -59,9 +66,13 @@ export function ComposePostPage() {
         workoutId: workoutId as Id<'workouts'>,
         visibility,
         ...(caption.trim() && { caption }),
-        ...(storageId && { storageId }),
+        ...(photo && storageId && {
+          storageId,
+          photoWidth: photo.width,
+          photoHeight: photo.height,
+        }),
       })
-      if (!result.ok) throw new Error(result.error)
+      if (!result.ok) throw new ConvexError(result.error)
       navigate('/friends')
     } catch (err) {
       setError(errorMessage(err, 'Could not post that.'))
@@ -144,7 +155,7 @@ export function ComposePostPage() {
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        onChange={pickFile}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => void pickFile(e)}
         sx={{ display: 'none' }}
       />
       <Button
@@ -152,18 +163,14 @@ export function ComposePostPage() {
         variant="outlined"
         color="inherit"
         sx={{ mt: 1.5 }}
+        disabled={processing}
         onClick={() => fileInputRef.current?.click()}
       >
-        {photo ? 'Change photo' : '🖼 Add a photo'}
+        {processing ? 'Preparing photo…' : photo ? 'Change photo' : '🖼 Add a photo'}
       </Button>
 
       {photo && (
-        <Box
-          component="img"
-          src={photo.url}
-          alt=""
-          sx={{ mt: 1.5, width: '100%', borderRadius: '12px', display: 'block' }}
-        />
+        <StoredImage src={photo.url} width={photo.width} height={photo.height} sx={{ mt: 1.5 }} />
       )}
 
       {error && (
@@ -176,7 +183,7 @@ export function ComposePostPage() {
         fullWidth
         variant="contained"
         sx={{ mt: 2 }}
-        disabled={busy}
+        disabled={busy || processing}
         onClick={() => void handlePost()}
       >
         {busy ? 'Posting…' : 'Post'}

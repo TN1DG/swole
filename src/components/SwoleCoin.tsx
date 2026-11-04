@@ -1,4 +1,4 @@
-import { tokens } from '../theme/tokens'
+import { brandTokens as tokens } from '../theme/tokens'
 
 // The coin carries TWO marks, picked by size.
 //

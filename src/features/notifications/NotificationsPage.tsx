@@ -81,7 +81,7 @@ export function NotificationsPage() {
                     px: 1.5,
                     py: 1.25,
                     color: 'text.primary',
-                    ...(n.readAt === null && { borderColor: 'rgb(193 84 31 / 0.4)' }),
+                    ...(n.readAt === null && { borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }),
                   }}
                 >
                   <Typography variant="body2" sx={{ fontWeight: n.readAt === null ? 600 : 400 }}>

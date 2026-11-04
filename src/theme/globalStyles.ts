@@ -1,13 +1,15 @@
 import type { CSSObject } from '@mui/material/styles'
-import { tokens } from './tokens'
+import { hexToRgbChannels, type ThemePreset } from './presets'
+import { fixedTokens } from './tokens'
 
 // Re-published as plain CSS custom properties for consumers that can't read
 // the MUI theme via React context: ProgressChart.tsx/ProgressRing.tsx/
 // CalendarView.tsx (hand-rolled SVG reading var(--color-accent) etc.) and
 // the modern-screenshot PNG-export pipeline (ShareCard/WorkoutBreakdown/
-// FriendTrophyCard), which snapshots real computed CSS. Same literal values
-// as the MUI theme (src/theme/index.ts) — tokens.ts is the single source.
-export const globalStyles: CSSObject = {
+// FriendTrophyCard), which snapshots real computed CSS, and for tokens.ts, whose
+// values are references to these. Same literal values as the MUI theme
+// (src/theme/index.ts), both built from the active preset.
+export const buildGlobalStyles = (preset: ThemePreset): CSSObject => ({
   ':root': {
     // Horizontal page gutter. A plain 1rem on most phones, but widened to
     // clear the notch/rounded corner when a landscape iPhone reports a
@@ -16,17 +18,22 @@ export const globalStyles: CSSObject = {
     // shared value rather than a hardcoded 16px in each place.
     '--app-gutter-left': 'max(1rem, env(safe-area-inset-left))',
     '--app-gutter-right': 'max(1rem, env(safe-area-inset-right))',
-    '--color-bg': tokens.bg,
-    '--color-surface': tokens.surface,
-    '--color-surface-2': tokens.surface2,
-    '--color-border': tokens.border,
-    '--color-text': tokens.text,
-    '--color-muted': tokens.muted,
-    '--color-accent': tokens.accent,
-    '--color-accent-fg': tokens.accentFg,
-    '--color-success': tokens.success,
-    '--color-pr': tokens.pr,
-    '--color-error': tokens.error,
+    '--color-bg': preset.bg,
+    '--color-surface': preset.surface,
+    '--color-surface-2': preset.surface2,
+    '--color-border': preset.border,
+    '--color-text': preset.text,
+    '--color-muted': preset.muted,
+    '--color-accent': preset.accent,
+    '--color-accent-fg': preset.accentFg,
+    '--color-success': fixedTokens.success,
+    '--color-pr': fixedTokens.pr,
+    '--color-error': fixedTokens.error,
+    // Bare channels, for translucent uses: rgb(var(--color-accent-rgb) / 0.4).
+    '--color-surface-rgb': hexToRgbChannels(preset.surface),
+    '--color-surface-2-rgb': hexToRgbChannels(preset.surface2),
+    '--color-border-rgb': hexToRgbChannels(preset.border),
+    '--color-accent-rgb': hexToRgbChannels(preset.accent),
   },
   'html, body, #root': {
     minHeight: '100svh',
@@ -45,7 +52,7 @@ export const globalStyles: CSSObject = {
     // boundary; the matching bg color is a last-resort fallback for any
     // sliver still visible through Safari's own chrome during that bounce.
     overscrollBehavior: 'none',
-    backgroundColor: tokens.bg,
+    backgroundColor: preset.bg,
   },
   html: {
     // Stops iOS Safari inflating body text when the phone is rotated to
@@ -79,8 +86,8 @@ export const globalStyles: CSSObject = {
     zIndex: 0,
     pointerEvents: 'none',
     background: [
-      'radial-gradient(ellipse 60% 40% at 20% -10%, rgb(193 84 31 / 0.16), transparent 60%)',
-      'radial-gradient(ellipse 50% 35% at 100% 110%, rgb(193 84 31 / 0.1), transparent 60%)',
+      'radial-gradient(ellipse 60% 40% at 20% -10%, rgb(var(--color-accent-rgb) / 0.16), transparent 60%)',
+      'radial-gradient(ellipse 50% 35% at 100% 110%, rgb(var(--color-accent-rgb) / 0.1), transparent 60%)',
       'radial-gradient(ellipse 40% 30% at 90% 20%, rgb(217 164 65 / 0.06), transparent 65%)',
     ].join(', '),
   },
@@ -102,4 +109,4 @@ export const globalStyles: CSSObject = {
     position: 'relative',
     zIndex: 1,
   },
-}
+})

@@ -14,6 +14,7 @@ import {
   WEEK_MS,
 } from './fitness'
 import { rateLimiter, requireWriter } from './rateLimiter'
+import { isThemePresetId } from './themePresets'
 
 // Cap on how many first-visit tips we'll remember dismissing — one per main
 // tab, generous headroom for future tabs without growing unbounded.
@@ -139,6 +140,7 @@ export const getMine = query({
     const monthPoints = sumAwarded(utcMonthStart(now), utcMonthEnd(now))
 
     return {
+      userId,
       email: user?.email ?? null,
       avatarUrl: profile?.avatarStorageId
         ? await ctx.storage.getUrl(profile.avatarStorageId)
@@ -158,6 +160,9 @@ export const getMine = query({
       activityLevel: profile?.activityLevel ?? null,
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
       nutritionGoal: profile?.nutritionGoal ?? null,
+      calorieTargetOverride: profile?.calorieTargetOverride ?? null,
+      macroTargetOverride: profile?.macroTargetOverride ?? null,
+      themePreset: profile?.themePreset ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
       weekPoints,
       monthPoints,
@@ -171,8 +176,9 @@ export const getMine = query({
   },
 })
 
-// One-time (well, changeable) handle — how friends find you. Lowercase and
-// unique; the friends feature is unusable until this is set.
+// Your handle — how friends find you. Lowercase and unique. Changeable anytime,
+// but rate-limited: a released handle is immediately claimable by anyone, so
+// churning through them would let an account squat or impersonate at speed.
 export const setUsername = mutation({
   args: { username: v.string() },
   handler: async (ctx, args) => {
@@ -184,9 +190,12 @@ export const setUsername = mutation({
       .query('profiles')
       .withIndex('by_username', (q) => q.eq('username', username))
       .unique()
-    if (existing && existing.userId !== userId) {
+    if (existing?.userId === userId) return // unchanged, so nothing to ration
+    if (existing) {
       throw new ConvexError('That username is taken — try another one')
     }
+
+    await rateLimiter.limit(ctx, 'usernameChange', { key: userId, throws: true })
 
     const profile = await getOrCreateProfile(ctx, userId)
     await ctx.db.patch(profile._id, { username })
@@ -286,10 +295,10 @@ export const setWorkoutsPublic = mutation({
   },
 })
 
-// Largest avatar blob we'll keep. The client crops to a small square JPEG
-// (see src/lib/cropImage.ts), so anything near this ceiling means the upload
-// didn't come from our own UI.
-const MAX_AVATAR_BYTES = 5 * 1024 * 1024
+// Largest avatar blob we'll keep. The client crops to a ~40KB square (see
+// src/lib/cropImage.ts), so anything near this ceiling means the upload didn't
+// come from our own UI.
+const MAX_AVATAR_BYTES = 1024 * 1024
 
 // Step 1 of the avatar flow: mint a one-shot upload URL. Rate-limited because
 // each call is permission to write a blob, and a client that never follows up
@@ -333,7 +342,7 @@ export const setAvatar = mutation({
       metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
     if (wrongType || metadata.size > MAX_AVATAR_BYTES) {
       await ctx.storage.delete(args.storageId)
-      return { ok: false, error: 'That file needs to be an image under 5MB' }
+      return { ok: false, error: 'That file needs to be an image under 1MB' }
     }
 
     const profile = await getOrCreateProfile(ctx, userId)
@@ -422,8 +431,10 @@ export const setDailyVolumeGoal = mutation({
   },
 })
 
-// Chosen from the Stats page's goal cards (convex/fitness.ts GOALS) — tapping
-// one saves it here and routes into the Caloric Consistency page.
+// Chosen during onboarding or from the Stats page's goal cards (convex/fitness.ts
+// GOALS). Clears any self-set calorie target: picking a card is picking that
+// card's number, and leaving the old override in force would make the card and
+// the Nutrition page disagree.
 export const setNutritionGoal = mutation({
   args: {
     goal: v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
@@ -432,7 +443,60 @@ export const setNutritionGoal = mutation({
     const userId = await requireWriter(ctx)
 
     const profile = await getOrCreateProfile(ctx, userId)
-    await ctx.db.patch(profile._id, { nutritionGoal: args.goal })
+    await ctx.db.patch(profile._id, {
+      nutritionGoal: args.goal,
+      calorieTargetOverride: undefined,
+      macroTargetOverride: undefined,
+    })
+  },
+})
+
+// A self-set daily calorie target, with any of its breakdown set by hand. `null`
+// goes back to following the goal, breakdown included. Macros that don't add up
+// to the calories are allowed: the form points it out, but it's the user's call.
+export const setCalorieTarget = mutation({
+  args: {
+    calories: v.union(v.number(), v.null()),
+    macros: v.optional(
+      v.object({
+        proteinG: v.optional(v.number()),
+        carbsG: v.optional(v.number()),
+        fatG: v.optional(v.number()),
+        fiberG: v.optional(v.number()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+
+    const calories =
+      args.calories === null
+        ? undefined
+        : Math.round(
+            assertRange(
+              args.calories,
+              LIMITS.calorieTargetMin,
+              LIMITS.calorieTargetMax,
+              'Calorie target',
+            ),
+          )
+    const macro = (value: number | undefined, label: string) =>
+      value === undefined ? undefined : Math.round(assertRange(value, 0, LIMITS.macroGrams, label))
+    const macros =
+      args.calories !== null && args.macros
+        ? {
+            proteinG: macro(args.macros.proteinG, 'Protein'),
+            carbsG: macro(args.macros.carbsG, 'Carbs'),
+            fatG: macro(args.macros.fatG, 'Fat'),
+            fiberG: macro(args.macros.fiberG, 'Fiber'),
+          }
+        : undefined
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, {
+      calorieTargetOverride: calories,
+      macroTargetOverride: macros,
+    })
   },
 })
 
@@ -442,12 +506,24 @@ export const updateDisplayName = mutation({
   handler: async (ctx, args) => {
     const userId = await requireWriter(ctx)
 
-    const trimmed = args.displayName.trim()
-    if (trimmed.length > 40) {
-      throw new ConvexError('Display name is too long (max 40 characters)')
-    }
+    const displayName = args.displayName.trim()
+      ? cleanName(args.displayName, 40, 'Display name')
+      : undefined
 
     const profile = await getOrCreateProfile(ctx, userId)
-    await ctx.db.patch(profile._id, { displayName: trimmed || undefined })
+    await ctx.db.patch(profile._id, { displayName })
+  },
+})
+
+// The user's colour theme. Purely their own view of the app; nobody else ever
+// sees it.
+export const setThemePreset = mutation({
+  args: { themePreset: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+    if (!isThemePresetId(args.themePreset)) throw new ConvexError('Unknown theme')
+
+    const profile = await getOrCreateProfile(ctx, userId)
+    await ctx.db.patch(profile._id, { themePreset: args.themePreset })
   },
 })

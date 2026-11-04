@@ -12,7 +12,7 @@ import {
   TRANSPARENT_TEXT_SX,
   type CardVariant,
 } from '../share/cardVariant'
-import { tokens } from '../../theme/tokens'
+import { brandTokens as tokens } from '../../theme/tokens'
 
 type Detail = NonNullable<FunctionReturnType<typeof api.friends.getFriendWorkoutDetail>>
 
