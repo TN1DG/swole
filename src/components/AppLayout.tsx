@@ -29,6 +29,8 @@ export function AppLayout() {
   // Drives the header bell's unread dot — same query the in-page banner
   // already subscribes to, so this doesn't add a new round trip either.
   const unreadNotifications = useQuery(api.notifications.listUnread)
+  // So a new message is noticed from anywhere in the app, not only on Friends.
+  const unreadChats = useQuery(api.friendThread.unreadFriendIds)
 
   return (
     // App shell pinned directly to the viewport via `position: fixed; inset:
@@ -243,7 +245,13 @@ export function AppLayout() {
                       }),
                     }}
                   >
-                    <Icon />
+                    <Badge
+                      color="error"
+                      variant="dot"
+                      invisible={to !== '/friends' || !unreadChats || unreadChats.length === 0}
+                    >
+                      <Icon />
+                    </Badge>
                   </Box>
                   <Box
                     component="span"

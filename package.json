@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.94",
+    "@convex-dev/presence": "^0.4.0",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

@@ -2,6 +2,8 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { v } from 'convex/values'
 import { internalMutation, mutation, type MutationCtx } from './_generated/server'
 import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
+import { presenceComponent } from './presence'
 import { rateLimiter } from './rateLimiter'
 import { awardPoints } from './profiles'
 import { cascadeDeletePost } from './feed'
@@ -198,18 +200,36 @@ export const purgeAccountData = internalMutation({
     // friend's own read marker pointing back at this user is left alone —
     // it's a harmless timestamp keyed by a now-dead friendId, and finding
     // them would need an index that exists for nothing else.
-    await drain(ctx, budget, (n) =>
-      ctx.db
-        .query('messages')
-        .withIndex('by_from', (q) => q.eq('fromUserId', userId))
-        .take(n),
+    //
+    // Photos go with their messages: drain only deletes rows, and a blob with no
+    // row pointing at it could never be found again. Freed as each batch is
+    // fetched, since drain deletes every row it's handed.
+    const withPhotosFreed = async <R extends { imageStorageId?: Id<'_storage'> }>(rows: R[]) => {
+      for (const row of rows) {
+        if (row.imageStorageId) await ctx.storage.delete(row.imageStorageId)
+      }
+      return rows
+    }
+    await drain(ctx, budget, async (n) =>
+      withPhotosFreed(
+        await ctx.db
+          .query('messages')
+          .withIndex('by_from', (q) => q.eq('fromUserId', userId))
+          .take(n),
+      ),
     )
-    await drain(ctx, budget, (n) =>
-      ctx.db
-        .query('messages')
-        .withIndex('by_to', (q) => q.eq('toUserId', userId))
-        .take(n),
+    await drain(ctx, budget, async (n) =>
+      withPhotosFreed(
+        await ctx.db
+          .query('messages')
+          .withIndex('by_to', (q) => q.eq('toUserId', userId))
+          .take(n),
+      ),
     )
+    // Presence rows name this user and nothing else cleans them up.
+    for (const { roomId } of await presenceComponent.listUser(ctx, userId)) {
+      await presenceComponent.removeRoomUser(ctx, roomId, userId)
+    }
     await drain(ctx, budget, (n) =>
       ctx.db
         .query('threadReads')

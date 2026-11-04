@@ -140,6 +140,7 @@ export const getMine = query({
     const monthPoints = sumAwarded(utcMonthStart(now), utcMonthEnd(now))
 
     return {
+      userId,
       email: user?.email ?? null,
       avatarUrl: profile?.avatarStorageId
         ? await ctx.storage.getUrl(profile.avatarStorageId)

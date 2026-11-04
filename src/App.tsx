@@ -109,6 +109,9 @@ export default function App() {
         <OnboardingGate>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
+              {/* Outside AppLayout: a conversation takes over the whole screen,
+                  with its own header and no tab bar. */}
+              <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<WorkoutsPage />} />
                 <Route path="/history" element={<HistoryPage />} />
@@ -123,7 +126,6 @@ export default function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/nutrition/consistency" element={<CaloricConsistencyPage />} />
                 <Route path="/friends" element={<FriendsPage />} />
-                <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
                 <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
                 <Route path="/friends/:userId/:workoutId" element={<FriendWorkoutDetailPage />} />
                 <Route

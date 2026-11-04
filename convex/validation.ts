@@ -60,6 +60,8 @@ export const LIMITS = {
   friendRequestsPerUser: 50, // pending outgoing requests
   featureRequestTextMaxLength: 1000,
   messageMaxLength: 1000,
+  // Most entries one thread read will ever return, however far back you scroll.
+  threadEntriesMax: 500,
   featureRequestsPerUser: 20,
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
   releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"

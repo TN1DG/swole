@@ -363,8 +363,16 @@ export default defineSchema({
   messages: defineTable({
     fromUserId: v.id('users'),
     toUserId: v.id('users'),
+    // May be empty only when a photo is attached (messages.ts:send).
     text: v.string(),
     sentAt: v.number(),
+    imageStorageId: v.optional(v.id('_storage')),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
+    // On the message rather than in its own table because chat is 1:1, so each
+    // person holds at most one reaction and this can never exceed two entries.
+    // It also means a thread needs no extra read per message to show them.
+    reactions: v.optional(v.array(v.object({ userId: v.id('users'), emoji: v.string() }))),
   })
     .index('by_from_to', ['fromUserId', 'toUserId'])
     .index('by_to', ['toUserId'])

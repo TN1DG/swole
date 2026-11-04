@@ -11,6 +11,7 @@
 import type * as account from "../account.js";
 import type * as auth from "../auth.js";
 import type * as challenges from "../challenges.js";
+import type * as chatRoom from "../chatRoom.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as emailAuth from "../emailAuth.js";
@@ -34,12 +35,14 @@ import type * as notifications from "../notifications.js";
 import type * as nutrition from "../nutrition.js";
 import type * as pings from "../pings.js";
 import type * as points from "../points.js";
+import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
+import type * as themePresets from "../themePresets.js";
 import type * as turnstile from "../turnstile.js";
 import type * as validation from "../validation.js";
 import type * as workoutFeedback from "../workoutFeedback.js";
@@ -55,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   account: typeof account;
   auth: typeof auth;
   challenges: typeof challenges;
+  chatRoom: typeof chatRoom;
   constants: typeof constants;
   crons: typeof crons;
   emailAuth: typeof emailAuth;
@@ -78,12 +82,14 @@ declare const fullApi: ApiFromModules<{
   nutrition: typeof nutrition;
   pings: typeof pings;
   points: typeof points;
+  presence: typeof presence;
   profiles: typeof profiles;
   prs: typeof prs;
   rateLimiter: typeof rateLimiter;
   routines: typeof routines;
   seed: typeof seed;
   seedData: typeof seedData;
+  themePresets: typeof themePresets;
   turnstile: typeof turnstile;
   validation: typeof validation;
   workoutFeedback: typeof workoutFeedback;
@@ -118,4 +124,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  presence: import("@convex-dev/presence/_generated/component.js").ComponentApi<"presence">;
 };

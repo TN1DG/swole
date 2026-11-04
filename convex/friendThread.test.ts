@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { api } from './_generated/api'
+import { chatRoomId } from './chatRoom'
 import {
   createBackend,
   givePoints,
@@ -351,5 +352,346 @@ describe('account deletion', () => {
     }))
     expect(remaining.messages).toEqual([])
     expect(remaining.reads).toEqual([])
+  })
+})
+
+function photoBlob(sizeBytes = 64): Blob {
+  return new Blob([new Uint8Array(sizeBytes)], { type: 'image/webp' })
+}
+const storedFileCount = (t: T) =>
+  t.run(async (ctx) => (await ctx.db.system.query('_storage').collect()).length)
+const storePhoto = (t: T, size?: number) =>
+  t.run(async (ctx) => await ctx.storage.store(photoBlob(size)))
+
+describe('photo messages', () => {
+  it('delivers a photo, with no caption needed, to both sides', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const storageId = await storePhoto(t)
+
+    const result = await alice.user.mutation(api.messages.send, {
+      toUserId: bob.userId,
+      text: '  ',
+      image: { storageId, width: 800, height: 600 },
+    })
+    expect(result).toEqual({ ok: true })
+
+    const [entry] = await bob.user.query(api.friendThread.getThread, { friendUserId: alice.userId })
+    expect(entry).toMatchObject({
+      type: 'message',
+      message: { text: '', imageWidth: 800, imageHeight: 600 },
+    })
+    if (entry?.type !== 'message') throw new Error('expected a message')
+    expect(entry.message.imageUrl).toBeTruthy()
+  })
+
+  it('rejects an oversized photo and deletes the upload', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const storageId = await storePhoto(t, 1024 * 1024 + 1)
+
+    const result = await alice.user.mutation(api.messages.send, {
+      toUserId: bob.userId,
+      text: 'look',
+      image: { storageId, width: 800, height: 600 },
+    })
+
+    expect(result).toMatchObject({ ok: false })
+    expect(await storedFileCount(t)).toBe(0)
+    expect(await bob.user.query(api.friendThread.getThread, { friendUserId: alice.userId })).toEqual([])
+  })
+
+  it('frees the upload when the recipient is not a friend', async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const carol = await userWithUsername(t, 'carol')
+    const storageId = await storePhoto(t)
+
+    const result = await alice.user.mutation(api.messages.send, {
+      toUserId: carol.userId,
+      text: '',
+      image: { storageId, width: 800, height: 600 },
+    })
+
+    expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/only message friends/i) })
+    expect(await storedFileCount(t)).toBe(0)
+  })
+
+  it('still requires text when there is no photo', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await expect(
+      alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: '' }),
+    ).rejects.toThrow(/required/i)
+  })
+
+  it('previews a photo in lastActivity', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const storageId = await storePhoto(t)
+    await alice.user.mutation(api.messages.send, {
+      toUserId: bob.userId,
+      text: '',
+      image: { storageId, width: 800, height: 600 },
+    })
+
+    const [activity] = await bob.user.query(api.friendThread.lastActivity, {})
+    expect(activity).toMatchObject({ kind: 'message', hasImage: true, text: '' })
+  })
+
+  it('frees chat photos when an account is deleted', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const fromAlice = await storePhoto(t)
+    const fromBob = await storePhoto(t)
+    await alice.user.mutation(api.messages.send, {
+      toUserId: bob.userId,
+      text: '',
+      image: { storageId: fromAlice, width: 10, height: 10 },
+    })
+    await bob.user.mutation(api.messages.send, {
+      toUserId: alice.userId,
+      text: '',
+      image: { storageId: fromBob, width: 10, height: 10 },
+    })
+    expect(await storedFileCount(t)).toBe(2)
+
+    await deleteAccountAndPurge(t, alice.user)
+
+    expect(await storedFileCount(t)).toBe(0)
+  })
+})
+
+describe('messages.toggleReaction', () => {
+  async function aMessage(t: T) {
+    const friends = await twoFriends(t)
+    await friends.alice.user.mutation(api.messages.send, { toUserId: friends.bob.userId, text: 'yo' })
+    const messageId = await t.run(
+      async (ctx) => (await ctx.db.query('messages').collect())[0]!._id,
+    )
+    const reactionsSeenBy = async (who: typeof friends.alice, friendUserId: typeof friends.bob.userId) => {
+      const [entry] = await who.user.query(api.friendThread.getThread, { friendUserId })
+      if (entry?.type !== 'message') throw new Error('expected a message')
+      return entry.message.reactions
+    }
+    return { ...friends, messageId, reactionsSeenBy }
+  }
+
+  it('adds, replaces and removes one reaction per person', async () => {
+    const t = createBackend()
+    const { alice, bob, messageId, reactionsSeenBy } = await aMessage(t)
+
+    await bob.user.mutation(api.messages.toggleReaction, { messageId, emoji: '🔥' })
+    expect(await reactionsSeenBy(bob, alice.userId)).toEqual([{ emoji: '🔥', isMine: true }])
+    expect(await reactionsSeenBy(alice, bob.userId)).toEqual([{ emoji: '🔥', isMine: false }])
+
+    await bob.user.mutation(api.messages.toggleReaction, { messageId, emoji: '💪' })
+    expect(await reactionsSeenBy(bob, alice.userId)).toEqual([{ emoji: '💪', isMine: true }])
+
+    await bob.user.mutation(api.messages.toggleReaction, { messageId, emoji: '💪' })
+    expect(await reactionsSeenBy(bob, alice.userId)).toEqual([])
+  })
+
+  it('keeps both people\'s reactions separate', async () => {
+    const t = createBackend()
+    const { alice, bob, messageId, reactionsSeenBy } = await aMessage(t)
+
+    await alice.user.mutation(api.messages.toggleReaction, { messageId, emoji: '😂' })
+    await bob.user.mutation(api.messages.toggleReaction, { messageId, emoji: '🔥' })
+
+    expect(await reactionsSeenBy(alice, bob.userId)).toHaveLength(2)
+  })
+
+  it('rejects an emoji outside the allow-list', async () => {
+    const t = createBackend()
+    const { bob, messageId } = await aMessage(t)
+    await expect(
+      bob.user.mutation(api.messages.toggleReaction, { messageId, emoji: 'lol' }),
+    ).rejects.toThrow(/unknown reaction/i)
+  })
+
+  it('refuses anyone outside the conversation', async () => {
+    const t = createBackend()
+    const { messageId } = await aMessage(t)
+    const carol = await userWithUsername(t, 'carol')
+    await expect(
+      carol.user.mutation(api.messages.toggleReaction, { messageId, emoji: '🔥' }),
+    ).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('getThread limit', () => {
+  async function threadOf(t: T, count: number) {
+    const friends = await twoFriends(t)
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        await ctx.db.insert('messages', {
+          fromUserId: friends.alice.userId,
+          toUserId: friends.bob.userId,
+          text: String(i),
+          sentAt: i + 1,
+        })
+      }
+    })
+    return friends
+  }
+
+  it('returns the newest entries, oldest first, defaulting to 60', async () => {
+    const t = createBackend()
+    const { alice, bob } = await threadOf(t, 70)
+
+    const thread = await alice.user.query(api.friendThread.getThread, { friendUserId: bob.userId })
+
+    expect(thread).toHaveLength(60)
+    expect(thread.at(-1)).toMatchObject({ message: { text: '69' } })
+  })
+
+  it('reaches further back when asked', async () => {
+    const t = createBackend()
+    const { alice, bob } = await threadOf(t, 70)
+
+    const thread = await alice.user.query(api.friendThread.getThread, {
+      friendUserId: bob.userId,
+      limit: 65,
+    })
+
+    expect(thread).toHaveLength(65)
+    expect(thread[0]).toMatchObject({ message: { text: '5' } })
+  })
+
+  it.each([0, -5, Number.NaN])('survives a nonsense limit of %s', async (limit) => {
+    const t = createBackend()
+    const { alice, bob } = await threadOf(t, 3)
+    const thread = await alice.user.query(api.friendThread.getThread, {
+      friendUserId: bob.userId,
+      limit,
+    })
+    expect(thread.length).toBeGreaterThan(0)
+  })
+})
+
+describe('friendReadAt', () => {
+  it("tells me when my friend last read, and never leaks to a stranger", async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const carol = await userWithUsername(t, 'carol')
+
+    expect(await alice.user.query(api.friendThread.friendReadAt, { friendUserId: bob.userId })).toBeNull()
+
+    await bob.user.mutation(api.friendThread.markRead, { friendUserId: alice.userId })
+
+    expect(await alice.user.query(api.friendThread.friendReadAt, { friendUserId: bob.userId })).toEqual(
+      expect.any(Number),
+    )
+    expect(await carol.user.query(api.friendThread.friendReadAt, { friendUserId: bob.userId })).toBeNull()
+    // My own read marker isn't what "Read" means.
+    expect(await bob.user.query(api.friendThread.friendReadAt, { friendUserId: alice.userId })).toBeNull()
+  })
+})
+
+describe('blocking closes the channel', () => {
+  it.each([
+    ['the blocker', true],
+    ['the blocked friend', false],
+  ])('stops %s messaging, pinging and challenging', async (_label, senderIsBlocker) => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await bob.user.mutation(api.feed.blockUser, { userId: alice.userId })
+    const [from, to] = senderIsBlocker ? [bob, alice] : [alice, bob]
+    await givePoints(t, from.userId, 100)
+
+    await expect(
+      from.user.mutation(api.messages.send, { toUserId: to.userId, text: 'hi' }),
+    ).rejects.toThrow(/couldn't be delivered/i)
+    await expect(from.user.mutation(api.pings.send, { toUserId: to.userId })).rejects.toThrow(
+      /couldn't be delivered/i,
+    )
+    await expect(
+      from.user.mutation(api.challenges.propose, { opponentId: to.userId, weeks: 1, wagerPoints: 10 }),
+    ).rejects.toThrow(/couldn't be delivered/i)
+  })
+
+  it('frees an already-uploaded photo', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await bob.user.mutation(api.feed.blockUser, { userId: alice.userId })
+    const storageId = await storePhoto(t)
+
+    const result = await alice.user.mutation(api.messages.send, {
+      toUserId: bob.userId,
+      text: '',
+      image: { storageId, width: 10, height: 10 },
+    })
+
+    expect(result).toMatchObject({ ok: false })
+    expect(await storedFileCount(t)).toBe(0)
+  })
+})
+
+describe('presence', () => {
+  const room = (a: string, b: string) => chatRoomId(a, b)
+
+  it('lets friends join their room, and uses auth rather than the claimed user', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const roomId = room(alice.userId, bob.userId)
+
+    const { roomToken } = await alice.user.mutation(api.presence.heartbeat, {
+      roomId,
+      userId: bob.userId, // lying about who this is
+      sessionId: 's1',
+      interval: 10000,
+    })
+
+    const present = await alice.user.query(api.presence.list, { roomToken })
+    expect(present.map((p) => p.userId)).toEqual([alice.userId])
+  })
+
+  it('shows typing state through the room', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const { roomToken } = await alice.user.mutation(api.presence.heartbeat, {
+      roomId: room(alice.userId, bob.userId),
+      userId: alice.userId,
+      sessionId: 's1',
+      interval: 10000,
+    })
+
+    await alice.user.mutation(api.presence.setTyping, { friendUserId: bob.userId, typing: true })
+
+    const [state] = await bob.user.query(api.presence.list, { roomToken })
+    expect(state).toMatchObject({ userId: alice.userId, data: { typing: true } })
+  })
+
+  it("refuses a room you aren't in, a stranger's room, and malformed ids", async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    const carol = await userWithUsername(t, 'carol')
+    const heartbeat = (user: typeof carol.user, roomId: string) =>
+      user.mutation(api.presence.heartbeat, {
+        roomId,
+        userId: 'x',
+        sessionId: 's1',
+        interval: 10000,
+      })
+
+    await expect(heartbeat(carol.user, room(alice.userId, bob.userId))).rejects.toThrow(/not available/i)
+    await expect(heartbeat(carol.user, room(carol.userId, alice.userId))).rejects.toThrow(/not available/i)
+    await expect(heartbeat(alice.user, 'nonsense')).rejects.toThrow(/not available/i)
+  })
+
+  it('refuses a blocked friend', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await bob.user.mutation(api.feed.blockUser, { userId: alice.userId })
+
+    await expect(
+      alice.user.mutation(api.presence.heartbeat, {
+        roomId: room(alice.userId, bob.userId),
+        userId: alice.userId,
+        sessionId: 's1',
+        interval: 10000,
+      }),
+    ).rejects.toThrow(/not available/i)
   })
 })

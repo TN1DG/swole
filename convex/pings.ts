@@ -4,7 +4,7 @@ import { mutation, query, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
-import { areFriends } from './friendships'
+import { areFriends, isBlockedEitherWay } from './friendships'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -17,6 +17,10 @@ export const send = mutation({
 
     if (!(await areFriends(ctx, fromUserId, args.toUserId))) {
       throw new Error('You can only ping friends')
+    }
+    // Worded so it doesn't reveal a block: blocks are silent by design.
+    if (await isBlockedEitherWay(ctx, fromUserId, args.toUserId)) {
+      throw new ConvexError("This ping couldn't be delivered")
     }
 
     const existing = await ctx.db

@@ -12,7 +12,7 @@ import { assertRange, LIMITS } from './validation'
 import { forwardStreakWeeks } from './fitness'
 import { awardPoints, escrowPoints } from './profiles'
 import { rateLimiter, requireWriter } from './rateLimiter'
-import { areFriends } from './friendships'
+import { areFriends, isBlockedEitherWay } from './friendships'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -96,6 +96,10 @@ export const propose = mutation({
     if (userId === args.opponentId) throw new Error("Can't challenge yourself")
     if (!(await areFriends(ctx, userId, args.opponentId))) {
       throw new Error('You can only challenge friends')
+    }
+    // Worded so it doesn't reveal a block: blocks are silent by design.
+    if (await isBlockedEitherWay(ctx, userId, args.opponentId)) {
+      throw new ConvexError("This challenge couldn't be delivered")
     }
     if (await openChallengeBetween(ctx, userId, args.opponentId)) {
       throw new ConvexError('Already have an open challenge with this friend')
