@@ -1,4 +1,4 @@
-import { Box, Typography } from '@mui/material'
+import { Box, Link, Typography } from '@mui/material'
 import { GlassTile } from '../../components/GlassTile'
 
 // One consumed-vs-target row on the Caloric Consistency page: a label, the
@@ -10,11 +10,15 @@ export function NutrientProgress({
   unit,
   consumed,
   target,
+  note,
+  onEdit,
 }: {
   label: string
   unit: string
   consumed: number
   target: number
+  note?: string
+  onEdit?: () => void
 }) {
   const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0
   return (
@@ -22,6 +26,15 @@ export function NutrientProgress({
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <Typography variant="body2" color="text.secondary">
           {label}
+          {note && ` · ${note}`}
+          {onEdit && (
+            <>
+              {' · '}
+              <Link component="button" type="button" variant="body2" onClick={onEdit}>
+                Edit
+              </Link>
+            </>
+          )}
         </Typography>
         <Typography variant="body2" sx={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
           {Math.round(consumed)} / {Math.round(target)} {unit}

@@ -1,14 +1,15 @@
-import { v } from 'convex/values'
-import { getAuthUserId } from '@convex-dev/auth/server'
+import { v, ConvexError } from 'convex/values'
 import { mutation, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { cleanText, LIMITS } from './validation'
-import { rateLimiter } from './rateLimiter'
-import { areFriends } from './friendships'
+import { assertRange, cleanText, LIMITS } from './validation'
+import { rateLimiter, requireWriter } from './rateLimiter'
+import { areFriends, isBlockedEitherWay } from './friendships'
+import { REACTION_EMOJIS } from './constants'
+import { queueMessagePush } from './push'
 
-// How many messages the thread ever loads. The unified thread trims again
-// across all entry types (see friendThread.ts); this just bounds the read.
-const THREAD_LIMIT = 100
+// The client optimizes to ~300KB at up to 1280px (src/lib/optimizeImage.ts), so
+// anything near this ceiling didn't come through our own UI.
+const MAX_MESSAGE_PHOTO_BYTES = 1024 * 1024
 
 
 // Both directions of a conversation, oldest first. A plain exported helper
@@ -19,18 +20,19 @@ export async function messagesBetween(
   ctx: QueryCtx,
   userId: Id<'users'>,
   friendId: Id<'users'>,
+  limit: number,
 ) {
   const [sent, received] = await Promise.all([
     ctx.db
       .query('messages')
       .withIndex('by_from_to', (q) => q.eq('fromUserId', userId).eq('toUserId', friendId))
       .order('desc')
-      .take(THREAD_LIMIT),
+      .take(limit),
     ctx.db
       .query('messages')
       .withIndex('by_from_to', (q) => q.eq('fromUserId', friendId).eq('toUserId', userId))
       .order('desc')
-      .take(THREAD_LIMIT),
+      .take(limit),
   ])
   return [...sent, ...received].sort((a, b) => a.sentAt - b.sentAt)
 }
@@ -57,7 +59,7 @@ export async function latestMessageBetween(
   ctx: QueryCtx,
   userId: Id<'users'>,
   friendId: Id<'users'>,
-): Promise<{ ts: number; isMine: boolean; text: string } | null> {
+): Promise<{ ts: number; isMine: boolean; text: string; hasImage: boolean } | null> {
   const [mine, theirs] = await Promise.all([
     ctx.db
       .query('messages')
@@ -74,31 +76,129 @@ export async function latestMessageBetween(
     .filter((m): m is NonNullable<typeof m> => m !== null)
     .sort((a, b) => b.sentAt - a.sentAt)[0]
   if (!latest) return null
-  return { ts: latest.sentAt, isMine: latest.fromUserId === userId, text: latest.text }
+  return {
+    ts: latest.sentAt,
+    isMine: latest.fromUserId === userId,
+    text: latest.text,
+    hasImage: latest.imageStorageId !== undefined,
+  }
 }
 
+// Step 1 of a photo message, mirroring profiles.generateAvatarUploadUrl.
+export const generateMessagePhotoUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireWriter(ctx)
+    await rateLimiter.limit(ctx, 'messagePhotoUploadUrl', { key: userId, throws: true })
+    return await ctx.storage.generateUploadUrl()
+  },
+})
+
+/**
+ * Sends a chat message, with an optional photo.
+ *
+ * A rejection with a photo attached returns `{ ok: false }` instead of throwing,
+ * so the delete of the already-uploaded blob commits. Throwing would roll it back
+ * and orphan the blob, the same trap documented on profiles.ts:setAvatar.
+ */
 export const send = mutation({
-  args: { toUserId: v.id('users'), text: v.string() },
-  handler: async (ctx, args) => {
-    const fromUserId = await getAuthUserId(ctx)
-    if (fromUserId === null) throw new Error('Not signed in')
+  args: {
+    toUserId: v.id('users'),
+    text: v.string(),
+    image: v.optional(
+      v.object({ storageId: v.id('_storage'), width: v.number(), height: v.number() }),
+    ),
+  },
+  handler: async (ctx, args): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const fromUserId = await requireWriter(ctx)
     await rateLimiter.limit(ctx, 'messageSend', { key: fromUserId, throws: true })
 
-    if (fromUserId === args.toUserId) throw new Error("You can't message yourself")
-    if (!(await areFriends(ctx, fromUserId, args.toUserId))) {
-      throw new Error('You can only message friends')
+    const refuse = async (error: string) => {
+      if (!args.image) throw new ConvexError(error)
+      await ctx.storage.delete(args.image.storageId)
+      return { ok: false as const, error }
     }
 
-    const text = cleanText(args.text, LIMITS.messageMaxLength, 'Message')
+    if (fromUserId === args.toUserId) return await refuse("You can't message yourself")
+    if (!(await areFriends(ctx, fromUserId, args.toUserId))) {
+      return await refuse('You can only message friends')
+    }
+    // Worded so it doesn't reveal a block: blocks are silent by design.
+    if (await isBlockedEitherWay(ctx, fromUserId, args.toUserId)) {
+      return await refuse("This message couldn't be delivered")
+    }
 
-    // No notification is raised for chat — the per-thread unread badge on the
+    // A caption is optional on a photo; text is required otherwise.
+    const text =
+      args.image && !args.text.trim()
+        ? ''
+        : cleanText(args.text, LIMITS.messageMaxLength, 'Message')
+
+    let image: {
+      imageStorageId: Id<'_storage'>
+      imageWidth: number
+      imageHeight: number
+    } | null = null
+    if (args.image) {
+      const width = assertRange(args.image.width, 1, LIMITS.imageMaxEdge, 'Photo width')
+      const height = assertRange(args.image.height, 1, LIMITS.imageMaxEdge, 'Photo height')
+      const metadata = await ctx.db.system.get('_storage', args.image.storageId)
+      if (!metadata) return { ok: false, error: 'Upload not found — try again' }
+      const wrongType =
+        metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
+      if (wrongType || metadata.size > MAX_MESSAGE_PHOTO_BYTES) {
+        return await refuse('That file needs to be an image under 1MB')
+      }
+      image = { imageStorageId: args.image.storageId, imageWidth: width, imageHeight: height }
+    }
+
+    // No in-app notice is raised for chat — the per-thread unread badge on the
     // Friends list covers this, and one banner per incoming message would
-    // bury everything else.
+    // bury everything else. A device notification is different: it collapses per
+    // conversation, and it's how you find out while the app is closed.
     await ctx.db.insert('messages', {
       fromUserId,
       toUserId: args.toUserId,
       text,
       sentAt: Date.now(),
+      ...image,
+    })
+    await queueMessagePush(ctx, {
+      toUserId: args.toUserId,
+      fromUserId,
+      text,
+      hasImage: image !== null,
+    })
+    return { ok: true }
+  },
+})
+
+// One reaction per person per message: the same emoji again removes it, a
+// different one replaces it.
+export const toggleReaction = mutation({
+  args: { messageId: v.id('messages'), emoji: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+    await rateLimiter.limit(ctx, 'messageReact', { key: userId, throws: true })
+
+    if (!(REACTION_EMOJIS as readonly string[]).includes(args.emoji)) {
+      throw new ConvexError('Unknown reaction')
+    }
+
+    const message = await ctx.db.get(args.messageId)
+    if (!message || (message.fromUserId !== userId && message.toUserId !== userId)) {
+      throw new ConvexError('Message not found')
+    }
+    const otherId = message.fromUserId === userId ? message.toUserId : message.fromUserId
+    if (await isBlockedEitherWay(ctx, userId, otherId)) {
+      throw new ConvexError('Not available')
+    }
+
+    const existing = message.reactions ?? []
+    const mine = existing.find((r) => r.userId === userId)
+    const others = existing.filter((r) => r.userId !== userId)
+    await ctx.db.patch(args.messageId, {
+      reactions: mine?.emoji === args.emoji ? others : [...others, { userId, emoji: args.emoji }],
     })
   },
 })

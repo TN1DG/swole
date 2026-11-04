@@ -20,3 +20,24 @@ export async function areFriends(
     .unique()
   return row !== null
 }
+
+// A block in either direction closes the channel. Friendship rows survive a
+// block (it's silent, so it can't visibly unfriend anyone), which is why this
+// has to be checked alongside areFriends wherever one friend reaches another.
+export async function isBlockedEitherWay(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<'users'>,
+  otherId: Id<'users'>,
+): Promise<boolean> {
+  const [mine, theirs] = await Promise.all([
+    ctx.db
+      .query('blockedUsers')
+      .withIndex('by_user_blocked', (q) => q.eq('userId', userId).eq('blockedUserId', otherId))
+      .unique(),
+    ctx.db
+      .query('blockedUsers')
+      .withIndex('by_user_blocked', (q) => q.eq('userId', otherId).eq('blockedUserId', userId))
+      .unique(),
+  ])
+  return mine !== null || theirs !== null
+}

@@ -60,10 +60,15 @@ export const LIMITS = {
   friendRequestsPerUser: 50, // pending outgoing requests
   featureRequestTextMaxLength: 1000,
   messageMaxLength: 1000,
+  // Most entries one thread read will ever return, however far back you scroll.
+  threadEntriesMax: 500,
   featureRequestsPerUser: 20,
   dailyVolumeGoalKg: 50000, // generous ceiling, same "beyond any world record" style as weightKg
   releaseVersionMaxLength: 40, // "What's new" popup version key, e.g. "1.1.0"
   // --- social feed ---
+  // Plausibility ceiling for client-reported image dimensions. They only ever
+  // size a placeholder, so this just keeps the numbers sane.
+  imageMaxEdge: 10000,
   postCaptionMaxLength: 500,
   postCommentMaxLength: 500,
   commentsPerPost: 500,
@@ -88,6 +93,11 @@ export const LIMITS = {
   calories: 20000, // generous ceiling for a single logged item
   macroGrams: 2000,
   foodDescriptionMaxLength: 200,
+  // A self-set daily target. The floor is lower than the 1200 we'd ever suggest
+  // (fitness.ts:MIN_SAFE_CALORIES) because it's the user's call, with a caution
+  // shown below 1200, but it still refuses numbers no one should be eating.
+  calorieTargetMin: 1000,
+  calorieTargetMax: 10000,
   // Entries for one UTC day, checked against a count read in nutrition.ts
   // before each insert. The rate limiter (convex/rateLimiter.ts) throttles
   // arrival *speed*; this caps how many rows one day can accumulate at all,

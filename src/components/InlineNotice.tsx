@@ -24,7 +24,7 @@ export function InlineNotice({
         gap: 1,
         p: 1.5,
         fontSize: '0.875rem',
-        borderColor: 'rgb(193 84 31 / 0.3)',
+        borderColor: 'rgb(var(--color-accent-rgb) / 0.3)',
       }}
     >
       <Box sx={{ flex: 1, color: 'text.secondary' }}>{children}</Box>

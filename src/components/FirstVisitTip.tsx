@@ -12,7 +12,7 @@ const TIP_COPY = {
   routines: 'Build a template once — starting it pre-fills every set with your last numbers.',
   exercises: 'Browse the library or add your own — tap one for its PR and history.',
   profile: 'Your stats, settings, and a direct line to the developer.',
-  nutrition: 'Log food by hand or snap a photo — tracked against the goal from your Stats.',
+  nutrition: 'Log food by hand or search the food database — tracked against the goal from your Stats.',
 } as const
 
 type TabKey = keyof typeof TIP_COPY

@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
-import { Badge, Box, Button, IconButton, TextField, Typography } from '@mui/material'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { TIER_LABELS } from '../../lib/tierLabels'
@@ -12,10 +12,10 @@ import { GlassTile } from '../../components/GlassTile'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
 import { FeedTab } from '../feed/FeedTab'
 import { formatLastActivity } from './activityLabel'
+import { conversationTimeLabel } from './threadLayout'
 
 type LastActivity = FunctionReturnType<typeof api.friendThread.lastActivity>[number]
 
@@ -31,11 +31,16 @@ export function FriendsPage() {
   const incoming = useQuery(api.friends.myIncomingRequests)
   const outgoing = useQuery(api.friends.myOutgoingRequests)
   const friends = useQuery(api.friends.myFriends)
+  const unreadIds = useQuery(api.friendThread.unreadFriendIds)
 
   const sendFriendRequest = useMutation(api.friends.sendFriendRequest)
   const resolveUsername = useMutation(api.friends.resolveUsername)
 
-  const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>('feed')
+  // Coming back from a conversation lands on Chats, not wherever the default is.
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>(
+    searchParams.get('tab') === 'chats' ? 'friends' : 'feed',
+  )
   const [searchTerm, setSearchTerm] = useState('')
   const [committedSearch, setCommittedSearch] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -159,7 +164,11 @@ export function FriendsPage() {
           options={[
             { value: 'feed', label: 'Feed' },
             { value: 'leaderboard', label: 'Board' },
-            { value: 'friends', label: 'Friends', badge: incoming?.length || undefined },
+            {
+              value: 'friends',
+              label: 'Chats',
+              badge: (incoming?.length ?? 0) + (unreadIds?.length ?? 0) || undefined,
+            },
           ]}
         />
       </Box>
@@ -169,7 +178,13 @@ export function FriendsPage() {
       ) : tab === 'leaderboard' ? (
         <LeaderboardTab />
       ) : (
-        <FriendsTab friends={friends} incoming={incoming} outgoing={outgoing} runAction={runAction} />
+        <FriendsTab
+          friends={friends}
+          unreadIds={unreadIds}
+          incoming={incoming}
+          outgoing={outgoing}
+          runAction={runAction}
+        />
       )}
     </Box>
   )
@@ -215,7 +230,7 @@ function LeaderboardTab() {
                   px: 1.5,
                   py: 1.5,
                   color: 'text.primary',
-                  ...(entry.isMe && { borderColor: 'rgb(193 84 31 / 0.4)' }),
+                  ...(entry.isMe && { borderColor: 'rgb(var(--color-accent-rgb) / 0.4)' }),
                 }}
               >
                 <Typography sx={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }} variant="body2" color="text.secondary">
@@ -258,99 +273,99 @@ function LeaderboardTab() {
   )
 }
 
-// One row in My Friends. Chat and Remove used to be full-width text buttons,
-// which together with the avatar left roughly 80px for the name on a 360px
-// phone — most display names were truncated to a few characters. As icon
-// buttons they cost about a third of that.
-//
-// Remove is destructive and previously fired with no confirmation at all;
-// shrinking its hit area without adding one would have turned a mis-tap into
-// a silently deleted friendship.
-function FriendRow({
+// One conversation. The whole row opens the chat, because that's what a row in
+// a list of conversations is for; the avatar goes to their profile. Remove and
+// Block live behind the chat's own menu, so a stray tap here can't reach them.
+function ConversationRow({
   friend,
   hasUnread,
   activity,
-  onRemove,
+  now,
 }: {
   friend: Friends[number]
   hasUnread: boolean
   activity: LastActivity | undefined
-  onRemove: () => void
+  now: number
 }) {
-  const [confirmOpen, setConfirmOpen] = useState(false)
   const preview = activity ? formatLastActivity(activity) : null
 
   return (
     <GlassTile sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
-      <Avatar src={friend.avatarUrl} name={friend.displayName} size={36} />
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography
-          component={Link}
-          to={`/friends/${friend.userId}`}
-          noWrap
-          sx={{ display: 'block', fontWeight: 500, color: 'text.primary', textDecoration: 'none' }}
-        >
-          {friend.displayName}
-        </Typography>
-        {preview && (
-          <Typography noWrap variant="body2" color="text.secondary">
-            {preview.icon ? `${preview.icon} ` : ''}
-            {preview.text}
-          </Typography>
-        )}
-      </Box>
-      <Badge color="error" variant="dot" invisible={!hasUnread} sx={{ flexShrink: 0 }}>
-        <IconButton
-          component={Link}
-          to={`/friends/${friend.userId}/chat`}
-          aria-label={`Chat with ${friend.displayName}`}
-          sx={{ border: '1px solid', borderColor: 'divider', fontSize: '1.125rem' }}
-        >
-          💬
-        </IconButton>
-      </Badge>
-      <IconButton
-        aria-label={`Remove ${friend.displayName}`}
-        size="small"
-        sx={{ flexShrink: 0, color: 'text.secondary' }}
-        onClick={() => setConfirmOpen(true)}
+      <Link
+        to={`/friends/${friend.userId}`}
+        aria-label={`${friend.displayName}'s profile`}
+        style={{ display: 'flex', flexShrink: 0 }}
       >
-        ✕
-      </IconButton>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        title={`Remove ${friend.displayName}?`}
-        description="You'll disappear from each other's friends list and leaderboard. You can send a new request any time."
-        confirmLabel="Remove"
-        destructive
-        onConfirm={onRemove}
-      />
+        <Avatar src={friend.avatarUrl} name={friend.displayName} size={44} />
+      </Link>
+      <Box
+        component={Link}
+        to={`/friends/${friend.userId}/chat`}
+        aria-label={`Chat with ${friend.displayName}${hasUnread ? ', unread messages' : ''}`}
+        sx={{ flex: 1, minWidth: 0, color: 'inherit', textDecoration: 'none' }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: hasUnread ? 700 : 500 }}>
+            {friend.displayName}
+          </Typography>
+          {activity && (
+            <Typography
+              variant="caption"
+              color={hasUnread ? 'primary.main' : 'text.secondary'}
+              sx={{ flexShrink: 0, fontWeight: hasUnread ? 600 : 400 }}
+            >
+              {conversationTimeLabel(activity.ts, now)}
+            </Typography>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            noWrap
+            variant="body2"
+            color={hasUnread ? 'text.primary' : 'text.secondary'}
+            sx={{ flex: 1, minWidth: 0, fontWeight: hasUnread ? 600 : 400 }}
+          >
+            {preview
+              ? `${preview.icon ? `${preview.icon} ` : ''}${preview.text}`
+              : `Say hi to ${friend.displayName}`}
+          </Typography>
+          {hasUnread && (
+            <Box sx={{ flexShrink: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />
+          )}
+        </Box>
+      </Box>
     </GlassTile>
   )
 }
 
 function FriendsTab({
   friends,
+  unreadIds,
   incoming,
   outgoing,
   runAction,
 }: {
   friends: Friends | undefined
+  unreadIds: FunctionReturnType<typeof api.friendThread.unreadFriendIds> | undefined
   incoming: IncomingRequests | undefined
   outgoing: OutgoingRequests | undefined
   runAction: (action: () => Promise<unknown>) => Promise<void>
 }) {
   const acceptFriendRequest = useMutation(api.friends.acceptFriendRequest)
   const declineFriendRequest = useMutation(api.friends.declineFriendRequest)
-  const removeFriend = useMutation(api.friends.removeFriend)
-  // Separate from myFriends so the chat page (which also loads myFriends)
-  // doesn't pay for unread computation it never shows.
-  const unreadIds = useQuery(api.friendThread.unreadFriendIds)
   const unread = new Set(unreadIds ?? [])
   const lastActivity = useQuery(api.friendThread.lastActivity)
-  const activityByFriend = new Map((lastActivity ?? []).map((a) => [a.friendId, a]))
+
+  // Latest conversation first, then people you haven't talked to yet by name.
+  const { conversations, activityByFriend } = useMemo(() => {
+    const activityByFriend = new Map((lastActivity ?? []).map((a) => [a.friendId, a]))
+    const conversations = [...(friends ?? [])].sort((a, b) => {
+      const diff = (activityByFriend.get(b.userId)?.ts ?? 0) - (activityByFriend.get(a.userId)?.ts ?? 0)
+      return diff || a.displayName.localeCompare(b.displayName)
+    })
+    return { conversations, activityByFriend }
+  }, [friends, lastActivity])
+  const now = Date.now()
 
   return (
     <>
@@ -414,7 +429,7 @@ function FriendsTab({
       )}
 
       <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
-        My Friends
+        Conversations
       </Typography>
       {friends === undefined ? (
         <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
@@ -426,13 +441,13 @@ function FriendsTab({
         </Typography>
       ) : (
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {friends.map((f) => (
-            <FriendRow
+          {conversations.map((f) => (
+            <ConversationRow
               key={f.userId}
               friend={f}
               hasUnread={unread.has(f.userId)}
               activity={activityByFriend.get(f.userId)}
-              onRemove={() => runAction(() => removeFriend({ friendId: f.userId }))}
+              now={now}
             />
           ))}
         </Box>

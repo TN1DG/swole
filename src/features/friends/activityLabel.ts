@@ -8,7 +8,10 @@ type Activity = FunctionReturnType<typeof api.friendThread.lastActivity>[number]
 // picked which activity is "most recent" (see convex/friendThread.ts).
 export function formatLastActivity(activity: Activity): { icon: string | null; text: string } {
   if (activity.kind === 'message') {
-    return { icon: null, text: (activity.isMine ? 'You: ' : '') + activity.text }
+    return {
+      icon: activity.hasImage ? '📷' : null,
+      text: (activity.isMine ? 'You: ' : '') + (activity.text || 'Photo'),
+    }
   }
 
   if (activity.kind === 'ping') {

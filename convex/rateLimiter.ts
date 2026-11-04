@@ -78,6 +78,15 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // challenges: those are one-off events, whereas a real back-and-forth
   // conversation fires several messages a minute and shouldn't feel throttled.
   messageSend: { kind: 'token bucket', rate: 30, period: MINUTE, capacity: 15 },
+  // Reactions are a tap, so they get a high ceiling like post likes.
+  messageReact: { kind: 'token bucket', rate: 60, period: MINUTE, capacity: 20 },
+  // Each call is permission to write a blob, same as avatarUploadUrl, but a
+  // photo in a conversation can come in quick bursts.
+  messagePhotoUploadUrl: { kind: 'token bucket', rate: 30, period: 60 * MINUTE, capacity: 10 },
+  // The client only reports typing starting and stopping, so a person generates
+  // a few of these a minute at most. This only stops a script from fanning writes
+  // out to a friend's subscription.
+  typingUpdate: { kind: 'token bucket', rate: 60, period: MINUTE, capacity: 20 },
 
   // Username lookups, keyed by caller userId. This one guards *reading*, not
   // spam: `resolveUsername` answers "does this username exist", so an
@@ -91,6 +100,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // gym friends; 20/minute sustained is far past human patience, while
   // turning an unbounded enumeration into a crawl.
   usernameLookup: { kind: 'token bucket', rate: 20, period: MINUTE, capacity: 10 },
+
+  // Handle changes, keyed by caller userId. Plenty for someone settling on a new
+  // name; too slow to squat handles or hop between them to impersonate people.
+  usernameChange: { kind: 'token bucket', rate: 5, period: 60 * MINUTE, capacity: 3 },
 
   // Avatar upload URLs, keyed by caller userId. Each generated URL is a
   // licence to write a blob into file storage, and a client that requests one

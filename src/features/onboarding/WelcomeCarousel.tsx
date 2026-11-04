@@ -4,14 +4,25 @@ import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/mater
 import { api } from '../../../convex/_generated/api'
 import {
   ACTIVITY_LEVELS,
+  goalCalories,
   mifflinStJeorBmr,
   tdee,
   type ActivityLevel,
+  type Goal,
   type Sex,
 } from '../../../convex/fitness'
 import { CalorieBreakdown } from '../stats/CalorieBreakdown'
 import { FlameIcon, PeopleIcon } from '../../components/icons'
 import { errorMessage } from '../../lib/errors'
+import {
+  calorieInputError,
+  EMPTY_MACRO_INPUTS,
+  isLowCalorieTarget,
+  LOW_CALORIE_CAUTION,
+  macroInputError,
+  macroInputsToOverride,
+} from '../../lib/calorieTarget'
+import { MacroTargetFields } from '../nutrition/MacroTargetFields'
 import {
   canonicalBody,
   convertBodyFields,
@@ -40,10 +51,10 @@ const STORY_SLIDES = [
   },
 ] as const
 
-// index 0-3: story slides. 4: identity. 5: stats questionnaire. 6: reward.
+// index 0-3: story slides. 4: identity. 5: stats questionnaire. 6: goal.
 const IDENTITY_STEP = STORY_SLIDES.length
 const STATS_STEP = IDENTITY_STEP + 1
-const REWARD_STEP = STATS_STEP + 1
+const GOAL_STEP = STATS_STEP + 1
 
 export function WelcomeCarousel() {
   const [step, setStep] = useState(0)
@@ -73,7 +84,7 @@ export function WelcomeCarousel() {
           }}
         />
       )}
-      {step === REWARD_STEP && bodyStats && <RewardSlide stats={bodyStats} />}
+      {step === GOAL_STEP && bodyStats && <GoalSlide stats={bodyStats} />}
 
       {step < IDENTITY_STEP && (
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center', gap: 1 }}>
@@ -359,23 +370,49 @@ function StatsSlide({
   )
 }
 
-function RewardSlide({
+// The last step, and the one thing setup won't let you skip: everything on the
+// Nutrition tab is measured against this choice. Exported for its test.
+export function GoalSlide({
   stats,
 }: {
   stats: { heightCm: number; weightKg: number; age: number; sex: Sex; activityLevel: ActivityLevel }
 }) {
+  const setNutritionGoal = useMutation(api.profiles.setNutritionGoal)
+  const setCalorieTarget = useMutation(api.profiles.setCalorieTarget)
   const finishOnboarding = useMutation(api.profiles.finishOnboarding)
+  const [goal, setGoal] = useState<Goal | null>(null)
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customCalories, setCustomCalories] = useState('')
+  const [macros, setMacros] = useState(EMPTY_MACRO_INPUTS)
+  const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const bmr = mifflinStJeorBmr(stats.weightKg, stats.heightCm, stats.age, stats.sex)
   const tdeeValue = tdee(bmr, stats.activityLevel)
+  const custom = customCalories.trim()
 
   async function handleFinish() {
+    if (goal === null) return
+    // Checked before any write, so a typo can't leave the goal saved and the
+    // user still stuck on this screen wondering what happened.
+    const inputError = custom ? (calorieInputError(custom) ?? macroInputError(macros)) : null
+    if (inputError) {
+      setError(inputError)
+      return
+    }
+    setError(null)
     setSubmitting(true)
     try {
+      // In this order: choosing a goal clears any custom target.
+      await setNutritionGoal({ goal })
+      if (custom) {
+        const override = macroInputsToOverride(macros)
+        await setCalorieTarget({ calories: Number(custom), ...(override && { macros: override }) })
+      }
       await finishOnboarding({})
       // Success flips profile.onboarded -> OnboardingGate swaps to the app.
-    } catch {
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save.'))
       setSubmitting(false)
     }
   }
@@ -384,17 +421,74 @@ function RewardSlide({
     <Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
         <Typography variant="h5" sx={{ fontWeight: 900, letterSpacing: '-0.02em' }}>
-          Here's what your body needs.
+          What are you training for?
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Based on what you just entered — revisit anytime from Profile → My Stats.
+          Pick a goal to set your daily numbers. You can change it anytime.
         </Typography>
       </Box>
       <Box sx={{ mt: 3 }}>
-        <CalorieBreakdown bmr={bmr} tdeeValue={tdeeValue} weightKg={stats.weightKg} />
+        <CalorieBreakdown
+          bmr={bmr}
+          tdeeValue={tdeeValue}
+          weightKg={stats.weightKg}
+          selectedGoal={goal ?? undefined}
+          selectedLabel="Selected"
+          onSelectGoal={setGoal}
+        />
       </Box>
-      <Button variant="contained" fullWidth disabled={submitting} sx={{ mt: 3 }} onClick={() => void handleFinish()}>
-        {submitting ? 'One sec…' : "Let's Lift 💪"}
+
+      {customOpen ? (
+        <>
+          <TextField
+            label="My daily calories"
+            value={customCalories}
+            onChange={(e) => setCustomCalories(e.target.value)}
+            fullWidth
+            autoFocus
+            sx={{ mt: 2 }}
+            helperText={
+              isLowCalorieTarget(custom)
+                ? LOW_CALORIE_CAUTION
+                : 'Replaces the number on your goal card.'
+            }
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+          />
+          {custom && (
+            <MacroTargetFields
+              // Half-typed or out-of-range calories suggest from the goal's number.
+              calories={
+                calorieInputError(custom)
+                  ? goalCalories(tdeeValue, goal ?? 'maintain')
+                  : Number(custom)
+              }
+              weightKg={stats.weightKg}
+              goal={goal ?? 'maintain'}
+              values={macros}
+              onChange={setMacros}
+            />
+          )}
+        </>
+      ) : (
+        <Button variant="text" color="inherit" sx={{ mt: 1.5, color: 'text.secondary' }} onClick={() => setCustomOpen(true)}>
+          Set my own calories
+        </Button>
+      )}
+
+      {error && (
+        <Typography variant="body2" color="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Typography>
+      )}
+
+      <Button
+        variant="contained"
+        fullWidth
+        disabled={submitting || goal === null}
+        sx={{ mt: 2 }}
+        onClick={() => void handleFinish()}
+      >
+        {submitting ? 'One sec…' : goal === null ? 'Choose a goal to continue' : "Let's Lift 💪"}
       </Button>
     </Box>
   )

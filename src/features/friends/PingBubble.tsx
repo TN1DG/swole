@@ -57,7 +57,7 @@ export function PingBubble({ ping }: { ping: PingEntry }) {
           py: 0.5,
           bgcolor: tokens.surface2Glass,
           border: '1px solid',
-          borderColor: 'rgb(69 61 53 / 0.3)',
+          borderColor: 'rgb(var(--color-border-rgb) / 0.3)',
         }}
       >
         <Box

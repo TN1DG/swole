@@ -87,6 +87,27 @@ export default defineSchema({
     nutritionGoal: v.optional(
       v.union(v.literal('maintain'), v.literal('cut'), v.literal('bulk'), v.literal('recomp')),
     ),
+    // A daily calorie target the user typed themselves, replacing what their
+    // goal would suggest (fitness.ts:resolveCalorieTarget). Absent means follow
+    // the goal; choosing a goal clears it.
+    calorieTargetOverride: v.optional(v.number()),
+    // Any of the breakdown the user typed by hand. A missing field follows the
+    // suggestion for their target (fitness.ts:resolveMacroTargets). Only ever set
+    // alongside calorieTargetOverride, and cleared with it.
+    macroTargetOverride: v.optional(
+      v.object({
+        proteinG: v.optional(v.number()),
+        carbsG: v.optional(v.number()),
+        fatG: v.optional(v.number()),
+        fiberG: v.optional(v.number()),
+      }),
+    ),
+    // One of convex/themePresets.ts. A plain string rather than a union so that
+    // adding a preset never needs a schema change; setThemePreset validates it,
+    // and the client falls back to the default for anything it doesn't know.
+    themePreset: v.optional(v.string()),
+    // Chat notifications say who but not what, for a more private lock screen.
+    pushHideMessageText: v.optional(v.boolean()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -108,6 +129,10 @@ export default defineSchema({
     visibility: v.union(v.literal('public'), v.literal('friends')),
     caption: v.optional(v.string()),
     photoStorageId: v.optional(v.id('_storage')),
+    // Measured on the client after optimizing (src/lib/optimizeImage.ts), so a
+    // photo's space is reserved before it loads. Absent on older posts.
+    photoWidth: v.optional(v.number()),
+    photoHeight: v.optional(v.number()),
 
     // Optional because a repost has no workout of its own, and because
     // history.deleteWorkout unlinks rather than destroying the post.
@@ -351,8 +376,16 @@ export default defineSchema({
   messages: defineTable({
     fromUserId: v.id('users'),
     toUserId: v.id('users'),
+    // May be empty only when a photo is attached (messages.ts:send).
     text: v.string(),
     sentAt: v.number(),
+    imageStorageId: v.optional(v.id('_storage')),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
+    // On the message rather than in its own table because chat is 1:1, so each
+    // person holds at most one reaction and this can never exceed two entries.
+    // It also means a thread needs no extra read per message to show them.
+    reactions: v.optional(v.array(v.object({ userId: v.id('users'), emoji: v.string() }))),
   })
     .index('by_from_to', ['fromUserId', 'toUserId'])
     .index('by_to', ['toUserId'])
@@ -368,7 +401,18 @@ export default defineSchema({
     lastReadAt: v.number(),
   }).index('by_user_friend', ['userId', 'friendId']),
 
-  // In-app notifications (no OS/push delivery — see docs/new-features-progress.md).
+  // One device that has agreed to receive push notifications (see convex/push.ts).
+  pushSubscriptions: defineTable({
+    userId: v.id('users'),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_endpoint', ['endpoint']),
+
+  // In-app notifications. convex/push.ts also sends most of these to devices.
   // One generalized table rather than a bespoke reactive query per feature,
   // which is the pattern friends.ts/pings.ts grew organically and which
   // doesn't scale to a cross-cutting concern like this.
@@ -440,6 +484,8 @@ export default defineSchema({
     loggedAt: v.number(), // ms since epoch; grouped into UTC days, same convention as fitness.ts:utcDayIndex
     source: v.union(v.literal('manual'), v.literal('photo')),
     status: v.union(v.literal('pending'), v.literal('complete'), v.literal('failed')),
+    // Only while `pending`. Nothing ever displays a food photo, so the blob is
+    // freed as soon as analysis finishes either way (see nutrition.ts).
     photoStorageId: v.optional(v.id('_storage')),
     description: v.optional(v.string()), // AI's guess at the food
     calories: v.optional(v.number()),

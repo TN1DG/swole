@@ -73,6 +73,11 @@ export default defineConfig({
     VitePWA({
       // New service worker versions activate automatically on next visit.
       registerType: 'autoUpdate',
+      // A worker we write ourselves (src/sw.ts) rather than a generated one,
+      // because a generated worker can't handle push.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Swole — Workout Logger',

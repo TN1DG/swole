@@ -343,6 +343,171 @@ describe('setNutritionGoal', () => {
   })
 })
 
+describe('setCalorieTarget', () => {
+  it('stores a rounded target, and null goes back to following the goal', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400.4 })
+    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBe(2400)
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: null })
+    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBeNull()
+  })
+
+  it.each([999, 10001, Number.NaN])('rejects %s', async (calories) => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await expect(user.mutation(api.profiles.setCalorieTarget, { calories })).rejects.toThrow(
+      /calorie target/i,
+    )
+  })
+
+  it('is cleared by choosing a goal, breakdown included', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { proteinG: 180 } })
+    await user.mutation(api.profiles.setNutritionGoal, { goal: 'bulk' })
+
+    const profile = (await user.query(api.profiles.getMine, {}))!
+    expect(profile.calorieTargetOverride).toBeNull()
+    expect(profile.macroTargetOverride).toBeNull()
+  })
+
+  it('stores only the macros that were typed, rounded', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, {
+      calories: 2400,
+      macros: { proteinG: 180.4, fiberG: 30 },
+    })
+
+    expect((await user.query(api.profiles.getMine, {}))!.macroTargetOverride).toEqual({
+      proteinG: 180,
+      fiberG: 30,
+    })
+  })
+
+  it('drops earlier macros when saved without any, and when reset', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const override = async () => (await user.query(api.profiles.getMine, {}))!.macroTargetOverride
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { fatG: 70 } })
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2500 })
+    expect(await override()).toBeNull()
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { fatG: 70 } })
+    await user.mutation(api.profiles.setCalorieTarget, { calories: null, macros: { fatG: 70 } })
+    expect(await override()).toBeNull()
+  })
+
+  it.each([-1, 2001, Number.NaN])('rejects a macro of %s', async (proteinG) => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await expect(
+      user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { proteinG } }),
+    ).rejects.toThrow(/protein/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    await expect(t.mutation(api.profiles.setCalorieTarget, { calories: 2400 })).rejects.toThrow(
+      /not signed in/i,
+    )
+  })
+})
+
+describe('setThemePreset', () => {
+  it('saves a known theme, defaulting to none', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    expect((await user.query(api.profiles.getMine, {}))!.themePreset).toBeNull()
+
+    await user.mutation(api.profiles.setThemePreset, { themePreset: 'ocean' })
+
+    expect((await user.query(api.profiles.getMine, {}))!.themePreset).toBe('ocean')
+  })
+
+  it('rejects an unknown theme', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await expect(
+      user.mutation(api.profiles.setThemePreset, { themePreset: 'nonsense' }),
+    ).rejects.toThrow(/unknown theme/i)
+  })
+
+  it('requires sign-in', async () => {
+    const t = createBackend()
+    await expect(
+      t.mutation(api.profiles.setThemePreset, { themePreset: 'ocean' }),
+    ).rejects.toThrow(/not signed in/i)
+  })
+})
+
+describe('changing names', () => {
+  it('lets a username change, and frees the old one for others', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.setUsername, { username: 'alice_one' })
+    await alice.mutation(api.profiles.setUsername, { username: 'alice_two' })
+    expect((await alice.query(api.profiles.getMine, {}))!.username).toBe('alice_two')
+
+    await bob.mutation(api.profiles.setUsername, { username: 'alice_one' })
+    expect((await bob.query(api.profiles.getMine, {}))!.username).toBe('alice_one')
+  })
+
+  it('refuses a username someone else holds', async () => {
+    const t = createBackend()
+    const alice = asUser(t, await createUser(t, 'alice'))
+    const bob = asUser(t, await createUser(t, 'bob'))
+
+    await alice.mutation(api.profiles.setUsername, { username: 'taken_name' })
+    await expect(
+      bob.mutation(api.profiles.setUsername, { username: 'taken_name' }),
+    ).rejects.toThrow(/taken/i)
+  })
+
+  it('rate-limits repeated username changes', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    for (const username of ['name_one', 'name_two', 'name_three']) {
+      await user.mutation(api.profiles.setUsername, { username })
+    }
+    await expect(
+      user.mutation(api.profiles.setUsername, { username: 'name_four' }),
+    ).rejects.toThrow()
+  })
+
+  it('does not spend the allowance when the username is unchanged', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setUsername, { username: 'same_name' })
+    for (let i = 0; i < 5; i++) {
+      await user.mutation(api.profiles.setUsername, { username: 'same_name' })
+    }
+    expect((await user.query(api.profiles.getMine, {}))!.username).toBe('same_name')
+  })
+
+  it('accepts emoji in a display name, and an empty one clears it', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.updateDisplayName, { displayName: 'Alice 💪' })
+    expect((await user.query(api.profiles.getMine, {}))!.displayName).toBe('Alice 💪')
+
+    await user.mutation(api.profiles.updateDisplayName, { displayName: '   ' })
+    expect((await user.query(api.profiles.getMine, {}))!.displayName).toBeNull()
+  })
+})
+
 describe('markReleaseSeen', () => {
   it('defaults to null', async () => {
     const t = createBackend()

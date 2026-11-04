@@ -12,7 +12,7 @@ export function GlassTile({ sx, ...props }: PaperProps) {
         backgroundColor: tokens.surface2Glass,
         // Deliberately a different (lighter) alpha than tokens.borderGlass —
         // matches the original glass-tile utility's own hardcoded border.
-        border: '1px solid rgb(69 61 53 / 0.3)',
+        border: '1px solid rgb(var(--color-border-rgb) / 0.3)',
         borderRadius: '12px',
         ...sx,
       }}

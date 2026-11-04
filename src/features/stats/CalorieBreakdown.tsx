@@ -9,21 +9,22 @@ import { GlassTile } from '../../components/GlassTile'
 // first-run questionnaire), so the numbers and their presentation can never
 // drift between the two.
 //
-// `selectedGoal`/`onSelectGoal` are optional: the onboarding call site passes
-// neither, so its cards stay purely informational (no goal-picking during
-// first-run). The Stats page passes both to turn each card into a "choose
-// this goal, then go log today's food" action.
+// `selectedGoal`/`onSelectGoal` turn each card into a button: on the Stats page
+// that's "choose this goal, then go log today's food", during onboarding it
+// picks the goal setup requires before it will finish.
 export function CalorieBreakdown({
   bmr,
   tdeeValue,
   weightKg,
   selectedGoal,
+  selectedLabel = 'Current',
   onSelectGoal,
 }: {
   bmr: number
   tdeeValue: number
   weightKg: number
   selectedGoal?: Goal
+  selectedLabel?: string
   onSelectGoal?: (goal: Goal) => void
 }) {
   const { formatWeightWithUnit } = useWeightUnit()
@@ -91,7 +92,7 @@ export function CalorieBreakdown({
                   {goal.label}
                   {isSelected && (
                     <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1, fontWeight: 600 }}>
-                      Current
+                      {selectedLabel}
                     </Typography>
                   )}
                 </Typography>

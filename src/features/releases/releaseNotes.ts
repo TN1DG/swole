@@ -27,6 +27,19 @@ export type Release = {
 // type instead of being re-checked at every use.
 export const RELEASES: [Release, ...Release[]] = [
   {
+    version: '1.6.0',
+    releasedAt: Date.UTC(2026, 10, 4),
+    summary: 'Chat now feels like texting, and the app is yours to personalise.',
+    changes: [
+      'Conversations are full screen, with photos, an emoji picker, reactions, typing indicators and read receipts. Friends is now your list of chats, latest first.',
+      'Pick a colour theme under Profile → Appearance. It follows you to every device.',
+      'Set your own daily calories and macros: tap Edit on the Calories tile in Nutrition. You get a suggested breakdown for your new number, and you can change any of it.',
+      'You can now change your username as well as your display name from Profile.',
+      'Notifications: turn them on under Profile to hear about messages, pings, challenges and more while the app is closed. On iPhone, add Swole to your Home Screen first.',
+      'Photos upload faster and load faster, and ones you have already seen load instantly. Location data is now removed from every photo before it leaves your phone.',
+    ],
+  },
+  {
     version: '1.5.0',
     releasedAt: Date.UTC(2026, 8, 4),
     summary: 'Track what you eat, and Routines and Exercises now share one Library tab.',

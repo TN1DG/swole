@@ -3,12 +3,15 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { mutation, query } from './_generated/server'
 import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
+import { areFriends } from './friendships'
+import { publicIdentity } from './identity'
+import { LIMITS } from './validation'
 import { latestIncomingMessageAt, latestMessageBetween, messagesBetween } from './messages'
 import { latestIncomingPingAt, latestPingBetween, pingsBetween } from './pings'
 import { challengesBetween, myChallengesRaw, pickLatestChallenge } from './challenges'
 
-// Newest N entries across all three kinds. Each source is already bounded on
-// its own; this caps the merged result the client renders.
+// Newest N entries across all three kinds, when the client doesn't ask for more.
+// Scrolling up asks for more by raising `limit`, up to LIMITS.threadEntriesMax.
 const THREAD_ENTRIES = 60
 
 // No friendship gate on reads here: every source query is scoped to the
@@ -27,16 +30,28 @@ const THREAD_ENTRIES = 60
  * rather than buried at the point it was first proposed.
  */
 export const getThread = query({
-  args: { friendUserId: v.id('users') },
+  args: { friendUserId: v.id('users'), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (userId === null) return []
 
-    const [messages, pings, challenges] = await Promise.all([
-      messagesBetween(ctx, userId, args.friendUserId),
+    const limit = Math.min(
+      Math.max(1, Math.floor(args.limit ?? THREAD_ENTRIES) || THREAD_ENTRIES),
+      LIMITS.threadEntriesMax,
+    )
+
+    const [rawMessages, pings, challenges] = await Promise.all([
+      messagesBetween(ctx, userId, args.friendUserId, limit),
       pingsBetween(ctx, userId, args.friendUserId),
       challengesBetween(ctx, userId, args.friendUserId),
     ])
+
+    const messages = await Promise.all(
+      rawMessages.map(async (m) => ({
+        ...m,
+        imageUrl: m.imageStorageId ? await ctx.storage.getUrl(m.imageStorageId) : null,
+      })),
+    )
 
     const entries = [
       ...messages.map((m) => ({
@@ -44,7 +59,17 @@ export const getThread = query({
         key: m._id as string,
         ts: m.sentAt,
         isMine: m.fromUserId === userId,
-        message: { text: m.text },
+        message: {
+          _id: m._id,
+          text: m.text,
+          imageUrl: m.imageUrl,
+          imageWidth: m.imageWidth ?? null,
+          imageHeight: m.imageHeight ?? null,
+          reactions: (m.reactions ?? []).map((r) => ({
+            emoji: r.emoji,
+            isMine: r.userId === userId,
+          })),
+        },
       })),
       ...pings.map((p) => ({
         type: 'ping' as const,
@@ -62,7 +87,39 @@ export const getThread = query({
       })),
     ]
 
-    return entries.sort((a, b) => a.ts - b.ts).slice(-THREAD_ENTRIES)
+    return entries.sort((a, b) => a.ts - b.ts).slice(-limit)
+  },
+})
+
+// Who a past conversation was with, once they're no longer in your friends list
+// and so can't be named from it. Only for someone you've actually exchanged
+// messages with, so this can't be used to look up a name from an arbitrary id.
+export const partnerName = query({
+  args: { friendUserId: v.id('users') },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return null
+    if ((await latestMessageBetween(ctx, userId, args.friendUserId)) === null) return null
+    return (await publicIdentity(ctx, args.friendUserId)).displayName
+  },
+})
+
+// When this friend last had our thread open, for the "Read" label. A separate
+// query so a read marker moving doesn't re-run the whole thread for both people.
+export const friendReadAt = query({
+  args: { friendUserId: v.id('users') },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return null
+    if (!(await areFriends(ctx, userId, args.friendUserId))) return null
+
+    const read = await ctx.db
+      .query('threadReads')
+      .withIndex('by_user_friend', (q) =>
+        q.eq('userId', args.friendUserId).eq('friendId', userId),
+      )
+      .unique()
+    return read?.lastReadAt ?? null
   },
 })
 

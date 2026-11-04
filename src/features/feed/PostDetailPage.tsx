@@ -121,7 +121,7 @@ export function PostDetailPage() {
           mt: 2,
           display: 'flex',
           gap: 1,
-          bgcolor: 'rgb(30 28 25 / 0.9)',
+          bgcolor: 'rgb(var(--color-surface-rgb) / 0.9)',
           backdropFilter: 'blur(4px)',
         }}
       >

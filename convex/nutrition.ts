@@ -11,7 +11,7 @@ import {
   type MutationCtx,
 } from './_generated/server'
 import { internal } from './_generated/api'
-import type { Id } from './_generated/dataModel'
+import type { Doc, Id } from './_generated/dataModel'
 import { assertRange, LIMITS } from './validation'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { caloriesFromMacros, DAY_MS, utcDayIndex } from './fitness'
@@ -28,8 +28,9 @@ import { envVar } from './env'
  * structured result back through a mutation (actions have no `ctx.db`).
  */
 
-// Largest food photo we'll keep — same ceiling as post photos (feed.ts).
-const MAX_FOOD_PHOTO_BYTES = 8 * 1024 * 1024
+// Largest food photo we'll accept — same ceiling as post photos (feed.ts). The
+// client optimizes to ~300KB first (src/lib/optimizeImage.ts).
+const MAX_FOOD_PHOTO_BYTES = 2 * 1024 * 1024
 
 // Vision-capable model, routed through the Vercel AI Gateway (see
 // AI_GATEWAY_API_KEY below). One named constant so swapping models later is
@@ -76,6 +77,15 @@ async function assertUnderDailyCap(ctx: MutationCtx, ownerId: Id<'users'>, now: 
   }
 }
 
+// A food photo exists only to be read by the vision model — nothing in the app
+// ever displays one — so it's freed the moment analysis ends, either way,
+// instead of being stored forever for no reader.
+async function releasePhoto(ctx: MutationCtx, entry: Doc<'foodLogs'>) {
+  if (!entry.photoStorageId) return
+  await ctx.storage.delete(entry.photoStorageId)
+  await ctx.db.patch(entry._id, { photoStorageId: undefined })
+}
+
 // Step 1 of the photo flow: mint a one-shot upload URL. Rate-limited for the
 // same reason as avatarUploadUrl — each call is permission to write a blob.
 export const generateFoodPhotoUploadUrl = mutation({
@@ -106,7 +116,7 @@ export const logPhotoEntry = mutation({
       metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
     if (wrongType || metadata.size > MAX_FOOD_PHOTO_BYTES) {
       await ctx.storage.delete(args.storageId)
-      return { ok: false, error: 'That file needs to be a photo under 8MB' }
+      return { ok: false, error: 'That file needs to be a photo under 2MB' }
     }
 
     const now = Date.now()
@@ -236,6 +246,7 @@ export const saveAnalysis = internalMutation({
   handler: async (ctx, args) => {
     const entry = await ctx.db.get(args.foodLogId)
     if (!entry || entry.ownerId !== args.ownerId) return
+    await releasePhoto(ctx, entry)
     await ctx.db.patch(args.foodLogId, {
       status: 'complete',
       description: args.description,
@@ -254,6 +265,7 @@ export const markAnalysisFailed = internalMutation({
   handler: async (ctx, args) => {
     const entry = await ctx.db.get(args.foodLogId)
     if (!entry || entry.ownerId !== args.ownerId) return
+    await releasePhoto(ctx, entry)
     await ctx.db.patch(args.foodLogId, { status: 'failed' })
   },
 })
