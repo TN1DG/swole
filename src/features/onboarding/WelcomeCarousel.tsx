@@ -4,6 +4,7 @@ import { Box, Button, MenuItem, Select, TextField, Typography } from '@mui/mater
 import { api } from '../../../convex/_generated/api'
 import {
   ACTIVITY_LEVELS,
+  goalCalories,
   mifflinStJeorBmr,
   tdee,
   type ActivityLevel,
@@ -13,7 +14,15 @@ import {
 import { CalorieBreakdown } from '../stats/CalorieBreakdown'
 import { FlameIcon, PeopleIcon } from '../../components/icons'
 import { errorMessage } from '../../lib/errors'
-import { calorieInputError, LOW_CALORIE_CAUTION, isLowCalorieTarget } from '../../lib/calorieTarget'
+import {
+  calorieInputError,
+  EMPTY_MACRO_INPUTS,
+  isLowCalorieTarget,
+  LOW_CALORIE_CAUTION,
+  macroInputError,
+  macroInputsToOverride,
+} from '../../lib/calorieTarget'
+import { MacroTargetFields } from '../nutrition/MacroTargetFields'
 import {
   canonicalBody,
   convertBodyFields,
@@ -374,6 +383,7 @@ export function GoalSlide({
   const [goal, setGoal] = useState<Goal | null>(null)
   const [customOpen, setCustomOpen] = useState(false)
   const [customCalories, setCustomCalories] = useState('')
+  const [macros, setMacros] = useState(EMPTY_MACRO_INPUTS)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -385,7 +395,7 @@ export function GoalSlide({
     if (goal === null) return
     // Checked before any write, so a typo can't leave the goal saved and the
     // user still stuck on this screen wondering what happened.
-    const inputError = custom ? calorieInputError(custom) : null
+    const inputError = custom ? (calorieInputError(custom) ?? macroInputError(macros)) : null
     if (inputError) {
       setError(inputError)
       return
@@ -395,7 +405,10 @@ export function GoalSlide({
     try {
       // In this order: choosing a goal clears any custom target.
       await setNutritionGoal({ goal })
-      if (custom) await setCalorieTarget({ calories: Number(custom) })
+      if (custom) {
+        const override = macroInputsToOverride(macros)
+        await setCalorieTarget({ calories: Number(custom), ...(override && { macros: override }) })
+      }
       await finishOnboarding({})
       // Success flips profile.onboarded -> OnboardingGate swaps to the app.
     } catch (err) {
@@ -426,20 +439,36 @@ export function GoalSlide({
       </Box>
 
       {customOpen ? (
-        <TextField
-          label="My daily calories"
-          value={customCalories}
-          onChange={(e) => setCustomCalories(e.target.value)}
-          fullWidth
-          autoFocus
-          sx={{ mt: 2 }}
-          helperText={
-            isLowCalorieTarget(custom)
-              ? LOW_CALORIE_CAUTION
-              : 'Replaces the number on your goal card. Your macros adjust to match.'
-          }
-          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-        />
+        <>
+          <TextField
+            label="My daily calories"
+            value={customCalories}
+            onChange={(e) => setCustomCalories(e.target.value)}
+            fullWidth
+            autoFocus
+            sx={{ mt: 2 }}
+            helperText={
+              isLowCalorieTarget(custom)
+                ? LOW_CALORIE_CAUTION
+                : 'Replaces the number on your goal card.'
+            }
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+          />
+          {custom && (
+            <MacroTargetFields
+              // Half-typed or out-of-range calories suggest from the goal's number.
+              calories={
+                calorieInputError(custom)
+                  ? goalCalories(tdeeValue, goal ?? 'maintain')
+                  : Number(custom)
+              }
+              weightKg={stats.weightKg}
+              goal={goal ?? 'maintain'}
+              values={macros}
+              onChange={setMacros}
+            />
+          )}
+        </>
       ) : (
         <Button variant="text" color="inherit" sx={{ mt: 1.5, color: 'text.secondary' }} onClick={() => setCustomOpen(true)}>
           Set my own calories

@@ -91,6 +91,17 @@ export default defineSchema({
     // goal would suggest (fitness.ts:resolveCalorieTarget). Absent means follow
     // the goal; choosing a goal clears it.
     calorieTargetOverride: v.optional(v.number()),
+    // Any of the breakdown the user typed by hand. A missing field follows the
+    // suggestion for their target (fitness.ts:resolveMacroTargets). Only ever set
+    // alongside calorieTargetOverride, and cleared with it.
+    macroTargetOverride: v.optional(
+      v.object({
+        proteinG: v.optional(v.number()),
+        carbsG: v.optional(v.number()),
+        fatG: v.optional(v.number()),
+        fiberG: v.optional(v.number()),
+      }),
+    ),
     // One of convex/themePresets.ts. A plain string rather than a union so that
     // adding a preset never needs a schema change; setThemePreset validates it,
     // and the client falls back to the default for anything it doesn't know.

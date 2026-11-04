@@ -161,6 +161,7 @@ export const getMine = query({
       dailyVolumeGoalKg: profile?.dailyVolumeGoalKg ?? null,
       nutritionGoal: profile?.nutritionGoal ?? null,
       calorieTargetOverride: profile?.calorieTargetOverride ?? null,
+      macroTargetOverride: profile?.macroTargetOverride ?? null,
       themePreset: profile?.themePreset ?? null,
       pointsBalance: profile?.pointsBalance ?? 0,
       weekPoints,
@@ -445,13 +446,26 @@ export const setNutritionGoal = mutation({
     await ctx.db.patch(profile._id, {
       nutritionGoal: args.goal,
       calorieTargetOverride: undefined,
+      macroTargetOverride: undefined,
     })
   },
 })
 
-// A self-set daily calorie target. `null` goes back to following the goal.
+// A self-set daily calorie target, with any of its breakdown set by hand. `null`
+// goes back to following the goal, breakdown included. Macros that don't add up
+// to the calories are allowed: the form points it out, but it's the user's call.
 export const setCalorieTarget = mutation({
-  args: { calories: v.union(v.number(), v.null()) },
+  args: {
+    calories: v.union(v.number(), v.null()),
+    macros: v.optional(
+      v.object({
+        proteinG: v.optional(v.number()),
+        carbsG: v.optional(v.number()),
+        fatG: v.optional(v.number()),
+        fiberG: v.optional(v.number()),
+      }),
+    ),
+  },
   handler: async (ctx, args) => {
     const userId = await requireWriter(ctx)
 
@@ -466,8 +480,23 @@ export const setCalorieTarget = mutation({
               'Calorie target',
             ),
           )
+    const macro = (value: number | undefined, label: string) =>
+      value === undefined ? undefined : Math.round(assertRange(value, 0, LIMITS.macroGrams, label))
+    const macros =
+      args.calories !== null && args.macros
+        ? {
+            proteinG: macro(args.macros.proteinG, 'Protein'),
+            carbsG: macro(args.macros.carbsG, 'Carbs'),
+            fatG: macro(args.macros.fatG, 'Fat'),
+            fiberG: macro(args.macros.fiberG, 'Fiber'),
+          }
+        : undefined
+
     const profile = await getOrCreateProfile(ctx, userId)
-    await ctx.db.patch(profile._id, { calorieTargetOverride: calories })
+    await ctx.db.patch(profile._id, {
+      calorieTargetOverride: calories,
+      macroTargetOverride: macros,
+    })
   },
 })
 

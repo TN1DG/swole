@@ -187,6 +187,35 @@ export function macroTargets(calories: number, bodyWeightKg: number, goal: Goal)
   return { calories, proteinG, fatG, carbsG, fiberG }
 }
 
+export type MacroOverride = {
+  proteinG?: number
+  carbsG?: number
+  fatG?: number
+  fiberG?: number
+}
+
+// The breakdown actually in force: whatever the user set by hand, and the
+// suggestion for this calorie target for the rest. Carbs fill whatever calories
+// protein and fat leave, the same way macroTargets gets them, so overriding
+// either one rebalances the carbs rather than breaking the total.
+export function resolveMacroTargets(
+  calories: number,
+  bodyWeightKg: number,
+  goal: Goal,
+  override: MacroOverride | null | undefined,
+): MacroTargets {
+  const suggested = macroTargets(calories, bodyWeightKg, goal)
+  const proteinG = override?.proteinG ?? suggested.proteinG
+  const fatG = override?.fatG ?? suggested.fatG
+  return {
+    calories,
+    proteinG,
+    fatG,
+    carbsG: override?.carbsG ?? Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4)),
+    fiberG: override?.fiberG ?? suggested.fiberG,
+  }
+}
+
 // Atwater factors: 4 kcal/g for protein and carbs, 9 kcal/g for fat — the same
 // 4/4/9 split `macroTargets` works backwards from. Carbs here means total
 // carbs, so fiber isn't a separate term (its ~2 kcal/g is already inside the

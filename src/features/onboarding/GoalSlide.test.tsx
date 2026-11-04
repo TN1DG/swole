@@ -70,6 +70,25 @@ describe('GoalSlide', () => {
     expect(state.calls[1]!.args).toEqual({ calories: 3100 })
   })
 
+  it('shows a suggested breakdown for the typed calories, and saves typed macros', async () => {
+    render(<GoalSlide stats={STATS} />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: /^Cut/ }))
+    await user.click(screen.getByRole('button', { name: 'Set my own calories' }))
+    await user.type(screen.getByLabelText('My daily calories'), '3000')
+
+    expect(screen.getByLabelText('Protein target (g)')).toHaveAttribute('placeholder', '176')
+
+    await user.type(screen.getByLabelText('Fiber target (g)'), '35')
+    await user.click(screen.getByRole('button', { name: /Let's Lift/ }))
+
+    expect(state.calls[1]).toEqual({
+      name: TARGET,
+      args: { calories: 3000, macros: { fiberG: 35 } },
+    })
+  })
+
   it('catches a bad custom target before saving anything', async () => {
     render(<GoalSlide stats={STATS} />)
     const user = userEvent.setup()

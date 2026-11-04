@@ -10,32 +10,46 @@ import {
   Typography,
 } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
-import { calorieInputError, isLowCalorieTarget, LOW_CALORIE_CAUTION } from '../../lib/calorieTarget'
+import type { Goal, MacroOverride } from '../../../convex/fitness'
+import {
+  calorieInputError,
+  isLowCalorieTarget,
+  LOW_CALORIE_CAUTION,
+  macroInputError,
+  macroInputsFrom,
+  macroInputsToOverride,
+} from '../../lib/calorieTarget'
 import { errorMessage } from '../../lib/errors'
+import { MacroTargetFields } from './MacroTargetFields'
 
 export function CalorieTargetDialog({
   current,
-  goalLabel,
+  currentMacros,
+  goal,
   goalCalories,
+  weightKg,
   isCustom,
   onClose,
 }: {
   current: number
-  goalLabel: string
+  currentMacros: MacroOverride | null
+  goal: Goal
   goalCalories: number
+  weightKg: number
   isCustom: boolean
   onClose: () => void
 }) {
   const setCalorieTarget = useMutation(api.profiles.setCalorieTarget)
   const [value, setValue] = useState(String(current))
+  const [macros, setMacros] = useState(() => macroInputsFrom(currentMacros))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  async function save(calories: number | null) {
+  async function save(args: { calories: number | null; macros?: MacroOverride }) {
     setError(null)
     setSaving(true)
     try {
-      await setCalorieTarget({ calories })
+      await setCalorieTarget(args)
       onClose()
     } catch (err) {
       setError(errorMessage(err, 'Could not save.'))
@@ -45,12 +59,13 @@ export function CalorieTargetDialog({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const inputError = calorieInputError(value)
+    const inputError = calorieInputError(value) ?? macroInputError(macros)
     if (inputError) {
       setError(inputError)
       return
     }
-    void save(Number(value))
+    const override = macroInputsToOverride(macros)
+    void save({ calories: Number(value), ...(override && { macros: override }) })
   }
 
   return (
@@ -68,9 +83,17 @@ export function CalorieTargetDialog({
             helperText={
               isLowCalorieTarget(value)
                 ? LOW_CALORIE_CAUTION
-                : `Your ${goalLabel} goal suggests ${goalCalories} kcal. Your macros adjust to match.`
+                : `Your ${goal} goal suggests ${goalCalories} kcal.`
             }
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+          />
+          <MacroTargetFields
+            // Half-typed or out-of-range calories keep the last sensible suggestion.
+            calories={calorieInputError(value) ? current : Number(value)}
+            weightKg={weightKg}
+            goal={goal}
+            values={macros}
+            onChange={setMacros}
           />
           {error && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
@@ -80,8 +103,13 @@ export function CalorieTargetDialog({
         </DialogContent>
         <DialogActions>
           {isCustom && (
-            <Button color="inherit" disabled={saving} sx={{ mr: 'auto' }} onClick={() => void save(null)}>
-              Use goal's number
+            <Button
+              color="inherit"
+              disabled={saving}
+              sx={{ mr: 'auto' }}
+              onClick={() => void save({ calories: null })}
+            >
+              Use goal's numbers
             </Button>
           )}
           <Button color="inherit" disabled={saving} onClick={onClose}>

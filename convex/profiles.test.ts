@@ -364,14 +364,53 @@ describe('setCalorieTarget', () => {
     )
   })
 
-  it('is cleared by choosing a goal', async () => {
+  it('is cleared by choosing a goal, breakdown included', async () => {
     const t = createBackend()
     const user = asUser(t, await createUser(t, 'alice'))
 
-    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400 })
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { proteinG: 180 } })
     await user.mutation(api.profiles.setNutritionGoal, { goal: 'bulk' })
 
-    expect((await user.query(api.profiles.getMine, {}))!.calorieTargetOverride).toBeNull()
+    const profile = (await user.query(api.profiles.getMine, {}))!
+    expect(profile.calorieTargetOverride).toBeNull()
+    expect(profile.macroTargetOverride).toBeNull()
+  })
+
+  it('stores only the macros that were typed, rounded', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+
+    await user.mutation(api.profiles.setCalorieTarget, {
+      calories: 2400,
+      macros: { proteinG: 180.4, fiberG: 30 },
+    })
+
+    expect((await user.query(api.profiles.getMine, {}))!.macroTargetOverride).toEqual({
+      proteinG: 180,
+      fiberG: 30,
+    })
+  })
+
+  it('drops earlier macros when saved without any, and when reset', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const override = async () => (await user.query(api.profiles.getMine, {}))!.macroTargetOverride
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { fatG: 70 } })
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2500 })
+    expect(await override()).toBeNull()
+
+    await user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { fatG: 70 } })
+    await user.mutation(api.profiles.setCalorieTarget, { calories: null, macros: { fatG: 70 } })
+    expect(await override()).toBeNull()
+  })
+
+  it.each([-1, 2001, Number.NaN])('rejects a macro of %s', async (proteinG) => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    await expect(
+      user.mutation(api.profiles.setCalorieTarget, { calories: 2400, macros: { proteinG } }),
+    ).rejects.toThrow(/protein/i)
   })
 
   it('requires sign-in', async () => {

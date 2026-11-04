@@ -16,6 +16,7 @@ import {
   ftInToCm,
   goalCalories,
   resolveCalorieTarget,
+  resolveMacroTargets,
   kgToLb,
   lbToKg,
   macroTargets,
@@ -198,6 +199,35 @@ describe('resolveCalorieTarget', () => {
 
   it('uses a self-set target over the goal', () => {
     expect(resolveCalorieTarget(2759, 'cut', 2400)).toBe(2400)
+  })
+})
+
+describe('resolveMacroTargets', () => {
+  it('suggests the same breakdown as macroTargets when nothing is overridden', () => {
+    expect(resolveMacroTargets(2500, 80, 'cut', null)).toEqual(macroTargets(2500, 80, 'cut'))
+    expect(resolveMacroTargets(2500, 80, 'cut', {})).toEqual(macroTargets(2500, 80, 'cut'))
+  })
+
+  it('scales the suggestion with the calorie target', () => {
+    const low = resolveMacroTargets(2000, 80, 'cut', null)
+    const high = resolveMacroTargets(3000, 80, 'cut', null)
+    expect(high.carbsG).toBeGreaterThan(low.carbsG)
+    expect(high.fatG).toBeGreaterThan(low.fatG)
+    // Protein is set off bodyweight, so calories alone don't move it.
+    expect(high.proteinG).toBe(low.proteinG)
+  })
+
+  it('keeps what the user typed and rebalances carbs to fit', () => {
+    const targets = resolveMacroTargets(2500, 80, 'cut', { proteinG: 200, fatG: 60 })
+    expect(targets).toMatchObject({ proteinG: 200, fatG: 60, carbsG: 290 })
+  })
+
+  it('leaves typed carbs alone, even when the total no longer matches', () => {
+    expect(resolveMacroTargets(2500, 80, 'cut', { carbsG: 100 }).carbsG).toBe(100)
+  })
+
+  it('never suggests negative carbs', () => {
+    expect(resolveMacroTargets(1000, 80, 'cut', { proteinG: 400 }).carbsG).toBe(0)
   })
 })
 
