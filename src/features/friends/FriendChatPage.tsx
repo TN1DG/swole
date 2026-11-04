@@ -53,6 +53,7 @@ export function FriendChatPage() {
   const me = useQuery(api.profiles.getMine)
   const friends = useQuery(api.friends.myFriends)
   const friendReadAt = useQuery(api.friendThread.friendReadAt, { friendUserId: friendId })
+  const partnerName = useQuery(api.friendThread.partnerName, { friendUserId: friendId })
   const sendPing = useMutation(api.pings.send)
   const markRead = useMutation(api.friendThread.markRead)
   const toggleReaction = useMutation(api.messages.toggleReaction)
@@ -69,7 +70,7 @@ export function FriendChatPage() {
     liveThread ?? (lastThread.current?.friendId === friendId ? lastThread.current.thread : undefined)
 
   const friend = friends?.find((f) => f.userId === friendId)
-  const friendName = friend?.displayName ?? 'them'
+  const friendName = friend?.displayName ?? partnerName ?? 'them'
   const notFriends = friends !== undefined && friend === undefined
 
   const [presence, setPresence] = useState<FriendPresence>(OFFLINE)
@@ -117,10 +118,11 @@ export function FriendChatPage() {
   return (
     <ChatShell
       friendId={friendId}
-      friendName={friend?.displayName ?? '…'}
+      friendName={friend?.displayName ?? partnerName ?? '…'}
       avatarUrl={friend?.avatarUrl}
       isFriend={friend !== undefined}
-      status={presence.typing ? 'typing…' : presence.online ? 'Active now' : null}
+      // The watcher only runs for a friend, so without one its last report is stale.
+      status={!friend ? null : presence.typing ? 'typing…' : presence.online ? 'Active now' : null}
       onLeave={() => navigate('/friends?tab=chats')}
     >
       {friend && me && (
@@ -132,7 +134,7 @@ export function FriendChatPage() {
         pending={pending}
         friendName={friendName}
         friendReadAt={friendReadAt ?? null}
-        friendTyping={presence.typing}
+        friendTyping={friend !== undefined && presence.typing}
         canLoadOlder={canLoadOlder}
         onLoadOlder={() => setLimit((l) => Math.min(l + THREAD_PAGE, LIMITS.threadEntriesMax))}
         onReact={(messageId, emoji) => void run(() => toggleReaction({ messageId, emoji }))}

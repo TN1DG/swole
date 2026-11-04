@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation } from 'convex/react'
 import { Box, IconButton, Menu, MenuItem, Typography } from '@mui/material'
@@ -7,30 +7,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { Avatar } from '../../components/Avatar'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { errorMessage } from '../../lib/errors'
-
-// Mobile browsers put the keyboard over the page rather than shrinking it, so a
-// composer at the bottom of a normal full-height layout would sit behind the
-// keyboard. The visual viewport is the part actually left visible; sizing the
-// shell to it keeps the composer just above the keyboard. offsetTop covers iOS
-// Safari scrolling the page up as well when an input takes focus.
-function useVisualViewport() {
-  const [viewport, setViewport] = useState<{ height: number; offsetTop: number } | null>(null)
-
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const update = () => setViewport({ height: vv.height, offsetTop: vv.offsetTop })
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [])
-
-  return viewport
-}
+import { useVisualViewport } from '../../lib/useVisualViewport'
 
 // The full-screen frame of a conversation, in place of the app's header and tab
 // bar: all of the screen goes to the messages and the keyboard.

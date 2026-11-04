@@ -16,6 +16,12 @@ export const presenceComponent = new Presence(components.presence)
 // Deliberately NOT requireWriter: these fire on a timer while a chat is open, and
 // sitting in a conversation shouldn't eat the budget that protects real writes.
 
+// What a refused heartbeat gets. The usePresence hook treats empty tokens as "no
+// room", so it quietly shows nobody. Throwing instead would put an error in the
+// console every 10 seconds, which is both noise and a way for someone to discover
+// they've been blocked, when blocks are meant to be silent.
+const NO_ROOM = { roomToken: '', sessionToken: '' }
+
 // `userId` is part of the signature the usePresence hook calls with, and is
 // ignored: identity comes only from auth, so nobody can appear online as someone
 // else, and only a member of a friendship can obtain that room's token.
@@ -23,7 +29,7 @@ export const heartbeat = mutation({
   args: { roomId: v.string(), userId: v.string(), sessionId: v.string(), interval: v.number() },
   handler: async (ctx, args) => {
     const me = await getAuthUserId(ctx)
-    if (me === null) throw new ConvexError('Not signed in')
+    if (me === null) return NO_ROOM
 
     const friendId = otherRoomMember(args.roomId, me)
     if (
@@ -31,7 +37,7 @@ export const heartbeat = mutation({
       !(await areFriends(ctx, me, friendId as Id<'users'>)) ||
       (await isBlockedEitherWay(ctx, me, friendId as Id<'users'>))
     ) {
-      throw new ConvexError('Not available')
+      return NO_ROOM
     }
 
     const interval = assertRange(args.interval, 1000, 60000, 'Interval')
@@ -58,7 +64,12 @@ export const setTyping = mutation({
   handler: async (ctx, args) => {
     const me = await getAuthUserId(ctx)
     if (me === null) throw new ConvexError('Not signed in')
-    if (!(await areFriends(ctx, me, args.friendUserId))) return
+    if (
+      !(await areFriends(ctx, me, args.friendUserId)) ||
+      (await isBlockedEitherWay(ctx, me, args.friendUserId))
+    ) {
+      return
+    }
 
     // Over the limit just means a typing dot doesn't update, which isn't worth
     // showing anyone an error for.

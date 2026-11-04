@@ -7,7 +7,7 @@ import { ChallengeCard } from './ChallengeCard'
 import { MessageBubble } from './MessageBubble'
 import { PingBubble } from './PingBubble'
 import type { PendingMessage } from './useMessageQueue'
-import { layoutThread, timeLabel } from './threadLayout'
+import { countUnseen, layoutThread, timeLabel } from './threadLayout'
 
 type ThreadEntry = FunctionReturnType<typeof api.friendThread.getThread>[number]
 
@@ -44,7 +44,9 @@ export function MessageList({
   const scroller = useRef<HTMLDivElement>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [atBottom, setAtBottom] = useState(true)
-  const [unseenCount, setUnseenCount] = useState(0)
+  // How far you'd caught up when you were last at the bottom. While you're
+  // reading older messages, new ones don't yank you down; the pill counts them.
+  const [seenUpTo, setSeenUpTo] = useState(0)
 
   const items = useMemo(() => layoutThread(thread ?? [], Date.now()), [thread])
 
@@ -57,22 +59,11 @@ export function MessageList({
     return null
   }, [thread, friendReadAt])
 
-  // The last entry of each person's latest message gets a time, as does each
-  // burst's end. Tapping a message reveals its time regardless.
-  const lastKey = thread?.at(-1)?.key
-
-  // While you're reading older messages, new ones don't yank you down; they're
-  // counted for the pill instead. Identified by the newest key, since older
-  // history arriving also changes the length.
-  const previousLast = useRef<string | undefined>(undefined)
+  const newestTs = thread?.at(-1)?.ts ?? 0
   useEffect(() => {
-    const previous = previousLast.current
-    previousLast.current = lastKey
-    if (previous === undefined || lastKey === undefined || previous === lastKey) return
-    const newest = thread?.at(-1)
-    if (atBottom || newest?.isMine) return
-    setUnseenCount((n) => n + 1)
-  }, [lastKey, thread, atBottom])
+    if (atBottom) setSeenUpTo(newestTs)
+  }, [atBottom, newestTs])
+  const unseenCount = atBottom ? 0 : countUnseen(thread ?? [], seenUpTo)
 
   // Sending is a clear "I'm back in the conversation", wherever you'd scrolled.
   useEffect(() => {
@@ -86,7 +77,6 @@ export function MessageList({
     const fromBottom = Math.abs(el.scrollTop)
     const nowAtBottom = fromBottom < AT_BOTTOM_PX
     setAtBottom(nowAtBottom)
-    if (nowAtBottom) setUnseenCount(0)
     if (canLoadOlder && el.scrollHeight - el.clientHeight - fromBottom < LOAD_MORE_PX) {
       onLoadOlder()
     }
@@ -239,8 +229,7 @@ export function MessageList({
           variant="contained"
           size="small"
           onClick={() => {
-            scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
-            setUnseenCount(0)
+            scroller.current?.scrollTo({ top: 0 })
           }}
           sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', borderRadius: '999px' }}
         >

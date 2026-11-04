@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversationTimeLabel, dayLabel, isBigEmoji, layoutThread } from './threadLayout'
+import { conversationTimeLabel, countUnseen, dayLabel, isBigEmoji, layoutThread } from './threadLayout'
 
 const NOON = new Date(2026, 10, 4, 12, 0).getTime()
 const MINUTE = 60_000
@@ -75,6 +75,27 @@ describe('layoutThread', () => {
 
   it('renders nothing for an empty thread', () => {
     expect(layoutThread([], NOON)).toEqual([])
+  })
+})
+
+describe('countUnseen', () => {
+  const thread = [
+    message('old', NOON - 10 * MINUTE, false),
+    message('seen', NOON, false),
+    message('mine', NOON + MINUTE, true),
+    message('new', NOON + 2 * MINUTE, false),
+  ]
+
+  it('counts only what the other person sent since you were at the bottom', () => {
+    expect(countUnseen(thread, NOON)).toBe(1)
+  })
+
+  it('is zero once you have caught up', () => {
+    expect(countUnseen(thread, NOON + 2 * MINUTE)).toBe(0)
+  })
+
+  it('ignores older history loading in above', () => {
+    expect(countUnseen([message('older', NOON - DAY, false), ...thread], NOON)).toBe(1)
   })
 })
 

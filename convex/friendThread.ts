@@ -4,6 +4,7 @@ import { mutation, query } from './_generated/server'
 import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { areFriends } from './friendships'
+import { publicIdentity } from './identity'
 import { LIMITS } from './validation'
 import { latestIncomingMessageAt, latestMessageBetween, messagesBetween } from './messages'
 import { latestIncomingPingAt, latestPingBetween, pingsBetween } from './pings'
@@ -87,6 +88,19 @@ export const getThread = query({
     ]
 
     return entries.sort((a, b) => a.ts - b.ts).slice(-limit)
+  },
+})
+
+// Who a past conversation was with, once they're no longer in your friends list
+// and so can't be named from it. Only for someone you've actually exchanged
+// messages with, so this can't be used to look up a name from an arbitrary id.
+export const partnerName = query({
+  args: { friendUserId: v.id('users') },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (userId === null) return null
+    if ((await latestMessageBetween(ctx, userId, args.friendUserId)) === null) return null
+    return (await publicIdentity(ctx, args.friendUserId)).displayName
   },
 })
 

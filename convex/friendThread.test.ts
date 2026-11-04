@@ -570,6 +570,26 @@ describe('getThread limit', () => {
   })
 })
 
+describe('partnerName', () => {
+  it('names someone you have talked to, even after they stop being a friend', async () => {
+    const t = createBackend()
+    const { alice, bob } = await twoFriends(t)
+    await alice.user.mutation(api.messages.send, { toUserId: bob.userId, text: 'yo' })
+    await alice.user.mutation(api.friends.removeFriend, { friendId: bob.userId })
+
+    expect(await alice.user.query(api.friendThread.partnerName, { friendUserId: bob.userId })).toBe('bob')
+    expect(await bob.user.query(api.friendThread.partnerName, { friendUserId: alice.userId })).toBe('alice')
+  })
+
+  it("won't name a stranger from their id", async () => {
+    const t = createBackend()
+    const alice = await userWithUsername(t, 'alice')
+    const carol = await userWithUsername(t, 'carol')
+
+    expect(await alice.user.query(api.friendThread.partnerName, { friendUserId: carol.userId })).toBeNull()
+  })
+})
+
 describe('friendReadAt', () => {
   it("tells me when my friend last read, and never leaks to a stranger", async () => {
     const t = createBackend()
@@ -675,23 +695,26 @@ describe('presence', () => {
         interval: 10000,
       })
 
-    await expect(heartbeat(carol.user, room(alice.userId, bob.userId))).rejects.toThrow(/not available/i)
-    await expect(heartbeat(carol.user, room(carol.userId, alice.userId))).rejects.toThrow(/not available/i)
-    await expect(heartbeat(alice.user, 'nonsense')).rejects.toThrow(/not available/i)
+    const refused = { roomToken: '', sessionToken: '' }
+    expect(await heartbeat(carol.user, room(alice.userId, bob.userId))).toEqual(refused)
+    expect(await heartbeat(carol.user, room(carol.userId, alice.userId))).toEqual(refused)
+    expect(await heartbeat(alice.user, 'nonsense')).toEqual(refused)
   })
 
-  it('refuses a blocked friend', async () => {
+  // Blocks are silent, so this must look like nobody's around rather than fail:
+  // an error here would tell the blocked person what happened.
+  it('quietly gives a blocked friend no room, without an error', async () => {
     const t = createBackend()
     const { alice, bob } = await twoFriends(t)
     await bob.user.mutation(api.feed.blockUser, { userId: alice.userId })
 
-    await expect(
-      alice.user.mutation(api.presence.heartbeat, {
+    expect(
+      await alice.user.mutation(api.presence.heartbeat, {
         roomId: room(alice.userId, bob.userId),
         userId: alice.userId,
         sessionId: 's1',
         interval: 10000,
       }),
-    ).rejects.toThrow(/not available/i)
+    ).toEqual({ roomToken: '', sessionToken: '' })
   })
 })

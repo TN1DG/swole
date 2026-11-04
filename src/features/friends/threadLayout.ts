@@ -80,6 +80,13 @@ export function layoutThread<E extends LayoutEntry>(entries: E[], now: number): 
   return items
 }
 
+// What arrived from the other person since you were last at the bottom. Derived
+// from the thread rather than counted as updates come in, so it can't drift from
+// what's actually there, and older history loading above can never add to it.
+export function countUnseen(entries: LayoutEntry[], seenUpTo: number): number {
+  return entries.filter((e) => !e.isMine && e.ts > seenUpTo).length
+}
+
 // Whether the text is nothing but a few emoji, which texting apps show large.
 // Not just \p{Emoji}, which also matches plain digits, '#' and '*'.
 const EMOJI_ONLY =
