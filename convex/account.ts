@@ -226,6 +226,13 @@ export const purgeAccountData = internalMutation({
           .take(n),
       ),
     )
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('pushSubscriptions')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .take(n),
+    )
+
     // Presence rows name this user and nothing else cleans them up.
     for (const { roomId } of await presenceComponent.listUser(ctx, userId)) {
       await presenceComponent.removeRoomUser(ctx, roomId, userId)

@@ -38,6 +38,8 @@ import type * as points from "../points.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
 import type * as prs from "../prs.js";
+import type * as push from "../push.js";
+import type * as pushSender from "../pushSender.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seed from "../seed.js";
@@ -85,6 +87,8 @@ declare const fullApi: ApiFromModules<{
   presence: typeof presence;
   profiles: typeof profiles;
   prs: typeof prs;
+  push: typeof push;
+  pushSender: typeof pushSender;
   rateLimiter: typeof rateLimiter;
   routines: typeof routines;
   seed: typeof seed;

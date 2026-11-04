@@ -5,6 +5,7 @@ import { assertRange, cleanText, LIMITS } from './validation'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { areFriends, isBlockedEitherWay } from './friendships'
 import { REACTION_EMOJIS } from './constants'
+import { queueMessagePush } from './push'
 
 // The client optimizes to ~300KB at up to 1280px (src/lib/optimizeImage.ts), so
 // anything near this ceiling didn't come through our own UI.
@@ -151,15 +152,22 @@ export const send = mutation({
       image = { imageStorageId: args.image.storageId, imageWidth: width, imageHeight: height }
     }
 
-    // No notification is raised for chat — the per-thread unread badge on the
+    // No in-app notice is raised for chat — the per-thread unread badge on the
     // Friends list covers this, and one banner per incoming message would
-    // bury everything else.
+    // bury everything else. A device notification is different: it collapses per
+    // conversation, and it's how you find out while the app is closed.
     await ctx.db.insert('messages', {
       fromUserId,
       toUserId: args.toUserId,
       text,
       sentAt: Date.now(),
       ...image,
+    })
+    await queueMessagePush(ctx, {
+      toUserId: args.toUserId,
+      fromUserId,
+      text,
+      hasImage: image !== null,
     })
     return { ok: true }
   },

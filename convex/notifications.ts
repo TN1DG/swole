@@ -5,6 +5,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { publicIdentity } from './identity'
+import { queuePush, type PushPayload } from './push'
 
 // How many unread notices the banner stack will ever need at once. Also the
 // ceiling on the "mark superseded ones read" sweep below.
@@ -32,6 +33,64 @@ export type NotificationKind =
 // name, so the final fallback is close to unreachable.
 async function senderName(ctx: QueryCtx, userId: Id<'users'>): Promise<string> {
   return (await publicIdentity(ctx, userId)).displayName
+}
+
+// The device notification for a notice. Same wording as the in-app banner
+// (src/components/NotificationsBanner.tsx), and the same place to land.
+function pushFor(args: {
+  kind: NotificationKind
+  who: string
+  fromUserId: Id<'users'>
+  postId?: Id<'posts'>
+  count: number
+}): PushPayload {
+  const { kind, who, fromUserId, postId, count } = args
+  const others = count > 1 ? ` and ${count - 1} other${count > 2 ? 's' : ''}` : ''
+  const post = postId ? `/feed/${postId}` : '/friends'
+  switch (kind) {
+    case 'friend_request_received':
+      return { title: `${who} sent you a friend request`, url: '/friends?tab=chats' }
+    case 'friend_request_accepted':
+      return { title: `${who} accepted your friend request`, url: '/friends?tab=chats' }
+    case 'ping_received':
+      return {
+        title: `${who} pinged you 🏋️`,
+        body: 'Hold them accountable',
+        url: `/friends/${fromUserId}/chat`,
+        tag: `ping-${fromUserId}`,
+      }
+    case 'workout_finished_after_ping':
+      return { title: `${who} won the battle 🏆`, url: '/notifications' }
+    // One notification per post and kind: a busy post updates its count instead of
+    // filling someone's lock screen.
+    case 'post_liked':
+      return { title: `${who}${others} liked your post`, url: post, tag: `like-${postId}` }
+    case 'post_commented':
+      return {
+        title: `${who}${others} commented on your post`,
+        url: post,
+        tag: `comment-${postId}`,
+      }
+    case 'post_reposted':
+      return { title: `${who}${others} reposted you`, url: post, tag: `repost-${postId}` }
+  }
+}
+
+async function pushNotice(
+  ctx: MutationCtx,
+  args: {
+    userId: Id<'users'>
+    kind: NotificationKind
+    fromUserId: Id<'users'>
+    postId?: Id<'posts'>
+  },
+  count: number,
+) {
+  await queuePush(ctx, {
+    toUserId: args.userId,
+    fromUserId: args.fromUserId,
+    payload: pushFor({ ...args, who: await senderName(ctx, args.fromUserId), count }),
+  })
 }
 
 /**
@@ -78,6 +137,7 @@ export async function notify(
         fromUserId: args.fromUserId,
         count: (existing.count ?? 1) + 1,
       })
+      await pushNotice(ctx, args, (existing.count ?? 1) + 1)
       return
     }
   }
@@ -93,6 +153,7 @@ export async function notify(
     ...(args.workoutId !== undefined && { workoutId: args.workoutId }),
     ...(args.postId !== undefined && { postId: args.postId }),
   })
+  await pushNotice(ctx, args, 1)
 }
 
 /**

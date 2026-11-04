@@ -13,6 +13,8 @@ import { forwardStreakWeeks } from './fitness'
 import { awardPoints, escrowPoints } from './profiles'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { areFriends, isBlockedEitherWay } from './friendships'
+import { publicIdentity } from './identity'
+import { queuePush } from './push'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -111,7 +113,7 @@ export const propose = mutation({
     const wagerPoints = Math.round(assertRange(args.wagerPoints, 1, LIMITS.maxWagerPoints, 'Wager'))
 
     await escrowPoints(ctx, userId, wagerPoints)
-    return await ctx.db.insert('challenges', {
+    const challengeId = await ctx.db.insert('challenges', {
       challengerId: userId,
       opponentId: args.opponentId,
       status: 'pending',
@@ -119,6 +121,18 @@ export const propose = mutation({
       wagerPoints,
       createdAt: Date.now(),
     })
+    const { displayName } = await publicIdentity(ctx, userId)
+    await queuePush(ctx, {
+      toUserId: args.opponentId,
+      fromUserId: userId,
+      payload: {
+        title: `${displayName} challenged you ⚔️`,
+        body: `${weeks} week${weeks === 1 ? '' : 's'} for ${wagerPoints} points`,
+        url: `/friends/${userId}/chat`,
+        tag: `challenge-${userId}`,
+      },
+    })
+    return challengeId
   },
 })
 

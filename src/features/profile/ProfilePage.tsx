@@ -23,6 +23,8 @@ import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { AvatarUploadDialog } from './AvatarUploadDialog'
 import { ThemePicker } from './ThemePicker'
+import { PushSettingsCard } from '../notifications/PushSettingsCard'
+import { useSignOutCleanup } from '../notifications/usePushNotifications'
 import { useAvatarPicker } from './useAvatarPicker'
 import { WhatsNewDialog } from '../releases/WhatsNewDialog'
 import { CURRENT_RELEASE } from '../releases/releaseNotes'
@@ -37,6 +39,7 @@ export function ProfilePage() {
   const submitFeatureRequest = useMutation(api.featureRequests.submit)
   const deleteAccount = useMutation(api.account.deleteAccount)
   const { signOut } = useAuthActions()
+  const signOutCleanup = useSignOutCleanup()
 
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
@@ -94,6 +97,7 @@ export function ProfilePage() {
     setDeleteError(null)
     setDeleting(true)
     try {
+      await signOutCleanup()
       await deleteAccount({})
       await signOut()
     } catch (err) {
@@ -212,6 +216,7 @@ export function ProfilePage() {
       </GlassCard>
 
       <ThemePicker />
+      <PushSettingsCard />
 
       <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <ConsistencyRing streakWeeks={profile!.streakWeeks} size={52} />
@@ -367,7 +372,7 @@ export function ProfilePage() {
         variant="outlined"
         color="inherit"
         sx={{ mt: 1.5, color: 'error.main' }}
-        onClick={() => void signOut()}
+        onClick={() => void signOutCleanup().then(() => signOut())}
       >
         Sign out
       </Button>

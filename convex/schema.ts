@@ -106,6 +106,8 @@ export default defineSchema({
     // adding a preset never needs a schema change; setThemePreset validates it,
     // and the client falls back to the default for anything it doesn't know.
     themePreset: v.optional(v.string()),
+    // Chat notifications say who but not what, for a more private lock screen.
+    pushHideMessageText: v.optional(v.boolean()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -399,7 +401,18 @@ export default defineSchema({
     lastReadAt: v.number(),
   }).index('by_user_friend', ['userId', 'friendId']),
 
-  // In-app notifications (no OS/push delivery — see docs/new-features-progress.md).
+  // One device that has agreed to receive push notifications (see convex/push.ts).
+  pushSubscriptions: defineTable({
+    userId: v.id('users'),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_endpoint', ['endpoint']),
+
+  // In-app notifications. convex/push.ts also sends most of these to devices.
   // One generalized table rather than a bespoke reactive query per feature,
   // which is the pattern friends.ts/pings.ts grew organically and which
   // doesn't scale to a cross-cutting concern like this.

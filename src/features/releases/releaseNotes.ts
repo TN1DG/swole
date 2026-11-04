@@ -35,7 +35,8 @@ export const RELEASES: [Release, ...Release[]] = [
       'Pick a colour theme under Profile → Appearance. It follows you to every device.',
       'Set your own daily calories and macros: tap Edit on the Calories tile in Nutrition. You get a suggested breakdown for your new number, and you can change any of it.',
       'You can now change your username as well as your display name from Profile.',
-      'Photos upload faster and load faster, and location data is now removed from every photo before it leaves your phone.',
+      'Notifications: turn them on under Profile to hear about messages, pings, challenges and more while the app is closed. On iPhone, add Swole to your Home Screen first.',
+      'Photos upload faster and load faster, and ones you have already seen load instantly. Location data is now removed from every photo before it leaves your phone.',
     ],
   },
   {

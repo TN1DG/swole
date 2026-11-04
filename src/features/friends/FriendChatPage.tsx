@@ -12,6 +12,7 @@ import { ChallengeComposeDialog } from './ChallengeComposeDialog'
 import { ChatShell } from './ChatShell'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
+import { PushPrompt } from '../notifications/PushPrompt'
 import { useMessageQueue } from './useMessageQueue'
 
 const THREAD_PAGE = 60
@@ -128,6 +129,8 @@ export function FriendChatPage() {
       {friend && me && (
         <PresenceWatcher key={friendId} myId={me.userId} friendId={friendId} onChange={setPresence} />
       )}
+
+      {friend && <PushPrompt friendName={friend.displayName} />}
 
       <MessageList
         thread={thread}

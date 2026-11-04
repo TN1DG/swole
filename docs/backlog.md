@@ -58,7 +58,7 @@ Full list, with labels and blocking state:
 | [#23](https://github.com/TN1DG/swole/issues/23) | PR "conquered" slash missing on a friend's workout detail | closed 2026-08-14 |
 | [#24](https://github.com/TN1DG/swole/issues/24) | Throttle `resolveUsername` to stop username enumeration | closed 2026-08-14 |
 | [#25](https://github.com/TN1DG/swole/issues/25) | Re-triage `npm audit` — now 5 high, up from 4 | closed 2026-08-14, now 0 |
-| [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | `ready-for-human` |
+| [#26](https://github.com/TN1DG/swole/issues/26) | Real push notifications | built; open until a real phone has received one. Needs production keys before `main`, see below |
 | [#27](https://github.com/TN1DG/swole/issues/27) | Deep-link association files for Universal Links / App Links | `ready-for-human` |
 | [#28](https://github.com/TN1DG/swole/issues/28) | Animated exercise demos with muscle highlighting | `needs-info` |
 | [#29](https://github.com/TN1DG/swole/issues/29) | Update Convex from 1.42.1 to the latest patch | closed 2026-08-14, now 1.44.0 |
@@ -72,6 +72,19 @@ again): four of those five highs were `devDependencies` — `vite` and
 does not use. A raw high count is not a count of live risks; check the
 dependency path with `npm ls <pkg> --all` before reacting. Per-advisory
 reasoning is in `docs/project-review-2026-08-13.md` §3.3.
+
+**Push notifications need production keys before reaching `main`.** Previews get
+their own automatically (`scripts/vercel-build.js`). Production's are set once, by
+hand: `node scripts/setup-push-env.mjs --prod`. Without them the feature hides
+itself rather than failing. Never regenerate a working pair: every subscribed
+device would silently stop receiving notifications.
+
+**Testing logged-in screens locally.** `npx convex deployment create local --select`
+gives a backend on `127.0.0.1:3210`, so test accounts stay on the machine. It runs
+`"use node"` actions only under Node 22 or 24. Restore `.env.local` afterwards. Use
+`localhost` and `127.0.0.1` as two separate users. The service worker only exists
+in a production build, and that build's CSP blocks the local backend, so strip the
+meta tag from `dist/index.html` before `vite preview`.
 
 **Turnstile is on in production** as of 2026-08-14 — both keys set, in the
 order `docs/security-audit.md` prescribes (site key in a real build first,
