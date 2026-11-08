@@ -232,10 +232,62 @@ describe('CaloricConsistencyPage — log food', () => {
     expect(screen.queryByText(/photo/i)).not.toBeInTheDocument()
   })
 
+  const ALMONDS = {
+    _id: 'food1',
+    name: 'Almonds (1 oz)',
+    category: 'Nut',
+    calories: 164,
+    proteinG: 6,
+    carbsG: 6,
+    fatG: 14,
+    fiberG: 3.5,
+  }
+
+  it('leads with food search and keeps manual entry tucked away', () => {
+    renderPage()
+
+    expect(screen.getByLabelText('Search foods')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Protein (g)')).not.toBeInTheDocument()
+  })
+
+  it('adds a searched food with a chosen number of servings', async () => {
+    state.queries.set(getFunctionName(api.foods.list), [
+      ALMONDS,
+      { ...ALMONDS, _id: 'food2', name: 'Banana' },
+    ])
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Search foods'), 'alm')
+    expect(screen.queryByText('Banana')).not.toBeInTheDocument()
+    await user.click(screen.getByText('Almonds (1 oz)'))
+
+    await user.click(screen.getByRole('button', { name: 'More servings' }))
+    expect(screen.getByLabelText('Servings')).toHaveTextContent('1½')
+    // 164 × 1.5 = 246 kcal, 14 × 1.5 = 21g fat — the same numbers logFood stores.
+    expect(screen.getByTestId('servings-preview')).toHaveTextContent('246 kcal · P 9g · C 9g · F 21g')
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(state.mutations.get(getFunctionName(api.nutrition.logFood))).toHaveBeenCalledWith({
+      foodId: 'food1',
+      servings: 1.5,
+    })
+  })
+
+  it('says so when no food matches', async () => {
+    state.queries.set(getFunctionName(api.foods.list), [ALMONDS])
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Search foods'), 'zzz')
+    expect(screen.getByText(/No match/)).toBeInTheDocument()
+  })
+
   it('previews the calorie total from macros as the Calories placeholder', async () => {
     renderPage()
     const user = userEvent.setup()
 
+    await user.click(screen.getByRole('button', { name: /Enter manually/ }))
     await user.type(screen.getByLabelText('Protein (g)'), '40')
     await user.type(screen.getByLabelText('Carbs (g)'), '50')
     await user.type(screen.getByLabelText('Fat (g)'), '20')
@@ -244,45 +296,42 @@ describe('CaloricConsistencyPage — log food', () => {
     expect(screen.getByText(/≈ 540 kcal from the macros above/)).toBeInTheDocument()
   })
 
-  it('logs a manual entry, leaving calories blank so the backend derives it', async () => {
+  it('logs a named manual entry, leaving calories blank so the backend derives it', async () => {
     renderPage()
     const user = userEvent.setup()
 
+    await user.click(screen.getByRole('button', { name: /Enter manually/ }))
+    await user.type(screen.getByLabelText('Food name'), 'Homemade stew')
     await user.type(screen.getByLabelText('Protein (g)'), '40')
     await user.click(screen.getByRole('button', { name: 'Log' }))
 
     expect(state.mutations.get(getFunctionName(api.nutrition.logManualEntry))).toHaveBeenCalledWith(
-      expect.objectContaining({ proteinG: 40, calories: undefined }),
+      expect.objectContaining({ description: 'Homemade stew', proteinG: 40, calories: undefined }),
     )
   })
 
-  it('fills the form from a picked food and logs it with its name as the description', async () => {
-    state.queries.set(getFunctionName(api.foods.list), [
-      {
-        _id: 'food1',
-        name: 'Banana',
-        category: 'Fruit',
-        calories: 105,
-        proteinG: 1.3,
-        carbsG: 27,
-        fatG: 0.4,
-        fiberG: 3.1,
-      },
-    ])
+  it('labels a multi-serving entry with its servings', () => {
+    setToday({
+      entries: [
+        {
+          _id: 'log1',
+          loggedAt: Date.now(),
+          source: 'manual',
+          status: 'complete',
+          description: 'Apple',
+          calories: 190,
+          proteinG: 1,
+          carbsG: 50,
+          fatG: 0.6,
+          fiberG: 8.8,
+          servings: 2,
+        },
+      ],
+      totals: { calories: 190, proteinG: 1, carbsG: 50, fatG: 0.6, fiberG: 8.8 },
+    } as never)
     renderPage()
-    const user = userEvent.setup()
 
-    await user.click(screen.getByRole('button', { name: 'Search the food database' }))
-    await user.click(screen.getByText('Banana'))
-
-    expect(screen.getByLabelText('Protein (g)')).toHaveValue('1.3')
-    expect(screen.getByText(/Logging:/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Log' }))
-
-    expect(state.mutations.get(getFunctionName(api.nutrition.logManualEntry))).toHaveBeenCalledWith(
-      expect.objectContaining({ description: 'Banana', proteinG: 1.3 }),
-    )
+    expect(screen.getByText('Apple × 2')).toBeInTheDocument()
   })
 
   it('deletes an entry', async () => {

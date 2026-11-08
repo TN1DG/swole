@@ -16,7 +16,7 @@ type Props<T> = {
 }
 
 // A bottom sheet with a client-side-filtered search list; tap a row to pick
-// it. Extracted from ExercisePicker and FoodPicker, which had grown into the
+// it. Extracted from ExercisePicker and the old FoodPicker, which had grown into the
 // same component with different data behind it — same reasoning BottomSheet
 // itself was pulled out for (see that file's comment).
 export function SearchPickerSheet<T>({

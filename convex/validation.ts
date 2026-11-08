@@ -96,6 +96,9 @@ export const LIMITS = {
   calories: 20000, // generous ceiling for a single logged item
   macroGrams: 2000,
   foodDescriptionMaxLength: 200,
+  // Servings of one database food in a single entry.
+  foodServingsMin: 0.25,
+  foodServingsMax: 20,
   // A self-set daily target. The floor is lower than the 1200 we'd ever suggest
   // (fitness.ts:MIN_SAFE_CALORIES) because it's the user's call, with a caution
   // shown below 1200, but it still refuses numbers no one should be eating.

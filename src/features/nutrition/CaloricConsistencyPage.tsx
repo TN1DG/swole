@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
-import { Box, Button, IconButton, Link as MuiLink, TextField, Typography } from '@mui/material'
+import { Box, Button, Collapse, IconButton, Link as MuiLink, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import {
   caloriesFromMacros,
@@ -13,10 +13,10 @@ import {
 } from '../../../convex/fitness'
 import { errorMessage } from '../../lib/errors'
 import { GlassTile } from '../../components/GlassTile'
-import { SearchIcon } from '../../components/icons'
 import { FirstVisitTip } from '../../components/FirstVisitTip'
 import { NutrientProgress } from './NutrientProgress'
-import { FoodPicker, type PickedFood } from './FoodPicker'
+import { FoodSearch } from './FoodSearch'
+import { formatServings } from './servings'
 import { CalorieTargetDialog } from './CalorieTargetDialog'
 
 type FoodFields = { calories: string; proteinG: string; carbsG: string; fatG: string; fiberG: string }
@@ -26,8 +26,9 @@ const EMPTY_FIELDS: FoodFields = { calories: '', proteinG: '', carbsG: '', fatG:
 // user hasn't picked a goal on the Stats page yet (see StatsPage.tsx:
 // handleSelectGoal), so it works fine reached directly from the nav rather
 // than only via a goal card. Shows today's food-intake stats against that
-// goal, and the ways to log a new item: enter the macros (the calorie count
-// follows from them unless you type your own), or search the food database.
+// goal, and the ways to log a new item: search the food database and pick a
+// number of servings (the main path), or enter a named item by hand (the
+// calorie count follows from the macros unless you type your own).
 //
 // The photo-estimate path (convex/nutrition.ts) has no entry point here until
 // it's connected: the backend is intact, only the button was removed.
@@ -38,8 +39,8 @@ export function CaloricConsistencyPage() {
   const deleteEntry = useMutation(api.nutrition.deleteEntry)
 
   const [fields, setFields] = useState<FoodFields>(EMPTY_FIELDS)
-  const [description, setDescription] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [description, setDescription] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -114,7 +115,7 @@ export function CaloricConsistencyPage() {
       // Calories left blank is intentional — logManualEntry fills it in from
       // the macros (4/4/9). Only send a number when the user typed their own.
       await logManualEntry({
-        description: description ?? undefined,
+        description: description.trim() || undefined,
         calories: fields.calories.trim() ? Number(fields.calories) : undefined,
         proteinG: fields.proteinG.trim() ? Number(fields.proteinG) : undefined,
         carbsG: fields.carbsG.trim() ? Number(fields.carbsG) : undefined,
@@ -122,26 +123,12 @@ export function CaloricConsistencyPage() {
         fiberG: fields.fiberG.trim() ? Number(fields.fiberG) : undefined,
       })
       setFields(EMPTY_FIELDS)
-      setDescription(null)
+      setDescription('')
     } catch (err) {
       setError(errorMessage(err, 'Could not log that.'))
     } finally {
       setSaving(false)
     }
-  }
-
-  // From the FoodPicker: fill the form with the picked food's macros so the
-  // user can still tweak the portion before logging, same as an AI estimate.
-  function handlePickFood(food: PickedFood) {
-    setDescription(food.description)
-    setFields({
-      calories: String(Math.round(food.calories)),
-      proteinG: String(food.proteinG),
-      carbsG: String(food.carbsG),
-      fatG: String(food.fatG),
-      fiberG: String(food.fiberG),
-    })
-    setPickerOpen(false)
   }
 
   return (
@@ -203,78 +190,76 @@ export function CaloricConsistencyPage() {
         Log food
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        Type in the macros, or search the food database.
+        Search for what you ate. The totals add up for you.
       </Typography>
 
-      <Box component="form" onSubmit={(e) => void handleLogManual(e)} sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        {description && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ flex: 1 }} noWrap>
-              Logging: <strong>{description}</strong>
-            </Typography>
-            <MuiLink component="button" type="button" onClick={() => setDescription(null)}>
-              Clear
-            </MuiLink>
+      <FoodSearch />
+
+      <Box sx={{ mt: 1.5, textAlign: 'center' }}>
+        <MuiLink component="button" type="button" onClick={() => setManualOpen((o) => !o)}>
+          {manualOpen ? 'Hide manual entry' : "Can't find it? Enter manually"}
+        </MuiLink>
+      </Box>
+
+      <Collapse in={manualOpen} unmountOnExit>
+        <Box component="form" onSubmit={(e) => void handleLogManual(e)} sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <TextField
+            label="Food name"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Homemade stew"
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+          />
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 1.5 }}>
+            <TextField
+              label="Protein (g)"
+              value={fields.proteinG}
+              onChange={(e) => setField('proteinG', e.target.value)}
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+            />
+            <TextField
+              label="Carbs (g)"
+              value={fields.carbsG}
+              onChange={(e) => setField('carbsG', e.target.value)}
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+            />
+            <TextField
+              label="Fat (g)"
+              value={fields.fatG}
+              onChange={(e) => setField('fatG', e.target.value)}
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+            />
+            <TextField
+              label="Fiber (g)"
+              value={fields.fiberG}
+              onChange={(e) => setField('fiberG', e.target.value)}
+              slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+            />
           </Box>
-        )}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 1.5 }}>
           <TextField
-            label="Protein (g)"
-            value={fields.proteinG}
-            onChange={(e) => setField('proteinG', e.target.value)}
+            label="Calories"
+            value={fields.calories}
+            onChange={(e) => setField('calories', e.target.value)}
+            placeholder={macroCalories !== null ? String(macroCalories) : undefined}
+            helperText={
+              macroCalories !== null
+                ? `≈ ${macroCalories} kcal from the macros above — leave blank to use this`
+                : 'Leave blank to total it from protein, carbs and fat'
+            }
             slotProps={{ htmlInput: { inputMode: 'decimal' } }}
           />
-          <TextField
-            label="Carbs (g)"
-            value={fields.carbsG}
-            onChange={(e) => setField('carbsG', e.target.value)}
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-          />
-          <TextField
-            label="Fat (g)"
-            value={fields.fatG}
-            onChange={(e) => setField('fatG', e.target.value)}
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-          />
-          <TextField
-            label="Fiber (g)"
-            value={fields.fiberG}
-            onChange={(e) => setField('fiberG', e.target.value)}
-            slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-          />
-        </Box>
-        <TextField
-          label="Calories"
-          value={fields.calories}
-          onChange={(e) => setField('calories', e.target.value)}
-          placeholder={macroCalories !== null ? String(macroCalories) : undefined}
-          helperText={
-            macroCalories !== null
-              ? `≈ ${macroCalories} kcal from the macros above — leave blank to use this`
-              : 'Leave blank to total it from protein, carbs and fat'
-          }
-          slotProps={{ htmlInput: { inputMode: 'decimal' } }}
-        />
 
-        {error && (
-          <Typography variant="body2" color="error">
-            {error}
-          </Typography>
-        )}
+          {error && (
+            <Typography variant="body2" color="error">
+              {error}
+            </Typography>
+          )}
 
-        <Box sx={{ display: 'flex', gap: 1 }}>
           <Button type="submit" variant="contained" fullWidth disabled={saving}>
             {saving ? 'Logging…' : 'Log'}
           </Button>
-          <IconButton
-            aria-label="Search the food database"
-            onClick={() => setPickerOpen(true)}
-            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
-          >
-            <SearchIcon size={20} />
-          </IconButton>
         </Box>
-      </Box>
+      </Collapse>
 
       <Typography variant="h6" sx={{ mt: 4, fontWeight: 'bold' }}>
         Today's entries
@@ -296,7 +281,11 @@ export function CaloricConsistencyPage() {
                     ? 'Analyzing…'
                     : entry.status === 'failed'
                       ? 'Could not analyze'
-                      : (entry.description ?? 'Manual entry')}
+                      : `${entry.description ?? 'Manual entry'}${
+                          entry.servings != null && entry.servings !== 1
+                            ? ` × ${formatServings(entry.servings)}`
+                            : ''
+                        }`}
                 </Typography>
                 {entry.status === 'complete' && (
                   <Typography variant="caption" color="text.secondary">
@@ -318,7 +307,6 @@ export function CaloricConsistencyPage() {
         </Box>
       )}
 
-      {pickerOpen && <FoodPicker onPick={handlePickFood} onClose={() => setPickerOpen(false)} />}
     </Box>
   )
 }

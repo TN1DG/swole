@@ -149,6 +149,87 @@ describe('logManualEntry', () => {
   })
 })
 
+describe('logFood', () => {
+  async function seedFood(t: T) {
+    return await t.run(async (ctx) =>
+      ctx.db.insert('foodDatabase', {
+        name: 'Almonds (1 oz)',
+        category: 'Nut',
+        calories: 164,
+        proteinG: 6,
+        carbsG: 6,
+        fatG: 14,
+        fiberG: 3.5,
+      }),
+    )
+  }
+
+  it('logs a database food scaled by servings, named after the food', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const foodId = await seedFood(t)
+
+    await user.mutation(api.nutrition.logFood, { foodId, servings: 1.5 })
+
+    const today = await user.query(api.nutrition.getToday, {})
+    expect(today.entries[0]).toMatchObject({
+      description: 'Almonds (1 oz)',
+      servings: 1.5,
+      calories: 246,
+      proteinG: 9,
+      carbsG: 9,
+      fatG: 21,
+      fiberG: 5.3,
+    })
+    expect(today.totals).toMatchObject({ calories: 246, proteinG: 9, fatG: 21 })
+  })
+
+  it('rejects servings outside the allowed range', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const foodId = await seedFood(t)
+
+    await expect(user.mutation(api.nutrition.logFood, { foodId, servings: 0 })).rejects.toThrow(/Servings/)
+    await expect(
+      user.mutation(api.nutrition.logFood, { foodId, servings: LIMITS.foodServingsMax + 1 }),
+    ).rejects.toThrow(/Servings/)
+    await expect(user.mutation(api.nutrition.logFood, { foodId, servings: NaN })).rejects.toThrow(/Servings/)
+  })
+
+  it('rejects a food that no longer exists', async () => {
+    const t = createBackend()
+    const user = asUser(t, await createUser(t, 'alice'))
+    const foodId = await seedFood(t)
+    await t.run(async (ctx) => ctx.db.delete(foodId))
+
+    await expect(user.mutation(api.nutrition.logFood, { foodId, servings: 1 })).rejects.toThrow(
+      /Food not found/,
+    )
+  })
+
+  it('counts toward the daily entry cap', async () => {
+    const t = createBackend()
+    const userId = await createUser(t, 'alice')
+    const user = asUser(t, userId)
+    const foodId = await seedFood(t)
+    await t.run(async (ctx) => {
+      for (let i = 0; i < LIMITS.foodLogsPerDay; i++) {
+        await ctx.db.insert('foodLogs', {
+          ownerId: userId,
+          loggedAt: Date.now(),
+          source: 'manual',
+          status: 'complete',
+          calories: 1,
+        })
+      }
+    })
+
+    await expect(user.mutation(api.nutrition.logFood, { foodId, servings: 1 })).rejects.toThrow(
+      /max entries/,
+    )
+  })
+})
+
 describe('getToday — day bucketing', () => {
   it('excludes entries from other days', async () => {
     const t = createBackend()

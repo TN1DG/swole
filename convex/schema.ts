@@ -536,6 +536,11 @@ export default defineSchema({
     carbsG: v.optional(v.number()),
     fatG: v.optional(v.number()),
     fiberG: v.optional(v.number()),
+    // Set when the entry came from the food database (nutrition.ts:logFood):
+    // which food, and how many of its servings. The macros above are already
+    // scaled by `servings`. Absent on hand-typed and photo entries.
+    foodId: v.optional(v.id('foodDatabase')),
+    servings: v.optional(v.number()),
   })
     // "today's entries" (owner + a loggedAt range) and, on the owner prefix
     // alone, "every entry this account ever created" for account deletion.
