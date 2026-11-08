@@ -12,6 +12,7 @@ import type * as account from "../account.js";
 import type * as auth from "../auth.js";
 import type * as challenges from "../challenges.js";
 import type * as chatRoom from "../chatRoom.js";
+import type * as clans from "../clans.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as emailAuth from "../emailAuth.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   challenges: typeof challenges;
   chatRoom: typeof chatRoom;
+  clans: typeof clans;
   constants: typeof constants;
   crons: typeof crons;
   emailAuth: typeof emailAuth;

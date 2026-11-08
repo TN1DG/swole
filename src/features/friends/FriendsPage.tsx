@@ -14,6 +14,7 @@ import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
 import { FeedTab } from '../feed/FeedTab'
+import { ClansPanel } from '../clans/ClansPanel'
 import { formatLastActivity } from './activityLabel'
 import { conversationTimeLabel } from './threadLayout'
 
@@ -38,8 +39,10 @@ export function FriendsPage() {
 
   // Coming back from a conversation lands on Chats, not wherever the default is.
   const [searchParams] = useSearchParams()
+  // ...and an invite link lands on Board → Clans.
+  const tabParam = searchParams.get('tab')
   const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>(
-    searchParams.get('tab') === 'chats' ? 'friends' : 'feed',
+    tabParam === 'chats' ? 'friends' : tabParam === 'clans' ? 'leaderboard' : 'feed',
   )
   const [searchTerm, setSearchTerm] = useState('')
   const [committedSearch, setCommittedSearch] = useState<string | null>(null)
@@ -176,7 +179,7 @@ export function FriendsPage() {
       {tab === 'feed' ? (
         <FeedTab />
       ) : tab === 'leaderboard' ? (
-        <LeaderboardTab />
+        <LeaderboardTab initialBoard={tabParam === 'clans' ? 'clans' : 'friends'} />
       ) : (
         <FriendsTab
           friends={friends}
@@ -190,14 +193,36 @@ export function FriendsPage() {
   )
 }
 
-function LeaderboardTab() {
+// Friends board or clan standings. A sub-toggle here rather than a fourth
+// segment above, which would crowd a 360px phone.
+function LeaderboardTab({ initialBoard }: { initialBoard: 'friends' | 'clans' }) {
+  const [board, setBoard] = useState(initialBoard)
+
+  return (
+    <>
+      <Box sx={{ mt: 2 }}>
+        <SegmentedControl
+          value={board}
+          onChange={setBoard}
+          options={[
+            { value: 'friends', label: 'Friends' },
+            { value: 'clans', label: 'Clans' },
+          ]}
+        />
+      </Box>
+      {board === 'friends' ? <FriendsBoard /> : <ClansPanel />}
+    </>
+  )
+}
+
+function FriendsBoard() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('week')
   const periodStartMs = usePeriodStart(period)
   const leaderboard = useQuery(api.friends.leaderboard, { period, periodStartMs })
 
   return (
     <>
-      <Box sx={{ mt: 2 }}>
+      <Box sx={{ mt: 1 }}>
         <SegmentedControl
           value={period}
           onChange={setPeriod}

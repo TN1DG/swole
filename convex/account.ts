@@ -7,6 +7,7 @@ import { presenceComponent } from './presence'
 import { rateLimiter } from './rateLimiter'
 import { awardPoints } from './profiles'
 import { cascadeDeletePost } from './feed'
+import { removeFromClan } from './clans'
 
 // Deleting an account touches ~28 tables. Doing it in one mutation worked
 // fine for small accounts and would have failed outright for a heavy one:
@@ -259,6 +260,14 @@ export const purgeAccountData = internalMutation({
         .withIndex('by_to', (q) => q.eq('toUserId', userId))
         .take(n),
     )
+
+    // Clan: leave it (handing leadership on, or disbanding if last) BEFORE
+    // their workouts go, so the clan's CP is re-derived without them. A no-op
+    // on a resumed run.
+    if (budget.left > 0) {
+      await removeFromClan(ctx, userId, Date.now())
+      budget.left -= 5
+    }
 
     // Friendships are stored one row per direction — delete this user's rows
     // plus the matching reverse row on each friend's side (the same cleanup

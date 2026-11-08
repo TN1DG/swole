@@ -108,6 +108,10 @@ export default defineSchema({
     themePreset: v.optional(v.string()),
     // Chat notifications say who but not what, for a more private lock screen.
     pushHideMessageText: v.optional(v.boolean()),
+    // When this user last joined (or founded) a clan. A clan's CP counts what
+    // its CURRENT members earned this month, so your month's points move with
+    // you — this caps that at one clan per calendar month (see convex/clans.ts).
+    lastClanJoinAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -242,6 +246,45 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_user_friend', ['userId', 'friendId']),
+
+  // ---------- clans ----------
+  // A group of up to LIMITS.clanMaxMembers players competing on CP: the Swole
+  // Points its members EARNED this calendar month (UTC). Joined by invite code
+  // only — there is no public directory, so no member identity reaches anyone
+  // who wasn't handed the code. See convex/clans.ts.
+  clans: defineTable({
+    name: v.string(),
+    // Lowercased name, for case-insensitive uniqueness.
+    nameLower: v.string(),
+    leaderId: v.id('users'),
+    inviteCode: v.string(),
+    // Denormalized so the cap check and the rankings never count rows.
+    memberCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_nameLower', ['nameLower'])
+    .index('by_inviteCode', ['inviteCode']),
+
+  // One row per member. At most one row per user — one clan each.
+  clanMembers: defineTable({
+    clanId: v.id('clans'),
+    userId: v.id('users'),
+    joinedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_clan_and_joinedAt', ['clanId', 'joinedAt']),
+
+  // A clan's CP for one calendar month. Only points.ts:refreshClanSeason
+  // writes `cp`, recomputing it from the members' stamped pointsAwarded, so it
+  // can't drift from the balances it's derived from. Past months stay as
+  // history.
+  clanSeasons: defineTable({
+    clanId: v.id('clans'),
+    monthStart: v.number(),
+    cp: v.number(),
+  })
+    .index('by_clan_and_monthStart', ['clanId', 'monthStart'])
+    .index('by_monthStart_and_cp', ['monthStart', 'cp']),
 
   // Snapchat-style accountability pings between friends.
   gymPings: defineTable({

@@ -41,6 +41,9 @@ const CaloricConsistencyPage = lazy(() =>
 const FriendsPage = lazy(() =>
   import('./features/friends/FriendsPage').then((m) => ({ default: m.FriendsPage })),
 )
+const JoinClanPage = lazy(() =>
+  import('./features/clans/JoinClanPage').then((m) => ({ default: m.JoinClanPage })),
+)
 const FriendWorkoutsPage = lazy(() =>
   import('./features/friends/FriendWorkoutsPage').then((m) => ({
     default: m.FriendWorkoutsPage,
@@ -126,6 +129,7 @@ export default function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/nutrition/consistency" element={<CaloricConsistencyPage />} />
                 <Route path="/friends" element={<FriendsPage />} />
+                <Route path="/clans/join/:code" element={<JoinClanPage />} />
                 <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
                 <Route path="/friends/:userId/:workoutId" element={<FriendWorkoutDetailPage />} />
                 <Route

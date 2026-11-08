@@ -64,6 +64,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 
   // Challenge proposals, keyed by caller userId.
   challengePropose: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
+  // Create/join/leave/kick/rename/rotate. Joining also guesses at invite
+  // codes, so this is the enumeration ceiling for those too.
+  clanWrite: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
 
   // Feature request submissions, keyed by caller userId. featureRequestsPerUser
   // caps lifetime total; this caps how fast they can arrive.
