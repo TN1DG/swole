@@ -1,0 +1,51 @@
+food_name,category,calories_kcal,protein_g,carbs_g,fat_g,fiber_g,sugar_g,sodium_mg,prep_time_min,cooking_method,origin_region,difficulty,meal_type,is_vegetarian,is_spicy,calorie_density,protein_ratio,health_score
+Koshari,Main Dish,450,18,65,12,8,5,680,45,Boiling/Frying,Cairo,Medium,Lunch/Dinner,True,False,4.74,4.0,33.78
+Ful Medames,Breakfast,320,15,45,10,12,2,520,15,Boiling,Cairo,Easy,Breakfast,True,False,4.57,4.69,56.25
+Taameya,Breakfast,280,12,30,15,6,1,480,20,Frying,Cairo,Easy,Breakfast,True,False,4.91,4.29,38.57
+Molokhia,Main Dish,180,8,12,8,5,2,420,30,Boiling,Egypt,Medium,Lunch/Dinner,True,False,6.43,4.44,45.56
+Mahshi,Main Dish,350,14,40,18,4,3,580,90,Baking/Boiling,Egypt,Hard,Lunch/Dinner,False,False,4.86,4.0,27.43
+Fattah,Main Dish,520,25,55,22,3,4,720,60,Baking/Boiling,Egypt,Hard,Lunch/Dinner,False,False,5.1,4.81,25.0
+Hawawshi,Main Dish,480,22,48,20,3,2,650,40,Baking,Egypt,Medium,Lunch/Dinner,False,True,5.33,4.58,24.58
+Shawarma,Street Food,550,28,50,24,2,3,890,10,Grilling,Levant,Easy,Lunch/Dinner,False,True,5.39,5.09,24.0
+Kofta,Main Dish,400,26,8,28,1,1,620,25,Grilling,Egypt,Easy,Lunch/Dinner,False,True,6.45,6.5,28.5
+Grilled Chicken,Main Dish,380,35,5,15,0,0,580,35,Grilling,Egypt,Easy,Lunch/Dinner,False,False,6.91,9.21,36.84
+Bamia,Main Dish,220,6,25,10,6,8,450,40,Stewing,Egypt,Medium,Lunch/Dinner,True,False,5.37,2.73,38.18
+Sayadeya,Seafood,340,28,35,12,2,2,580,50,Baking,Alexandria,Medium,Lunch/Dinner,False,False,4.53,8.24,38.82
+Umm Ali,Dessert,380,10,50,18,1,25,220,55,Baking,Egypt,Medium,Dessert,True,False,4.87,2.63,13.16
+Basbousa,Dessert,420,6,55,16,1,30,180,50,Baking,Egypt,Medium,Dessert,True,False,5.45,1.43,8.1
+Kunafa,Dessert,460,8,58,20,1,28,240,45,Baking,Levant,Hard,Dessert,True,False,5.35,1.74,9.13
+Roz Bel Laban,Dessert,310,10,48,10,0,20,160,40,Boiling,Egypt,Easy,Dessert,True,False,4.56,3.23,12.9
+Kahk,Dessert,290,6,45,12,1,15,200,120,Baking,Egypt,Hard,Dessert,True,False,4.6,2.07,11.72
+Qatayef,Dessert,350,5,52,14,2,22,190,35,Frying,Egypt,Medium,Dessert,True,False,4.93,1.43,11.43
+Shish Tawook,Main Dish,360,30,10,14,1,2,560,30,Grilling,Levant,Easy,Lunch/Dinner,False,True,6.67,8.33,36.11
+Feseekh,Main Dish,280,22,2,18,0,0,920,20,Fermenting,Egypt,Easy,Lunch/Dinner,False,False,6.67,7.86,31.43
+Hamam Mahshi,Main Dish,420,24,15,20,1,2,520,75,Baking/Boiling,Egypt,Hard,Lunch/Dinner,False,False,7.12,5.71,25.24
+Kaware3,Main Dish,380,20,10,22,0,1,480,180,Boiling,Egypt,Hard,Lunch/Dinner,False,False,7.31,5.26,21.05
+Sogo2,Street Food,320,12,35,16,2,3,780,15,Frying,Egypt,Easy,Snack,False,True,5.08,3.75,21.25
+Baba Ganoush,Appetizer,180,4,12,14,5,3,380,20,Grilling,Levant,Easy,Appetizer,True,False,6.0,2.22,36.67
+Tabbouleh,Appetizer,150,3,15,10,3,2,320,15,Mixing,Levant,Easy,Appetizer,True,False,5.36,2.0,28.0
+Fattoush,Appetizer,170,3,18,8,4,3,340,15,Mixing,Levant,Easy,Appetizer,True,False,5.86,1.76,30.59
+Mansaf,Main Dish,580,30,55,25,2,4,680,90,Boiling/Baking,Jordan,Hard,Lunch/Dinner,False,False,5.27,5.17,24.14
+Warak Enab,Main Dish,310,8,30,14,3,3,420,60,Boiling,Levant,Medium,Lunch/Dinner,False,False,5.96,2.58,20.0
+Kibbeh,Appetizer,260,8,22,14,2,2,380,45,Frying/Baking,Levant,Medium,Appetizer,False,False,5.91,3.08,20.0
+Mulukhiyah with Rabbit,Main Dish,340,26,15,16,5,2,450,90,Boiling,Egypt,Hard,Lunch/Dinner,False,False,5.96,7.65,45.29
+Besarah,Appetizer,200,10,20,8,4,2,380,25,Blending,Egypt,Easy,Appetizer,True,False,5.26,5.0,40.0
+Torshi,Side Dish,80,1,15,0,2,8,950,15,Pickling,Egypt,Easy,Side,True,False,5.0,1.25,30.0
+Bamia with Lahma,Main Dish,290,18,22,12,5,4,520,50,Stewing,Egypt,Medium,Lunch/Dinner,False,False,5.58,6.21,42.07
+Firik,Side Dish,190,6,35,6,4,2,280,20,Boiling,Egypt,Easy,Side,True,False,4.04,3.16,33.68
+Hummus,Appetizer,220,7,30,12,6,1,340,15,Blending,Levant,Easy,Appetizer,True,False,4.49,3.18,40.0
+Labneh,Breakfast,180,8,18,12,0,2,320,10,Straining,Levant,Easy,Breakfast,True,False,4.74,4.44,17.78
+Zalabia,Dessert,340,3,8,18,0,4,180,25,Frying,Egypt,Easy,Dessert,True,False,11.72,0.88,3.53
+Balaleet,Breakfast,280,6,45,12,1,20,140,30,Boiling,Gulf,Easy,Breakfast,True,False,4.44,2.14,12.14
+Harees,Main Dish,310,12,40,14,2,15,380,120,Boiling,Gulf,Medium,Lunch/Dinner,False,False,4.7,3.87,21.94
+Thareed,Main Dish,340,14,35,16,3,3,420,90,Boiling,Gulf,Medium,Lunch/Dinner,False,False,5.23,4.12,25.29
+Jareesh,Main Dish,330,11,40,10,3,2,360,60,Boiling,Gulf,Medium,Lunch/Dinner,False,False,5.41,3.33,22.42
+Margoog,Main Dish,360,13,38,12,4,3,400,70,Boiling,Gulf,Medium,Lunch/Dinner,False,False,5.71,3.61,25.56
+Asida,Dessert,290,5,50,10,2,15,120,40,Boiling,Gulf,Easy,Dessert,True,False,4.46,1.72,13.79
+Aseedah,Dessert,310,6,55,12,3,18,140,45,Boiling,Yemen,Easy,Dessert,True,False,4.25,1.94,17.42
+Saleeg,Main Dish,350,10,45,12,2,2,340,50,Boiling,Gulf,Medium,Lunch/Dinner,False,False,5.22,2.86,17.14
+Mandi,Main Dish,540,28,50,22,2,3,580,120,Baking,Yemen,Hard,Lunch/Dinner,False,False,5.4,5.19,24.44
+Kabsa,Main Dish,560,32,52,20,2,4,620,100,Baking,Saudi,Hard,Lunch/Dinner,False,True,5.38,5.71,26.43
+Machboos,Main Dish,520,28,48,18,2,3,560,90,Baking,Gulf,Hard,Lunch/Dinner,False,True,5.53,5.38,25.38
+Shorbat Adas,Soup,140,8,22,4,6,2,380,40,Boiling,Egypt,Easy,Starter,True,False,4.12,5.71,65.71
+Shorbat Orzo,Soup,160,6,25,5,3,2,360,35,Boiling,Egypt,Easy,Starter,True,False,4.44,3.75,33.75

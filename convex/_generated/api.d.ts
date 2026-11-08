@@ -23,6 +23,8 @@ import type * as featureRequests from "../featureRequests.js";
 import type * as feed from "../feed.js";
 import type * as fitness from "../fitness.js";
 import type * as foodSeedData from "../foodSeedData.js";
+import type * as foodSeedIndian from "../foodSeedIndian.js";
+import type * as foodSeedRegional from "../foodSeedRegional.js";
 import type * as foods from "../foods.js";
 import type * as friendThread from "../friendThread.js";
 import type * as friends from "../friends.js";
@@ -73,6 +75,8 @@ declare const fullApi: ApiFromModules<{
   feed: typeof feed;
   fitness: typeof fitness;
   foodSeedData: typeof foodSeedData;
+  foodSeedIndian: typeof foodSeedIndian;
+  foodSeedRegional: typeof foodSeedRegional;
   foods: typeof foods;
   friendThread: typeof friendThread;
   friends: typeof friends;

@@ -546,8 +546,9 @@ export default defineSchema({
     // alone, "every entry this account ever created" for account deletion.
     .index('by_owner_loggedAt', ['ownerId', 'loggedAt']),
 
-  // A reference food with known macros, seeded once from
-  // convex/foodSeedData.ts (see foods.ts:seed) so manual logging can search
+  // A reference food with known macros, seeded from convex/foodSeedData.ts
+  // plus the regional lists (see foods.ts:ALL_SEED_FOODS and foods.ts:seed,
+  // which only ever adds missing names) so manual logging can search
   // for a food by name instead of typing its macros from scratch — a free
   // alternative to the AI photo-estimate path for common items.
   foodDatabase: defineTable({
