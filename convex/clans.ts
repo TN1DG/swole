@@ -8,6 +8,9 @@ import { getOrCreateProfile } from './profiles'
 import { rateLimiter, requireWriter } from './rateLimiter'
 import { cleanClanName, LIMITS } from './validation'
 import { profileForWithAvatar } from './friends'
+import { internal } from './_generated/api'
+import { presenceComponent } from './presence'
+import { clanRoomId } from './chatRoom'
 
 // Clans: up to LIMITS.clanMaxMembers players pooling their CP.
 //
@@ -116,6 +119,13 @@ export async function removeFromClan(ctx: MutationCtx, userId: Id<'users'>, now:
   if (!membership) return
   const clan = (await ctx.db.get(membership.clanId))!
   await ctx.db.delete(membership._id)
+  // Their place in the chat goes with them; the chat itself stays.
+  const read = await ctx.db
+    .query('clanReads')
+    .withIndex('by_userId_and_clanId', (q) => q.eq('userId', userId).eq('clanId', clan._id))
+    .unique()
+  if (read) await ctx.db.delete(read._id)
+  await presenceComponent.removeRoomUser(ctx, clanRoomId(clan._id), userId)
 
   if (clan.memberCount <= 1) {
     await disband(ctx, clan)
@@ -143,6 +153,8 @@ async function disband(ctx: MutationCtx, clan: Doc<'clans'>) {
     .take(1000)
   for (const s of seasons) await ctx.db.delete(s._id)
   await ctx.db.delete(clan._id)
+  // The chat can be long, so it's emptied in batches of its own.
+  await ctx.scheduler.runAfter(0, internal.clanChat.purgeClanChat, { clanId: clan._id })
 }
 
 function canonicalMonthStart(monthStartMs: number) {

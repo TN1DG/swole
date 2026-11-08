@@ -5,7 +5,9 @@
 const GROUP_WINDOW_MS = 3 * 60 * 1000
 const BIG_EMOJI_MAX = 3
 
-type LayoutEntry = { key: string; type: string; ts: number; isMine: boolean }
+// `senderId` matters only in a group chat, where everyone else is "not mine"
+// yet two different people's messages mustn't merge into one burst.
+type LayoutEntry = { key: string; type: string; ts: number; isMine: boolean; senderId?: string }
 
 export type ThreadItem<E extends LayoutEntry> =
   | { kind: 'day'; key: string; label: string }
@@ -57,6 +59,7 @@ function joins(a: LayoutEntry | undefined, b: LayoutEntry | undefined): boolean 
   if (a.type !== 'message' || b.type !== 'message') return false
   return (
     a.isMine === b.isMine &&
+    a.senderId === b.senderId &&
     b.ts - a.ts <= GROUP_WINDOW_MS &&
     startOfDay(a.ts) === startOfDay(b.ts)
   )

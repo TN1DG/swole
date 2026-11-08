@@ -227,6 +227,28 @@ export const purgeAccountData = internalMutation({
           .take(n),
       ),
     )
+    // Their clan-chat messages (and photos), pings and read markers. Weekly
+    // MVP rows stay: they're the clan's history, and render as "Someone".
+    await drain(ctx, budget, async (n) =>
+      withPhotosFreed(
+        await ctx.db
+          .query('clanMessages')
+          .withIndex('by_fromUserId', (q) => q.eq('fromUserId', userId))
+          .take(n),
+      ),
+    )
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('clanPings')
+        .withIndex('by_fromUserId', (q) => q.eq('fromUserId', userId))
+        .take(n),
+    )
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('clanReads')
+        .withIndex('by_userId_and_clanId', (q) => q.eq('userId', userId))
+        .take(n),
+    )
     await drain(ctx, budget, (n) =>
       ctx.db
         .query('pushSubscriptions')

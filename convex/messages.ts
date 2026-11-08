@@ -84,6 +84,35 @@ export async function latestMessageBetween(
   }
 }
 
+export type MessagePhotoFields = {
+  imageStorageId: Id<'_storage'>
+  imageWidth: number
+  imageHeight: number
+}
+
+/**
+ * The checks an attached chat photo must pass, shared by 1:1 messages and clan
+ * chat (clanChat.ts) so the two can't drift apart.
+ *
+ * `missing` means the upload isn't there (nothing to clean up); `refused` means
+ * it is but isn't acceptable, so the caller must delete the blob before
+ * returning — without throwing, or the delete would roll back with it.
+ */
+export async function checkMessagePhoto(
+  ctx: QueryCtx,
+  image: { storageId: Id<'_storage'>; width: number; height: number },
+): Promise<{ fields: MessagePhotoFields } | { missing: string } | { refused: string }> {
+  const width = assertRange(image.width, 1, LIMITS.imageMaxEdge, 'Photo width')
+  const height = assertRange(image.height, 1, LIMITS.imageMaxEdge, 'Photo height')
+  const metadata = await ctx.db.system.get('_storage', image.storageId)
+  if (!metadata) return { missing: 'Upload not found — try again' }
+  const wrongType = metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
+  if (wrongType || metadata.size > MAX_MESSAGE_PHOTO_BYTES) {
+    return { refused: 'That file needs to be an image under 1MB' }
+  }
+  return { fields: { imageStorageId: image.storageId, imageWidth: width, imageHeight: height } }
+}
+
 // Step 1 of a photo message, mirroring profiles.generateAvatarUploadUrl.
 export const generateMessagePhotoUploadUrl = mutation({
   args: {},
@@ -134,22 +163,12 @@ export const send = mutation({
         ? ''
         : cleanText(args.text, LIMITS.messageMaxLength, 'Message')
 
-    let image: {
-      imageStorageId: Id<'_storage'>
-      imageWidth: number
-      imageHeight: number
-    } | null = null
+    let image: MessagePhotoFields | null = null
     if (args.image) {
-      const width = assertRange(args.image.width, 1, LIMITS.imageMaxEdge, 'Photo width')
-      const height = assertRange(args.image.height, 1, LIMITS.imageMaxEdge, 'Photo height')
-      const metadata = await ctx.db.system.get('_storage', args.image.storageId)
-      if (!metadata) return { ok: false, error: 'Upload not found — try again' }
-      const wrongType =
-        metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
-      if (wrongType || metadata.size > MAX_MESSAGE_PHOTO_BYTES) {
-        return await refuse('That file needs to be an image under 1MB')
-      }
-      image = { imageStorageId: args.image.storageId, imageWidth: width, imageHeight: height }
+      const checked = await checkMessagePhoto(ctx, args.image)
+      if ('missing' in checked) return { ok: false, error: checked.missing }
+      if ('refused' in checked) return await refuse(checked.refused)
+      image = checked.fields
     }
 
     // No in-app notice is raised for chat — the per-thread unread badge on the

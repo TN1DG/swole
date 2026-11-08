@@ -286,6 +286,57 @@ export default defineSchema({
     .index('by_clan_and_monthStart', ['clanId', 'monthStart'])
     .index('by_monthStart_and_cp', ['monthStart', 'cp']),
 
+  // ---------- clan chat (convex/clanChat.ts) ----------
+  // Gated on CURRENT membership of the clan, never on friendship: clanmates
+  // joined by invite code and needn't be friends.
+
+  // A group-chat message. Reactions live on the row, as in `messages`: a clan
+  // has at most LIMITS.clanMaxMembers people, each holding one reaction.
+  clanMessages: defineTable({
+    clanId: v.id('clans'),
+    fromUserId: v.id('users'),
+    // May be empty only when a photo is attached.
+    text: v.string(),
+    sentAt: v.number(),
+    imageStorageId: v.optional(v.id('_storage')),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
+    reactions: v.optional(v.array(v.object({ userId: v.id('users'), emoji: v.string() }))),
+  })
+    .index('by_clanId_and_sentAt', ['clanId', 'sentAt'])
+    .index('by_fromUserId', ['fromUserId']),
+
+  // "Who's training?" — to the whole clan (no targetUserIds) or to picked
+  // members. Both arrays are bounded by the clan's size.
+  clanPings: defineTable({
+    clanId: v.id('clans'),
+    fromUserId: v.id('users'),
+    sentAt: v.number(),
+    targetUserIds: v.optional(v.array(v.id('users'))),
+    goingUserIds: v.array(v.id('users')),
+  })
+    .index('by_clanId_and_sentAt', ['clanId', 'sentAt'])
+    .index('by_fromUserId', ['fromUserId']),
+
+  // The weekly race's result: whoever earned the most points in a calendar
+  // week (UTC). Written once per (clan, week) by clanChat.awardWeeklyMvps.
+  clanWeeklyMvps: defineTable({
+    clanId: v.id('clans'),
+    weekStart: v.number(),
+    userId: v.id('users'),
+    points: v.number(),
+    daysTrained: v.number(),
+  }).index('by_clanId_and_weekStart', ['clanId', 'weekStart']),
+
+  // How far through their clan's chat a member has read.
+  clanReads: defineTable({
+    userId: v.id('users'),
+    clanId: v.id('clans'),
+    lastReadAt: v.number(),
+  })
+    .index('by_userId_and_clanId', ['userId', 'clanId'])
+    .index('by_clanId', ['clanId']),
+
   // Snapchat-style accountability pings between friends.
   gymPings: defineTable({
     fromUserId: v.id('users'),

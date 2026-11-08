@@ -67,6 +67,9 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Create/join/leave/kick/rename/rotate. Joining also guesses at invite
   // codes, so this is the enumeration ceiling for those too.
   clanWrite: { kind: 'token bucket', rate: 10, period: MINUTE, capacity: 5 },
+  // A clan ping can notify up to 19 people at once, so it's rationed harder
+  // than a 1:1 ping.
+  clanPing: { kind: 'token bucket', rate: 5, period: 60 * MINUTE, capacity: 3 },
 
   // Feature request submissions, keyed by caller userId. featureRequestsPerUser
   // caps lifetime total; this caps how fast they can arrive.

@@ -7,6 +7,15 @@ const state = vi.hoisted(() => ({
   results: {} as Record<string, unknown>,
 }))
 
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 vi.mock('convex/react', async () => {
   const { getFunctionName: name } = await import('convex/server')
   return {
@@ -55,7 +64,7 @@ describe('ClansPanel', () => {
     ])
   })
 
-  it('shows your clan, its CP and rank, members, and the standings', async () => {
+  it('shows your clan, its CP and rank, and the standings, with the chat one tap away', async () => {
     state.results = {
       'clans:myClan': {
         clanId: 'c1',
@@ -73,6 +82,7 @@ describe('ClansPanel', () => {
         { clanId: 'c0', name: 'Bench Club', memberCount: 5, cp: 90, isMine: false },
         { clanId: 'c1', name: 'Iron Wolves', memberCount: 2, cp: 50, isMine: true },
       ],
+      'clanChat:overview': { clanId: 'c1', name: 'Iron Wolves', memberCount: 2, unread: true, last: null },
     }
     render(<ClansPanel />)
     const user = userEvent.setup()
@@ -81,21 +91,18 @@ describe('ClansPanel', () => {
     expect(screen.getByText('ABCD2345')).toBeInTheDocument()
     expect(screen.getByText('2/20 members')).toBeInTheDocument()
     expect(screen.getByText('Bench Club')).toBeInTheDocument()
-    expect(screen.getByText('Bob')).toBeInTheDocument()
 
-    // Leader can kick others but not themselves.
-    const kicks = screen.getAllByRole('button', { name: 'Kick' })
-    expect(kicks).toHaveLength(1)
-    await user.click(kicks[0]!)
+    // The members list and the clan's own leaderboard live in the clan chat now.
+    expect(screen.queryByText('Bob')).not.toBeInTheDocument()
+    const chat = screen.getByRole('link', { name: /Open clan chat/ })
+    expect(chat).toHaveAttribute('href', '/clans/chat')
+    expect(screen.getByLabelText('unread')).toBeInTheDocument()
 
     // Leaving asks first.
     await user.click(screen.getByRole('button', { name: 'Leave clan' }))
     expect(screen.getByText(/can't join another clan until next month/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Leave clan' }))
 
-    expect(state.calls).toEqual([
-      { name: 'clans:kick', args: { userId: 'u2' } },
-      { name: 'clans:leave', args: {} },
-    ])
+    expect(state.calls).toEqual([{ name: 'clans:leave', args: {} }])
   })
 })

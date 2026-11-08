@@ -9,7 +9,7 @@ import {
   type MutationCtx,
 } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { chatRoomId } from './chatRoom'
+import { chatRoomId, clanRoomId } from './chatRoom'
 import { envVar } from './env'
 import { isBlockedEitherWay } from './friendships'
 import { publicIdentity } from './identity'
@@ -217,6 +217,54 @@ export async function queueMessagePush(
       ...(!recipient?.pushHideMessageText && preview ? { body: preview } : {}),
       url: `/friends/${args.fromUserId}/chat`,
       tag: `chat-${args.fromUserId}`,
+    },
+  })
+}
+
+/**
+ * A clan-chat message, to one member. Same rules as queueMessagePush: nothing
+ * if they have the clan chat open right now, and only the sender's name if
+ * they've asked for private lock-screen notifications. Collapses per clan.
+ */
+export async function queueClanMessagePush(
+  ctx: MutationCtx,
+  args: {
+    toUserId: Id<'users'>
+    fromUserId: Id<'users'>
+    clanId: Id<'clans'>
+    clanName: string
+    text: string
+    hasImage: boolean
+  },
+) {
+  const first = await ctx.db
+    .query('pushSubscriptions')
+    .withIndex('by_user', (q) => q.eq('userId', args.toUserId))
+    .first()
+  if (!first) return
+
+  const inRoom = await presenceComponent.listRoom(ctx, clanRoomId(args.clanId), true)
+  if (inRoom.some((member) => member.userId === args.toUserId)) return
+
+  const [sender, recipient] = await Promise.all([
+    publicIdentity(ctx, args.fromUserId),
+    ctx.db
+      .query('profiles')
+      .withIndex('by_user', (q) => q.eq('userId', args.toUserId))
+      .unique(),
+  ])
+  const preview = args.text ? truncated(args.text) : args.hasImage ? '📷 Photo' : ''
+
+  await queuePush(ctx, {
+    toUserId: args.toUserId,
+    fromUserId: args.fromUserId,
+    payload: {
+      title: args.clanName,
+      body: recipient?.pushHideMessageText
+        ? `New message from ${sender.displayName}`
+        : `${sender.displayName}: ${preview}`,
+      url: '/clans/chat',
+      tag: `clan-${args.clanId}`,
     },
   })
 }

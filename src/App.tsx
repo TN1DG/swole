@@ -41,6 +41,9 @@ const CaloricConsistencyPage = lazy(() =>
 const FriendsPage = lazy(() =>
   import('./features/friends/FriendsPage').then((m) => ({ default: m.FriendsPage })),
 )
+const ClanChatPage = lazy(() =>
+  import('./features/clans/ClanChatPage').then((m) => ({ default: m.ClanChatPage })),
+)
 const JoinClanPage = lazy(() =>
   import('./features/clans/JoinClanPage').then((m) => ({ default: m.JoinClanPage })),
 )
@@ -115,6 +118,7 @@ export default function App() {
               {/* Outside AppLayout: a conversation takes over the whole screen,
                   with its own header and no tab bar. */}
               <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
+              <Route path="/clans/chat" element={<ClanChatPage />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<WorkoutsPage />} />
                 <Route path="/history" element={<HistoryPage />} />

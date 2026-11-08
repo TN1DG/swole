@@ -1,10 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { Box, Button, TextField, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import { GlassTile } from '../../components/GlassTile'
-import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { errorMessage } from '../../lib/errors'
 import { usePeriodStart } from '../../lib/period'
@@ -173,7 +173,8 @@ function NoClan() {
 
 function ClanCard({ clan }: { clan: MyClan }) {
   const leave = useMutation(api.clans.leave)
-  const kick = useMutation(api.clans.kick)
+  const overview = useQuery(api.clanChat.overview)
+  const unread = overview?.unread ?? false
   const rotate = useMutation(api.clans.rotateInviteCode)
   const rename = useMutation(api.clans.rename)
   const [error, setError] = useState<string | null>(null)
@@ -279,45 +280,23 @@ function ClanCard({ clan }: { clan: MyClan }) {
         )}
       </GlassTile>
 
-      <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
-        Members
-      </Typography>
-      <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {clan.members.map((m) => (
-          <GlassTile key={m.userId} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
-            {/* No profile link: clanmates aren't necessarily friends, and a
-                stranger's workouts are private. */}
-            <Avatar src={m.avatarUrl} name={m.displayName} size={32} />
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography noWrap sx={{ fontWeight: 500 }}>
-                {m.displayName}
-                {m.isMe && <Typography component="span" color="text.secondary"> (you)</Typography>}
-              </Typography>
-              {m.isLeader && (
-                <Typography variant="caption" color="primary.main">
-                  Leader
-                </Typography>
-              )}
-            </Box>
-            <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-              <SwoleCoin size={14} title="points" />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {m.points}
-              </Typography>
-            </Box>
-            {clan.isLeader && !m.isMe && (
-              <Button
-                size="small"
-                color="inherit"
-                sx={{ flexShrink: 0, minWidth: 0 }}
-                onClick={() => void run(() => kick({ userId: m.userId }), 'Could not remove that member.')}
-              >
-                Kick
-              </Button>
-            )}
-          </GlassTile>
-        ))}
-      </Box>
+      {/* Members and the clan's own leaderboard live in the clan chat. */}
+      <Button
+        component={Link}
+        to="/clans/chat"
+        variant="contained"
+        fullWidth
+        sx={{ mt: 1.5, position: 'relative' }}
+      >
+        Open clan chat
+        {unread && (
+          <Box
+            component="span"
+            aria-label="unread"
+            sx={{ position: 'absolute', top: 8, right: 12, width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main' }}
+          />
+        )}
+      </Button>
 
       {confirmLeave && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, textAlign: 'center' }}>
