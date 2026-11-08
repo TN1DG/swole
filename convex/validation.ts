@@ -58,6 +58,9 @@ export const LIMITS = {
   usernameMaxLength: 20,
   friendsPerUser: 200,
   friendRequestsPerUser: 50, // pending outgoing requests
+  clanMaxMembers: 20,
+  clanNameMinLength: 3,
+  clanNameMaxLength: 24,
   featureRequestTextMaxLength: 1000,
   messageMaxLength: 1000,
   // Most entries one thread read will ever return, however far back you scroll.
@@ -93,6 +96,9 @@ export const LIMITS = {
   calories: 20000, // generous ceiling for a single logged item
   macroGrams: 2000,
   foodDescriptionMaxLength: 200,
+  // Servings of one database food in a single entry.
+  foodServingsMin: 0.25,
+  foodServingsMax: 20,
   // A self-set daily target. The floor is lower than the 1200 we'd ever suggest
   // (fitness.ts:MIN_SAFE_CALORIES) because it's the user's call, with a caution
   // shown below 1200, but it still refuses numbers no one should be eating.
@@ -131,4 +137,22 @@ export function cleanUsername(raw: string): string {
     throw new ConvexError('Username can only contain lowercase letters, numbers, and underscores')
   }
   return username
+}
+
+// Letters (any script), digits, spaces and a little punctuation. No control
+// or zero-width characters, so two names can't look identical but differ.
+const CLAN_NAME_PATTERN = /^[\p{L}\p{N} '&._-]+$/u
+
+/** Trims, collapses inner whitespace, and validates a clan name. */
+export function cleanClanName(raw: string): string {
+  const name = raw.trim().replace(/\s+/g, ' ')
+  if (name.length < LIMITS.clanNameMinLength || name.length > LIMITS.clanNameMaxLength) {
+    throw new ConvexError(
+      `Clan name must be ${LIMITS.clanNameMinLength}-${LIMITS.clanNameMaxLength} characters`,
+    )
+  }
+  if (!CLAN_NAME_PATTERN.test(name)) {
+    throw new ConvexError("Clan name can only contain letters, numbers, spaces and ' & . _ -")
+  }
+  return name
 }

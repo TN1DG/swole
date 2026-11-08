@@ -343,6 +343,43 @@ export const logManualEntry = mutation({
   },
 })
 
+// A food from the database, times a number of servings. The macros are
+// computed here from the database row, not taken from the client, so a
+// "database" entry can't carry made-up numbers.
+export const logFood = mutation({
+  args: { foodId: v.id('foodDatabase'), servings: v.number() },
+  handler: async (ctx, args) => {
+    const userId = await requireWriter(ctx)
+    const servings = assertRange(
+      args.servings,
+      LIMITS.foodServingsMin,
+      LIMITS.foodServingsMax,
+      'Servings',
+    )
+    const food = await ctx.db.get(args.foodId)
+    if (!food) throw new ConvexError('Food not found')
+
+    const now = Date.now()
+    await assertUnderDailyCap(ctx, userId, now)
+
+    const scale = (n: number) => Math.round(n * servings * 10) / 10
+    await ctx.db.insert('foodLogs', {
+      ownerId: userId,
+      loggedAt: now,
+      source: 'manual',
+      status: 'complete',
+      description: food.name,
+      calories: Math.round(food.calories * servings),
+      proteinG: scale(food.proteinG),
+      carbsG: scale(food.carbsG),
+      fatG: scale(food.fatG),
+      fiberG: scale(food.fiberG),
+      foodId: food._id,
+      servings,
+    })
+  },
+})
+
 export const deleteEntry = mutation({
   args: { foodLogId: v.id('foodLogs') },
   handler: async (ctx, args) => {
@@ -396,6 +433,7 @@ export const getToday = query({
         carbsG: e.carbsG ?? null,
         fatG: e.fatG ?? null,
         fiberG: e.fiberG ?? null,
+        servings: e.servings ?? null,
       })),
       totals,
     }

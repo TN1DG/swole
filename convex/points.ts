@@ -1,12 +1,15 @@
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { adjustPoints } from './profiles'
+import { LIMITS } from './validation'
 import {
   distinctTrainingDays,
   streakEndingAt,
   utcWeekIndex,
   utcWeekStart,
   weeklyPointsIncrements,
+  utcMonthEnd,
+  utcMonthStart,
   WEEK_MS,
 } from './fitness'
 
@@ -121,8 +124,67 @@ export async function reconcileWeek(
     }
   }
 
-  if (delta !== 0) await adjustPoints(ctx, userId, delta)
+  if (delta !== 0) {
+    await adjustPoints(ctx, userId, delta)
+    // A week can straddle two calendar months, so both seasons it touches are
+    // re-derived. Same month twice is the common case and costs one refresh.
+    const months = new Set([utcMonthStart(weekStart), utcMonthStart(weekEnd - 1)])
+    for (const monthStart of months) await refreshClanSeasonForUser(ctx, userId, monthStart)
+  }
   return delta
+}
+
+/**
+ * Recomputes one clan's CP for one calendar month from scratch: the sum of
+ * what each CURRENT member earned that month.
+ *
+ * Idempotent, like reconcileWeek, and for the same reason: every event that
+ * can change the answer (a workout finished or deleted, a member joining,
+ * leaving or being kicked) just calls this and it converges. It is the only
+ * writer of `clanSeasons.cp`. Bounded: at most LIMITS.clanMaxMembers ranged
+ * reads over one month.
+ */
+export async function refreshClanSeason(
+  ctx: MutationCtx,
+  clanId: Id<'clans'>,
+  monthStart: number,
+): Promise<number> {
+  const monthEnd = utcMonthEnd(monthStart)
+  const members = await ctx.db
+    .query('clanMembers')
+    .withIndex('by_clan_and_joinedAt', (q) => q.eq('clanId', clanId))
+    .take(LIMITS.clanMaxMembers)
+
+  const perMember = await Promise.all(
+    members.map(async (m) =>
+      summarizePeriod(await finishedWorkoutsBetween(ctx, m.userId, monthStart, monthEnd)).points,
+    ),
+  )
+  const cp = perMember.reduce((sum, p) => sum + p, 0)
+
+  const existing = await ctx.db
+    .query('clanSeasons')
+    .withIndex('by_clan_and_monthStart', (q) => q.eq('clanId', clanId).eq('monthStart', monthStart))
+    .unique()
+  if (existing) {
+    if (existing.cp !== cp) await ctx.db.patch(existing._id, { cp })
+  } else {
+    await ctx.db.insert('clanSeasons', { clanId, monthStart, cp })
+  }
+  return cp
+}
+
+/** refreshClanSeason for whichever clan `userId` is in, if any. */
+export async function refreshClanSeasonForUser(
+  ctx: MutationCtx,
+  userId: Id<'users'>,
+  monthStart: number,
+): Promise<void> {
+  const membership = await ctx.db
+    .query('clanMembers')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .unique()
+  if (membership) await refreshClanSeason(ctx, membership.clanId, monthStart)
 }
 
 /**

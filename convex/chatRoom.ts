@@ -14,3 +14,19 @@ export function otherRoomMember(roomId: string, userId: string): string | null {
   if (members[1] === userId) return members[0]!
   return null
 }
+
+// The presence room for a clan's group chat. Prefixed so it can never parse as
+// a friend room: otherRoomMember needs exactly two ':'-separated ids and the
+// prefix makes three parts with a non-id first part.
+const CLAN_ROOM_PREFIX = 'clan:'
+
+export function clanRoomId(clanId: string): string {
+  return `${CLAN_ROOM_PREFIX}${clanId}`
+}
+
+/** The clan a room belongs to, or null if it isn't a clan room. */
+export function clanIdOfRoom(roomId: string): string | null {
+  if (!roomId.startsWith(CLAN_ROOM_PREFIX)) return null
+  const id = roomId.slice(CLAN_ROOM_PREFIX.length)
+  return id && !id.includes(':') ? id : null
+}

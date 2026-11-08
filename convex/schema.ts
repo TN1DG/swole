@@ -108,6 +108,10 @@ export default defineSchema({
     themePreset: v.optional(v.string()),
     // Chat notifications say who but not what, for a more private lock screen.
     pushHideMessageText: v.optional(v.boolean()),
+    // When this user last joined (or founded) a clan. A clan's CP counts what
+    // its CURRENT members earned this month, so your month's points move with
+    // you — this caps that at one clan per calendar month (see convex/clans.ts).
+    lastClanJoinAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_username', ['username']),
@@ -242,6 +246,96 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_user_friend', ['userId', 'friendId']),
+
+  // ---------- clans ----------
+  // A group of up to LIMITS.clanMaxMembers players competing on CP: the Swole
+  // Points its members EARNED this calendar month (UTC). Joined by invite code
+  // only — there is no public directory, so no member identity reaches anyone
+  // who wasn't handed the code. See convex/clans.ts.
+  clans: defineTable({
+    name: v.string(),
+    // Lowercased name, for case-insensitive uniqueness.
+    nameLower: v.string(),
+    leaderId: v.id('users'),
+    inviteCode: v.string(),
+    // Denormalized so the cap check and the rankings never count rows.
+    memberCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_nameLower', ['nameLower'])
+    .index('by_inviteCode', ['inviteCode']),
+
+  // One row per member. At most one row per user — one clan each.
+  clanMembers: defineTable({
+    clanId: v.id('clans'),
+    userId: v.id('users'),
+    joinedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_clan_and_joinedAt', ['clanId', 'joinedAt']),
+
+  // A clan's CP for one calendar month. Only points.ts:refreshClanSeason
+  // writes `cp`, recomputing it from the members' stamped pointsAwarded, so it
+  // can't drift from the balances it's derived from. Past months stay as
+  // history.
+  clanSeasons: defineTable({
+    clanId: v.id('clans'),
+    monthStart: v.number(),
+    cp: v.number(),
+  })
+    .index('by_clan_and_monthStart', ['clanId', 'monthStart'])
+    .index('by_monthStart_and_cp', ['monthStart', 'cp']),
+
+  // ---------- clan chat (convex/clanChat.ts) ----------
+  // Gated on CURRENT membership of the clan, never on friendship: clanmates
+  // joined by invite code and needn't be friends.
+
+  // A group-chat message. Reactions live on the row, as in `messages`: a clan
+  // has at most LIMITS.clanMaxMembers people, each holding one reaction.
+  clanMessages: defineTable({
+    clanId: v.id('clans'),
+    fromUserId: v.id('users'),
+    // May be empty only when a photo is attached.
+    text: v.string(),
+    sentAt: v.number(),
+    imageStorageId: v.optional(v.id('_storage')),
+    imageWidth: v.optional(v.number()),
+    imageHeight: v.optional(v.number()),
+    reactions: v.optional(v.array(v.object({ userId: v.id('users'), emoji: v.string() }))),
+  })
+    .index('by_clanId_and_sentAt', ['clanId', 'sentAt'])
+    .index('by_fromUserId', ['fromUserId']),
+
+  // "Who's training?" — to the whole clan (no targetUserIds) or to picked
+  // members. Both arrays are bounded by the clan's size.
+  clanPings: defineTable({
+    clanId: v.id('clans'),
+    fromUserId: v.id('users'),
+    sentAt: v.number(),
+    targetUserIds: v.optional(v.array(v.id('users'))),
+    goingUserIds: v.array(v.id('users')),
+  })
+    .index('by_clanId_and_sentAt', ['clanId', 'sentAt'])
+    .index('by_fromUserId', ['fromUserId']),
+
+  // The weekly race's result: whoever earned the most points in a calendar
+  // week (UTC). Written once per (clan, week) by clanChat.awardWeeklyMvps.
+  clanWeeklyMvps: defineTable({
+    clanId: v.id('clans'),
+    weekStart: v.number(),
+    userId: v.id('users'),
+    points: v.number(),
+    daysTrained: v.number(),
+  }).index('by_clanId_and_weekStart', ['clanId', 'weekStart']),
+
+  // How far through their clan's chat a member has read.
+  clanReads: defineTable({
+    userId: v.id('users'),
+    clanId: v.id('clans'),
+    lastReadAt: v.number(),
+  })
+    .index('by_userId_and_clanId', ['userId', 'clanId'])
+    .index('by_clanId', ['clanId']),
 
   // Snapchat-style accountability pings between friends.
   gymPings: defineTable({
@@ -493,13 +587,19 @@ export default defineSchema({
     carbsG: v.optional(v.number()),
     fatG: v.optional(v.number()),
     fiberG: v.optional(v.number()),
+    // Set when the entry came from the food database (nutrition.ts:logFood):
+    // which food, and how many of its servings. The macros above are already
+    // scaled by `servings`. Absent on hand-typed and photo entries.
+    foodId: v.optional(v.id('foodDatabase')),
+    servings: v.optional(v.number()),
   })
     // "today's entries" (owner + a loggedAt range) and, on the owner prefix
     // alone, "every entry this account ever created" for account deletion.
     .index('by_owner_loggedAt', ['ownerId', 'loggedAt']),
 
-  // A reference food with known macros, seeded once from
-  // convex/foodSeedData.ts (see foods.ts:seed) so manual logging can search
+  // A reference food with known macros, seeded from convex/foodSeedData.ts
+  // plus the regional lists (see foods.ts:ALL_SEED_FOODS and foods.ts:seed,
+  // which only ever adds missing names) so manual logging can search
   // for a food by name instead of typing its macros from scratch — a free
   // alternative to the AI photo-estimate path for common items.
   foodDatabase: defineTable({

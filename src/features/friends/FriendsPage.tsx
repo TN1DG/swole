@@ -14,6 +14,7 @@ import { Avatar } from '../../components/Avatar'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { usePeriodStart, type LeaderboardPeriod } from '../../lib/period'
 import { FeedTab } from '../feed/FeedTab'
+import { ClansPanel } from '../clans/ClansPanel'
 import { formatLastActivity } from './activityLabel'
 import { conversationTimeLabel } from './threadLayout'
 
@@ -32,14 +33,17 @@ export function FriendsPage() {
   const outgoing = useQuery(api.friends.myOutgoingRequests)
   const friends = useQuery(api.friends.myFriends)
   const unreadIds = useQuery(api.friendThread.unreadFriendIds)
+  const clanChat = useQuery(api.clanChat.overview)
 
   const sendFriendRequest = useMutation(api.friends.sendFriendRequest)
   const resolveUsername = useMutation(api.friends.resolveUsername)
 
   // Coming back from a conversation lands on Chats, not wherever the default is.
   const [searchParams] = useSearchParams()
+  // ...and an invite link lands on Board → Clans.
+  const tabParam = searchParams.get('tab')
   const [tab, setTab] = useState<'feed' | 'leaderboard' | 'friends'>(
-    searchParams.get('tab') === 'chats' ? 'friends' : 'feed',
+    tabParam === 'chats' ? 'friends' : tabParam === 'clans' ? 'leaderboard' : 'feed',
   )
   const [searchTerm, setSearchTerm] = useState('')
   const [committedSearch, setCommittedSearch] = useState<string | null>(null)
@@ -167,7 +171,9 @@ export function FriendsPage() {
             {
               value: 'friends',
               label: 'Chats',
-              badge: (incoming?.length ?? 0) + (unreadIds?.length ?? 0) || undefined,
+              badge:
+                (incoming?.length ?? 0) + (unreadIds?.length ?? 0) + (clanChat?.unread ? 1 : 0) ||
+                undefined,
             },
           ]}
         />
@@ -176,9 +182,10 @@ export function FriendsPage() {
       {tab === 'feed' ? (
         <FeedTab />
       ) : tab === 'leaderboard' ? (
-        <LeaderboardTab />
+        <LeaderboardTab initialBoard={tabParam === 'clans' ? 'clans' : 'friends'} />
       ) : (
         <FriendsTab
+          clanChat={clanChat}
           friends={friends}
           unreadIds={unreadIds}
           incoming={incoming}
@@ -190,14 +197,36 @@ export function FriendsPage() {
   )
 }
 
-function LeaderboardTab() {
+// Friends board or clan standings. A sub-toggle here rather than a fourth
+// segment above, which would crowd a 360px phone.
+function LeaderboardTab({ initialBoard }: { initialBoard: 'friends' | 'clans' }) {
+  const [board, setBoard] = useState(initialBoard)
+
+  return (
+    <>
+      <Box sx={{ mt: 2 }}>
+        <SegmentedControl
+          value={board}
+          onChange={setBoard}
+          options={[
+            { value: 'friends', label: 'Friends' },
+            { value: 'clans', label: 'Clans' },
+          ]}
+        />
+      </Box>
+      {board === 'friends' ? <FriendsBoard /> : <ClansPanel />}
+    </>
+  )
+}
+
+function FriendsBoard() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('week')
   const periodStartMs = usePeriodStart(period)
   const leaderboard = useQuery(api.friends.leaderboard, { period, periodStartMs })
 
   return (
     <>
-      <Box sx={{ mt: 2 }}>
+      <Box sx={{ mt: 1 }}>
         <SegmentedControl
           value={period}
           onChange={setPeriod}
@@ -338,13 +367,74 @@ function ConversationRow({
   )
 }
 
+// Your clan's group chat, pinned above the 1:1 conversations.
+function ClanConversationRow({
+  clanChat,
+  now,
+}: {
+  clanChat: NonNullable<FunctionReturnType<typeof api.clanChat.overview>>
+  now: number
+}) {
+  const { unread, last } = clanChat
+  return (
+    <Box
+      component={Link}
+      to="/clans/chat"
+      aria-label={`${clanChat.name} clan chat${unread ? ', unread messages' : ''}`}
+      sx={{ display: 'block', mt: 1, color: 'inherit', textDecoration: 'none' }}
+    >
+      <GlassTile
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          px: 1.5,
+          py: 1,
+          borderColor: 'rgb(var(--color-accent-rgb) / 0.4)',
+        }}
+      >
+        <Avatar src={null} name={clanChat.name} size={44} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: unread ? 700 : 500 }}>
+              🛡️ {clanChat.name}
+            </Typography>
+            {last && (
+              <Typography
+                variant="caption"
+                color={unread ? 'primary.main' : 'text.secondary'}
+                sx={{ flexShrink: 0, fontWeight: unread ? 600 : 400 }}
+              >
+                {conversationTimeLabel(last.ts, now)}
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography
+              noWrap
+              variant="body2"
+              color={unread ? 'text.primary' : 'text.secondary'}
+              sx={{ flex: 1, minWidth: 0, fontWeight: unread ? 600 : 400 }}
+            >
+              {last ? last.text : `Clan chat · ${clanChat.memberCount} ${clanChat.memberCount === 1 ? 'member' : 'members'}`}
+            </Typography>
+            {unread && <Box sx={{ flexShrink: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />}
+          </Box>
+        </Box>
+      </GlassTile>
+    </Box>
+  )
+}
+
 function FriendsTab({
+  clanChat,
   friends,
   unreadIds,
   incoming,
   outgoing,
   runAction,
 }: {
+  clanChat: FunctionReturnType<typeof api.clanChat.overview> | undefined
   friends: Friends | undefined
   unreadIds: FunctionReturnType<typeof api.friendThread.unreadFriendIds> | undefined
   incoming: IncomingRequests | undefined
@@ -431,6 +521,7 @@ function FriendsTab({
       <Typography variant="overline" color="text.secondary" component="h2" sx={{ display: 'block', mt: 2 }}>
         Conversations
       </Typography>
+      {clanChat && <ClanConversationRow clanChat={clanChat} now={now} />}
       {friends === undefined ? (
         <Typography sx={{ mt: 1.5, textAlign: 'center' }} color="text.secondary">
           Loading…
