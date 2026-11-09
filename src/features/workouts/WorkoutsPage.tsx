@@ -63,10 +63,20 @@ export function WorkoutsPage() {
             <>
               <Button
                 component={Link}
-                to={`/share/${summary.workoutId}`}
+                to={`/feed/compose/${summary.workoutId}`}
                 variant="contained"
                 fullWidth
                 sx={{ mt: 2 }}
+              >
+                Share to Feed
+              </Button>
+              <Button
+                component={Link}
+                to={`/share/${summary.workoutId}`}
+                variant="outlined"
+                color="inherit"
+                fullWidth
+                sx={{ mt: 1.5 }}
               >
                 Share as Photo 📸
               </Button>
