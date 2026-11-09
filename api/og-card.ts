@@ -8,10 +8,13 @@ const TEXT = '#f0ebe3'
 const MUTED = '#a89a8c'
 const ACCENT = '#c1541f'
 
+// On the Edge runtime, which @vercel/og is built for. As a Node function it
+// failed to load twice: its bundle does a dynamic require('fs'), and the
+// emitted ES module was then loaded as CommonJS. Edge bundles it cleanly.
+export const config = { runtime: 'edge' }
+
 // Satori takes plain { type, props } element objects, so this file needs no
-// JSX. That matters: Vercel compiles functions against the root
-// tsconfig.json, which has no `jsx` setting, and a .tsx function crashed on
-// load with FUNCTION_INVOCATION_FAILED.
+// JSX, which the root tsconfig.json Vercel compiles functions with lacks.
 type Node = { type: string; props: Record<string, unknown> }
 type Child = Node | string | null | false
 function h(style: Record<string, unknown>, ...children: Child[]): Node {
@@ -37,7 +40,7 @@ function stat(label: string, value: string) {
  * photo: its workout, drawn like a Swole share card. Public posts only;
  * anything else is a 404 and the preview falls back to the page tags.
  */
-export async function GET(request: Request): Promise<Response> {
+export default async function handler(request: Request): Promise<Response> {
   const postId = new URL(request.url).searchParams.get('id') ?? ''
   const post = await fetchPublicPost(postId)
   if (!post || post.workoutName === null) return new Response('Not found', { status: 404 })
