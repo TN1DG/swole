@@ -70,6 +70,36 @@ describe('deleteWorkout record recomputation', () => {
   })
 })
 
+describe('estimated reps', () => {
+  it('never become the record when it is recomputed after a delete', async () => {
+    const { user, exerciseId } = await oneUser()
+    await finishedWorkout(user, exerciseId, 100, 5)
+
+    // 140 kg × estimated reps: volume only, never a record.
+    const workoutId = await user.mutation(api.workouts.start, {})
+    await user.mutation(api.workouts.addExercise, { workoutId, exerciseId })
+    const weId = (await user.query(api.workouts.getActive, {}))!.exercises[0].workoutExerciseId
+    await user.mutation(api.workouts.addSet, { workoutExerciseId: weId })
+    const [a, b] = (await user.query(api.workouts.getActive, {}))!.exercises[0].sets
+    await user.mutation(api.workouts.updateSet, { setId: a._id, weightKg: 90, reps: 6, completed: true })
+    await user.mutation(api.workouts.updateSet, {
+      setId: b._id, weightKg: 140, reps: 0, completed: true, toFailure: true,
+    })
+    await user.mutation(api.workouts.finish, { workoutId })
+    const removed = await finishedWorkout(user, exerciseId, 105, 5)
+
+    await user.mutation(api.history.deleteWorkout, { workoutId: removed })
+    const [record] = await user.query(api.prs.listMine, {})
+    expect(record.bestWeightKg).toBe(100)
+
+    // The chart's top set skips the estimate too, but its volume keeps it.
+    const sessions = await user.query(api.history.exerciseHistory, { exerciseId })
+    const estimatedSession = sessions.find((s) => s.workoutId === workoutId)!
+    expect(estimatedSession.topWeightKg).toBe(90)
+    expect(estimatedSession.volumeKg).toBe(90 * 6 + 140 * 6)
+  })
+})
+
 describe('listCompleted pagination', () => {
   it('pages newest-first and terminates', async () => {
     const { user, exerciseId } = await oneUser()

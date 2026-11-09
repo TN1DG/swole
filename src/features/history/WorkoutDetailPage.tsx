@@ -20,6 +20,8 @@ import { useWeightUnit } from '../../lib/useWeightUnit'
 import { ExerciseDetail } from '../exercises/ExerciseDetail'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { setBadge, setBadgeColor } from '../workouts/setDisplay'
+import { SetReps } from '../workouts/SetReps'
 
 export function WorkoutDetailPage() {
   const { workoutId } = useParams()
@@ -141,11 +143,11 @@ export function WorkoutDetailPage() {
                           border: 0,
                           py: 0.5,
                           px: 0,
-                          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+                          color: setBadgeColor(set),
                           ...conqueredSx,
                         }}
                       >
-                        {set.isWarmup ? 'W' : set.setNumber}
+                        {setBadge(set)}
                       </TableCell>
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
@@ -155,7 +157,7 @@ export function WorkoutDetailPage() {
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
                       >
-                        {set.reps}
+                        <SetReps set={set} />
                       </TableCell>
                     </TableRow>
                   )

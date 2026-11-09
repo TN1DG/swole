@@ -8,6 +8,7 @@ import { reconcileWeek } from './points'
 import { notify } from './notifications'
 import { requireWriter } from './rateLimiter'
 import { getOrCreateProfile } from './profiles'
+import { lastPerformance } from './routines'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -214,9 +215,13 @@ export const updateSet = mutation({
     reps: v.optional(v.number()),
     completed: v.optional(v.boolean()),
     isWarmup: v.optional(v.boolean()),
+    toFailure: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await getOwnedSet(ctx, args.setId)
+    if (args.isWarmup === true && args.toFailure === true) {
+      throw new Error('A set cannot be both a warm-up and to failure')
+    }
 
     const patch: Partial<Doc<'sets'>> = {}
     if (args.weightKg !== undefined) {
@@ -224,9 +229,19 @@ export const updateSet = mutation({
     }
     if (args.reps !== undefined) {
       patch.reps = Math.round(assertRange(args.reps, 0, LIMITS.reps, 'Reps'))
+      patch.repsEstimated = undefined
     }
     if (args.completed !== undefined) patch.completed = args.completed
-    if (args.isWarmup !== undefined) patch.isWarmup = args.isWarmup
+    // Warm-up and to-failure are mutually exclusive: turning one on turns the
+    // other off.
+    if (args.isWarmup !== undefined) {
+      patch.isWarmup = args.isWarmup
+      if (args.isWarmup) patch.toFailure = undefined
+    }
+    if (args.toFailure !== undefined) {
+      patch.toFailure = args.toFailure || undefined
+      if (args.toFailure) patch.isWarmup = false
+    }
     await ctx.db.patch(args.setId, patch)
   },
 })
@@ -304,6 +319,27 @@ export const cancel = mutation({
   },
 })
 
+// Best guess at the reps of a to-failure set logged without a count: the
+// nearest earlier completed set of this exercise in this workout, else any
+// later one, else the same position in the last session with this exercise.
+// 0 when there's nothing to go on (the set then adds no volume).
+export function estimateFailureReps(
+  set: Doc<'sets'>,
+  completed: Doc<'sets'>[],
+  previous: Doc<'sets'>[] | null,
+): number {
+  const known = completed.filter(
+    (s) => s._id !== set._id && !s.isWarmup && s.reps > 0 && !s.repsEstimated,
+  )
+  const earlier = known.filter((s) => s.setNumber < set.setNumber)
+  const nearest = earlier.length > 0 ? earlier[earlier.length - 1] : known[0]
+  if (nearest) return nearest.reps
+
+  const past = (previous ?? []).filter((s) => s.reps > 0)
+  const index = completed.filter((s) => !s.isWarmup && s.setNumber < set.setNumber).length
+  return past[Math.min(index, past.length - 1)]?.reps ?? 0
+}
+
 // Finish: discard incomplete sets, update personal records, return a summary.
 export const finish = mutation({
   args: { workoutId: v.id('workouts') },
@@ -332,16 +368,34 @@ export const finish = mutation({
       exerciseCount++
       completedSetCount += completed.length
 
+      // To-failure sets logged without reps get an estimate, so they still
+      // count toward volume. Done here rather than when the set is ticked so
+      // a later edit of an earlier set can't leave a stale guess behind.
+      const unrepped = completed.filter((s) => s.toFailure && s.reps === 0)
+      if (unrepped.length > 0) {
+        const previous = await lastPerformance(ctx, userId, we.exerciseId)
+        for (const s of unrepped) {
+          const estimate = estimateFailureReps(s, completed, previous)
+          if (estimate > 0) {
+            s.reps = estimate
+            s.repsEstimated = true
+            await ctx.db.patch(s._id, { reps: estimate, repsEstimated: true })
+          }
+        }
+      }
+
       // Warm-ups don't count toward volume or records.
       const working = completed.filter((s) => !s.isWarmup && s.weightKg > 0 && s.reps > 0)
       totalVolumeKg += working.reduce((sum, s) => sum + s.weightKg * s.reps, 0)
-      if (working.length === 0) continue
+      // ...and an estimated rep count is a guess, so it can't set a record.
+      const recordable = working.filter((s) => !s.repsEstimated)
+      if (recordable.length === 0) continue
 
       // Best set by weight (ties broken by reps) and best estimated 1RM.
-      const bestBy1rm = working.reduce((a, b) =>
+      const bestBy1rm = recordable.reduce((a, b) =>
         epley1rm(b.weightKg, b.reps) > epley1rm(a.weightKg, a.reps) ? b : a,
       )
-      const bestByWeight = working.reduce((a, b) =>
+      const bestByWeight = recordable.reduce((a, b) =>
         b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a,
       )
 
