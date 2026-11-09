@@ -22,16 +22,19 @@ export function WorkoutBreakdown({
   setCount,
   prCount,
   lines,
+  maxLines = 6,
 }: {
   durationMs: number
   volumeKg: number
   setCount: number
   prCount: number
   lines: Line[]
+  /** Lines shown before "+ N more exercises"; smaller formats show fewer. */
+  maxLines?: number
 }) {
   // The exported PNG carries whatever units the person sharing it reads in.
   const { formatWeightWithUnit } = useWeightUnit()
-  const shown = lines.slice(0, 6)
+  const shown = lines.slice(0, maxLines)
 
   return (
     <>

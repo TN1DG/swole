@@ -1,11 +1,27 @@
 import { useRef, useState } from 'react'
 import { domToBlob } from 'modern-screenshot'
 
-const EXPORT_WIDTH = 1080 // Instagram-story sized PNG (1080x1920)
+const EXPORT_WIDTH = 1080 // 1080x1920 story or 1080x1080 square, see cardFormat.ts
 
 /**
- * Renders a card to a PNG and hands it to the OS share sheet (or a download
- * on desktop). Owns the ref you attach to the exportable node.
+ * iPhone and iPad, including iPadOS, which reports itself as a Mac but has a
+ * touchscreen. On these a web app has exactly one way into Photos: the share
+ * sheet, whose top row is "Save Image". A download lands in Files instead.
+ */
+export function isAppleMobile(nav: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'> = navigator) {
+  return /iPad|iPhone|iPod/.test(nav.userAgent) || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
+}
+
+/**
+ * Renders a card to a PNG and either saves it or hands it to the OS share
+ * sheet. Owns the ref you attach to the exportable node.
+ *
+ * - `save()`: the fewest taps to get the image into the photo library. A
+ *   plain download on Android (lands in the gallery) and desktop; the share
+ *   sheet on iPhone, where "Save Image" is the only route into Photos.
+ * - `share()`: always the share sheet, for Instagram, Snapchat, WhatsApp…
+ *   (websites can't post into Stories directly). Falls back to a download
+ *   where files can't be shared.
  *
  * Extracted because SharePage and FriendTrophyPage carried byte-identical
  * copies of all four functions below, and the transparent-export work would
@@ -21,7 +37,7 @@ const EXPORT_WIDTH = 1080 // Instagram-story sized PNG (1080x1920)
  * its alpha channel. Transparency is therefore purely a CSS concern in the
  * card — see cardVariant.ts. Do not add a backgroundColor here.
  */
-export function useCardExport(fileName = 'workout.png') {
+export function useCardExport(fileName = 'swole-workout.png') {
   const frameRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -46,33 +62,39 @@ export function useCardExport(fileName = 'workout.png') {
     URL.revokeObjectURL(url)
   }
 
-  async function share() {
-    setBusy(true)
+  async function shareFile(blob: Blob): Promise<boolean> {
+    const file = new File([blob], fileName, { type: 'image/png' })
+    if (!navigator.canShare?.({ files: [file] })) return false
     try {
-      const blob = await makePng()
-      if (!blob) return
-      const file = new File([blob], fileName, { type: 'image/png' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] })
-      } else {
-        downloadBlob(blob) // desktop browsers: just save it
-      }
+      await navigator.share({ files: [file] })
     } catch {
       // user closed the share sheet — not an error
-    } finally {
-      setBusy(false)
     }
+    return true
   }
 
-  async function download() {
+  async function run(handle: (blob: Blob) => Promise<void>) {
     setBusy(true)
     try {
       const blob = await makePng()
-      if (blob) downloadBlob(blob)
+      if (blob) await handle(blob)
+    } catch (error) {
+      console.error('Card export failed', error)
     } finally {
       setBusy(false)
     }
   }
 
-  return { frameRef, busy, share, download }
+  const share = () =>
+    run(async (blob) => {
+      if (!(await shareFile(blob))) downloadBlob(blob) // desktop browsers: just save it
+    })
+
+  const save = () =>
+    run(async (blob) => {
+      if (isAppleMobile() && (await shareFile(blob))) return
+      downloadBlob(blob)
+    })
+
+  return { frameRef, busy, share, save }
 }
