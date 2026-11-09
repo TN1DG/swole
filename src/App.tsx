@@ -41,6 +41,12 @@ const CaloricConsistencyPage = lazy(() =>
 const FriendsPage = lazy(() =>
   import('./features/friends/FriendsPage').then((m) => ({ default: m.FriendsPage })),
 )
+const ClanChatPage = lazy(() =>
+  import('./features/clans/ClanChatPage').then((m) => ({ default: m.ClanChatPage })),
+)
+const JoinClanPage = lazy(() =>
+  import('./features/clans/JoinClanPage').then((m) => ({ default: m.JoinClanPage })),
+)
 const FriendWorkoutsPage = lazy(() =>
   import('./features/friends/FriendWorkoutsPage').then((m) => ({
     default: m.FriendWorkoutsPage,
@@ -112,6 +118,7 @@ export default function App() {
               {/* Outside AppLayout: a conversation takes over the whole screen,
                   with its own header and no tab bar. */}
               <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
+              <Route path="/clans/chat" element={<ClanChatPage />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<WorkoutsPage />} />
                 <Route path="/history" element={<HistoryPage />} />
@@ -126,6 +133,7 @@ export default function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/nutrition/consistency" element={<CaloricConsistencyPage />} />
                 <Route path="/friends" element={<FriendsPage />} />
+                <Route path="/clans/join/:code" element={<JoinClanPage />} />
                 <Route path="/friends/:userId" element={<FriendWorkoutsPage />} />
                 <Route path="/friends/:userId/:workoutId" element={<FriendWorkoutDetailPage />} />
                 <Route

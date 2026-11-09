@@ -27,9 +27,12 @@ export type PendingMessage = {
  * Convex resolves a mutation only after its result is in the query results, so
  * removing the entry on success swaps it for the real message without a flicker.
  */
-export function useMessageQueue(toUserId: Id<'users'>) {
-  const sendMessage = useMutation(api.messages.send)
-  const generateUploadUrl = useMutation(api.messages.generateMessagePhotoUploadUrl)
+// `target` is a friend's id for a 1:1 chat, or 'clan' for your clan's group chat.
+export function useMessageQueue(target: Id<'users'> | 'clan') {
+  const sendToFriend = useMutation(api.messages.send)
+  const friendUploadUrl = useMutation(api.messages.generateMessagePhotoUploadUrl)
+  const sendToClan = useMutation(api.clanChat.send)
+  const clanUploadUrl = useMutation(api.clanChat.generatePhotoUploadUrl)
   const [pending, setPending] = useState<PendingMessage[]>([])
   // Sends run one at a time, so a slow photo can't let the text typed after it
   // overtake it in the conversation.
@@ -42,14 +45,20 @@ export function useMessageQueue(toUserId: Id<'users'>) {
         try {
           let image: { storageId: Id<'_storage'>; width: number; height: number } | undefined
           if (message.attachment) {
-            const storageId = await uploadBlob(() => generateUploadUrl({}), message.attachment.blob)
+            const storageId = await uploadBlob(
+              () => (target === 'clan' ? clanUploadUrl({}) : friendUploadUrl({})),
+              message.attachment.blob,
+            )
             image = {
               storageId,
               width: message.attachment.width,
               height: message.attachment.height,
             }
           }
-          const result = await sendMessage({ toUserId, text: message.text, image })
+          const result =
+            target === 'clan'
+              ? await sendToClan({ text: message.text, image })
+              : await sendToFriend({ toUserId: target, text: message.text, image })
           if (!result.ok) throw new ConvexError(result.error)
           if (message.attachment) URL.revokeObjectURL(message.attachment.url)
           setPending((all) => all.filter((m) => m.id !== message.id))
@@ -64,7 +73,7 @@ export function useMessageQueue(toUserId: Id<'users'>) {
         }
       })
     },
-    [generateUploadUrl, sendMessage, toUserId],
+    [target, sendToFriend, friendUploadUrl, sendToClan, clanUploadUrl],
   )
 
   const send = useCallback(
@@ -104,7 +113,7 @@ export function useMessageQueue(toUserId: Id<'users'>) {
   // Moving to another friend's chat keeps this component mounted with a new id.
   useEffect(() => {
     setPending([])
-  }, [toUserId])
+  }, [target])
 
   return { pending, send, retry, discard }
 }

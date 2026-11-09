@@ -27,11 +27,12 @@ export function Composer({
 }: {
   disabled: boolean
   canPing: boolean
-  canChallenge: boolean
+  canChallenge?: boolean
   pingFlareKey: number
   onSend: (text: string, attachment: Attachment | null) => void
   onPing: () => void
-  onChallenge: () => void
+  // Absent (e.g. in clan chat) hides the Challenge action entirely.
+  onChallenge?: () => void
   onTypingChange: (typing: boolean) => void
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -269,15 +270,17 @@ export function Composer({
         >
           🏋️ Gym ping
         </MenuItem>
-        <MenuItem
-          disabled={!canChallenge}
-          onClick={() => {
-            setMenuAnchor(null)
-            onChallenge()
-          }}
-        >
-          ⚔️ Challenge
-        </MenuItem>
+        {onChallenge && (
+          <MenuItem
+            disabled={!canChallenge}
+            onClick={() => {
+              setMenuAnchor(null)
+              onChallenge()
+            }}
+          >
+            ⚔️ Challenge
+          </MenuItem>
+        )}
       </Menu>
     </Box>
   )

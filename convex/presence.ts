@@ -4,7 +4,7 @@ import { getAuthUserId } from '@convex-dev/auth/server'
 import { components } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import type { Id } from './_generated/dataModel'
-import { chatRoomId, otherRoomMember } from './chatRoom'
+import { chatRoomId, clanIdOfRoom, clanRoomId, otherRoomMember } from './chatRoom'
 import { areFriends, isBlockedEitherWay } from './friendships'
 import { assertRange } from './validation'
 import { rateLimiter } from './rateLimiter'
@@ -30,6 +30,18 @@ export const heartbeat = mutation({
   handler: async (ctx, args) => {
     const me = await getAuthUserId(ctx)
     if (me === null) return NO_ROOM
+
+    // A clan's group chat: only a current member gets the room's token.
+    const clanId = clanIdOfRoom(args.roomId)
+    if (clanId !== null) {
+      const membership = await ctx.db
+        .query('clanMembers')
+        .withIndex('by_user', (q) => q.eq('userId', me))
+        .unique()
+      if (!membership || membership.clanId !== clanId) return NO_ROOM
+      const interval = assertRange(args.interval, 1000, 60000, 'Interval')
+      return await presenceComponent.heartbeat(ctx, args.roomId, me, args.sessionId, interval)
+    }
 
     const friendId = otherRoomMember(args.roomId, me)
     if (
@@ -77,6 +89,27 @@ export const setTyping = mutation({
     if (!ok) return
 
     await presenceComponent.updateRoomUser(ctx, chatRoomId(me, args.friendUserId), me, {
+      typing: args.typing,
+    })
+  },
+})
+
+// "X is typing…" in your clan's group chat.
+export const setClanTyping = mutation({
+  args: { typing: v.boolean() },
+  handler: async (ctx, args) => {
+    const me = await getAuthUserId(ctx)
+    if (me === null) throw new ConvexError('Not signed in')
+    const membership = await ctx.db
+      .query('clanMembers')
+      .withIndex('by_user', (q) => q.eq('userId', me))
+      .unique()
+    if (!membership) return
+
+    const { ok } = await rateLimiter.limit(ctx, 'typingUpdate', { key: me })
+    if (!ok) return
+
+    await presenceComponent.updateRoomUser(ctx, clanRoomId(membership.clanId), me, {
       typing: args.typing,
     })
   },

@@ -61,7 +61,7 @@ async function profileFor(ctx: QueryCtx, userId: Id<'users'>) {
 // resolveUsername, and adding it there would hand a stranger's photo to
 // anyone who guesses their username. Only paths that have already
 // established a friendship (or public opt-in) use this one.
-async function profileForWithAvatar(ctx: QueryCtx, userId: Id<'users'>) {
+export async function profileForWithAvatar(ctx: QueryCtx, userId: Id<'users'>) {
   const { profile, info } = await identityOf(ctx, userId)
   return {
     ...info,
