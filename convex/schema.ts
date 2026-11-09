@@ -513,6 +513,48 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_endpoint', ['endpoint']),
 
+  // ---------- Spotify (convex/spotify.ts) ----------
+
+  // A user's linked Spotify account. The tokens never leave the server: no
+  // public function returns this row. `pollToken` identifies the one poll
+  // loop allowed to run for this user (see convex/spotifyApi.ts), so starting
+  // a new loop retires any older one.
+  spotifyConnections: defineTable({
+    userId: v.id('users'),
+    spotifyUserId: v.string(),
+    displayName: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    expiresAt: v.number(),
+    pollToken: v.optional(v.string()),
+  }).index('by_userId', ['userId']),
+
+  // An OAuth `state` handed to Spotify, waiting for the callback. Single use,
+  // and only honoured for 10 minutes.
+  spotifyOAuthStates: defineTable({
+    userId: v.id('users'),
+    state: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_state', ['state'])
+    .index('by_userId', ['userId']),
+
+  // What a connected user is playing during their active workout, written by
+  // the poll loop. Exists only while they're working out with Spotify on, so
+  // it's high-churn and kept apart from the connection row.
+  spotifyNowPlaying: defineTable({
+    userId: v.id('users'),
+    trackId: v.string(),
+    trackName: v.string(),
+    artists: v.string(),
+    albumArtUrl: v.optional(v.string()),
+    trackUrl: v.string(),
+    contextUrl: v.optional(v.string()),
+    contextType: v.optional(v.string()),
+    isPlaying: v.boolean(),
+    updatedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
   // In-app notifications. convex/push.ts also sends most of these to devices.
   // One generalized table rather than a bespoke reactive query per feature,
   // which is the pattern friends.ts/pings.ts grew organically and which

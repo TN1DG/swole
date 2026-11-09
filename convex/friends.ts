@@ -20,9 +20,10 @@ import {
   trainedWeekSet,
 } from './points'
 import { cleanUsername, LIMITS } from './validation'
+import { visibleNowPlaying } from './spotify'
 import { consumeUsernameLookup, rateLimiter, requireWriter } from './rateLimiter'
 import { markHandled, notify } from './notifications'
-import { areFriends } from './friendships'
+import { areFriends, isBlockedEitherWay } from './friendships'
 
 // The profile row behind a user's public identity. The leaderboard and
 // friends list call this once per friend, so anything read here is read
@@ -182,7 +183,24 @@ export const myFriends = query({
       .query('friendships')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .collect()
-    return Promise.all(friendships.map((f) => profileForWithAvatar(ctx, f.friendId)))
+    return Promise.all(
+      friendships.map(async (f) => {
+        const profile = await profileForWithAvatar(ctx, f.friendId)
+        // What they're listening to mid-workout, if they share it. A block
+        // leaves the friendship row in place, so it's checked here too.
+        const playing = (await isBlockedEitherWay(ctx, userId, f.friendId))
+          ? null
+          : await visibleNowPlaying(ctx, f.friendId)
+        return {
+          ...profile,
+          nowPlaying: playing && {
+            trackName: playing.trackName,
+            artists: playing.artists,
+            updatedAt: playing.updatedAt,
+          },
+        }
+      }),
+    )
   },
 })
 

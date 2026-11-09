@@ -255,6 +255,25 @@ export const purgeAccountData = internalMutation({
         .withIndex('by_user', (q) => q.eq('userId', userId))
         .take(n),
     )
+    // Spotify: the tokens especially must not outlive the account.
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('spotifyConnections')
+        .withIndex('by_userId', (q) => q.eq('userId', userId))
+        .take(n),
+    )
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('spotifyOAuthStates')
+        .withIndex('by_userId', (q) => q.eq('userId', userId))
+        .take(n),
+    )
+    await drain(ctx, budget, (n) =>
+      ctx.db
+        .query('spotifyNowPlaying')
+        .withIndex('by_userId', (q) => q.eq('userId', userId))
+        .take(n),
+    )
 
     // Presence rows name this user and nothing else cleans them up.
     for (const { roomId } of await presenceComponent.listUser(ctx, userId)) {

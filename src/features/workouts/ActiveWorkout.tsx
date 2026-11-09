@@ -11,6 +11,7 @@ import { ExercisePicker } from './ExercisePicker'
 import { RestTimer } from './RestTimer'
 import { GlassTile } from '../../components/GlassTile'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { NowPlayingCard } from '../spotify/NowPlayingCard'
 
 // The exact shape getActive returns, minus null — TypeScript derives it
 // from the backend function, so the two can never drift apart.
@@ -136,6 +137,8 @@ export function ActiveWorkout({ workout, onFinished }: Props) {
           Finish
         </Button>
       </Box>
+
+      <NowPlayingCard userId={workout.ownerId} isSelf />
 
       <Box sx={{ mt: 2 }}>
         <RestTimer autoStartSignal={restSignal} />

@@ -4,6 +4,7 @@ import { mutation, query, type MutationCtx } from './_generated/server'
 import { requireWriter } from './rateLimiter'
 import type { Id } from './_generated/dataModel'
 import { cleanName, LIMITS } from './validation'
+import { kickSpotifyPoller } from './spotify'
 
 // Exercises must exist and be visible to the caller (built-in or their own).
 async function validateExercises(
@@ -238,6 +239,7 @@ export const startFromRoutine = mutation({
         })
       }
     }
+    await kickSpotifyPoller(ctx, userId)
     return workoutId
   },
 })

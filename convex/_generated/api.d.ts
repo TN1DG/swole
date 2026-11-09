@@ -48,6 +48,8 @@ import type * as rateLimiter from "../rateLimiter.js";
 import type * as routines from "../routines.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
+import type * as spotify from "../spotify.js";
+import type * as spotifyApi from "../spotifyApi.js";
 import type * as themePresets from "../themePresets.js";
 import type * as turnstile from "../turnstile.js";
 import type * as validation from "../validation.js";
@@ -101,6 +103,8 @@ declare const fullApi: ApiFromModules<{
   routines: typeof routines;
   seed: typeof seed;
   seedData: typeof seedData;
+  spotify: typeof spotify;
+  spotifyApi: typeof spotifyApi;
   themePresets: typeof themePresets;
   turnstile: typeof turnstile;
   validation: typeof validation;

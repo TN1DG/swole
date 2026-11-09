@@ -24,6 +24,8 @@ import { SwoleCoin } from '../../components/SwoleCoin'
 import { AvatarUploadDialog } from './AvatarUploadDialog'
 import { ThemePicker } from './ThemePicker'
 import { PushSettingsCard } from '../notifications/PushSettingsCard'
+import { SpotifyCard } from '../spotify/SpotifyCard'
+import { NowPlayingCard } from '../spotify/NowPlayingCard'
 import { useSignOutCleanup } from '../notifications/usePushNotifications'
 import { useAvatarPicker } from './useAvatarPicker'
 import { WhatsNewDialog } from '../releases/WhatsNewDialog'
@@ -217,6 +219,8 @@ export function ProfilePage() {
 
       <ThemePicker />
       <PushSettingsCard />
+      <SpotifyCard />
+      <NowPlayingCard userId={profile!.userId} isSelf />
 
       <GlassCard sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <ConsistencyRing streakWeeks={profile!.streakWeeks} size={52} />

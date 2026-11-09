@@ -7,6 +7,7 @@ import { formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 import { useWeightUnit } from '../../lib/useWeightUnit'
 import { GlassTile } from '../../components/GlassTile'
+import { NowPlayingCard } from '../spotify/NowPlayingCard'
 
 // Read-only: a friend's (or a public opt-in user's) workout history. Same
 // card shape as your own History tab; tapping one opens a read-only detail
@@ -35,6 +36,7 @@ export function FriendWorkoutsPage() {
           <Typography noWrap variant="h4" sx={{ mt: 1, fontWeight: 'bold' }}>
             {data.displayName}
           </Typography>
+          <NowPlayingCard userId={userId as Id<'users'>} />
           {data.workouts.length === 0 ? (
             <Typography sx={{ mt: 4, textAlign: 'center' }} color="text.secondary">
               No workouts logged yet.

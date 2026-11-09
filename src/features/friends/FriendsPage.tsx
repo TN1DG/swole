@@ -17,6 +17,7 @@ import { FeedTab } from '../feed/FeedTab'
 import { ClansPanel } from '../clans/ClansPanel'
 import { formatLastActivity } from './activityLabel'
 import { conversationTimeLabel } from './threadLayout'
+import { isFreshNowPlaying } from '../spotify/freshness'
 
 type LastActivity = FunctionReturnType<typeof api.friendThread.lastActivity>[number]
 
@@ -362,6 +363,11 @@ function ConversationRow({
             <Box sx={{ flexShrink: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />
           )}
         </Box>
+        {friend.nowPlaying && isFreshNowPlaying(friend.nowPlaying.updatedAt, now) && (
+          <Typography noWrap variant="caption" color="success.main" sx={{ display: 'block' }}>
+            🎧 {friend.nowPlaying.trackName} — {friend.nowPlaying.artists}
+          </Typography>
+        )}
       </Box>
     </GlassTile>
   )

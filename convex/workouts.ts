@@ -9,6 +9,7 @@ import { notify } from './notifications'
 import { requireWriter } from './rateLimiter'
 import { getOrCreateProfile } from './profiles'
 import { lastPerformance } from './routines'
+import { clearNowPlaying, kickSpotifyPoller } from './spotify'
 
 // ---------- shared ownership helpers ----------
 // Every mutation walks up to the workout and checks it belongs to the caller.
@@ -138,11 +139,13 @@ export const start = mutation({
       : hour < 21 ? 'Evening Workout'
       : 'Night Workout'
 
-    return await ctx.db.insert('workouts', {
+    const workoutId = await ctx.db.insert('workouts', {
       ownerId: userId,
       name,
       startedAt: Date.now(),
     })
+    await kickSpotifyPoller(ctx, userId)
+    return workoutId
   },
 })
 
@@ -316,6 +319,7 @@ export const cancel = mutation({
       await ctx.db.delete(we._id)
     }
     await ctx.db.delete(args.workoutId)
+    await clearNowPlaying(ctx, workout.ownerId)
   },
 })
 
@@ -348,6 +352,9 @@ export const finish = mutation({
     if (workout.endedAt !== undefined) throw new Error('Workout already finished')
 
     const now = Date.now()
+    // The session is over either way (finished or discarded), so friends
+    // stop seeing what was playing.
+    await clearNowPlaying(ctx, userId)
     let totalVolumeKg = 0
     let completedSetCount = 0
     let prCount = 0
