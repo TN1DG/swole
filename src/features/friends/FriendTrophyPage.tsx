@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { FriendTrophyCard } from './FriendTrophyCard'
 import { useCardExport } from '../share/useCardExport'
 import { CHECKERBOARD_SX, type CardVariant } from '../share/cardVariant'
-import { SegmentedControl } from '../../components/SegmentedControl'
+import { cardFileName, type CardFormat } from '../share/cardFormat'
+import { CardExportButtons, CardOptions } from '../share/CardExportControls'
 
 // A friend's download of someone else's workout — stats only, no photo step
 // (the friend wasn't there), so this skips straight to the exportable card.
@@ -17,8 +18,11 @@ export function FriendTrophyPage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const { frameRef, busy, share, download } = useCardExport()
+  const [format, setFormat] = useState<CardFormat>('story')
   const [variant, setVariant] = useState<CardVariant>('card')
+  const { frameRef, busy, share, save } = useCardExport(
+    cardFileName(detail ? `${detail.owner.displayName} ${detail.name}` : 'workout', format),
+  )
 
   if (detail === undefined)
     return (
@@ -45,16 +49,7 @@ export function FriendTrophyPage() {
         Download Trophy
       </Typography>
 
-      <Box sx={{ mt: 1.5 }}>
-        <SegmentedControl
-          value={variant}
-          onChange={setVariant}
-          options={[
-            { value: 'card', label: 'Card' },
-            { value: 'transparent', label: 'Transparent' },
-          ]}
-        />
-      </Box>
+      <CardOptions format={format} onFormatChange={setFormat} variant={variant} onVariantChange={setVariant} />
 
       <Box
         sx={{
@@ -66,17 +61,10 @@ export function FriendTrophyPage() {
           ...(variant === 'transparent' ? CHECKERBOARD_SX : null),
         }}
       >
-        <FriendTrophyCard ref={frameRef} detail={detail} variant={variant} />
+        <FriendTrophyCard ref={frameRef} detail={detail} variant={variant} format={format} />
       </Box>
 
-      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-        <Button variant="contained" fullWidth disabled={busy} onClick={() => void share()}>
-          {busy ? 'Rendering…' : 'Share'}
-        </Button>
-        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={() => void download()}>
-          Save Image
-        </Button>
-      </Box>
+      <CardExportButtons busy={busy} onSave={() => void save()} onShare={() => void share()} />
     </Box>
   )
 }

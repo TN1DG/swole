@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from 'convex/react'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { ShareCard } from './ShareCard'
 import { useCardExport } from './useCardExport'
 import { CHECKERBOARD_SX, type CardVariant } from './cardVariant'
+import { cardFileName, type CardFormat } from './cardFormat'
+import { CardExportButtons, CardOptions } from './CardExportControls'
 import { GlassTile } from '../../components/GlassTile'
-import { SegmentedControl } from '../../components/SegmentedControl'
 
 export function SharePage() {
   const { workoutId } = useParams()
@@ -16,7 +17,8 @@ export function SharePage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const { frameRef, busy, share, download } = useCardExport()
+  const [format, setFormat] = useState<CardFormat>('story')
+  const { frameRef, busy, share, save } = useCardExport(cardFileName(detail?.name ?? 'workout', format))
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
@@ -91,21 +93,7 @@ export function SharePage() {
         </GlassTile>
       </Box>
 
-      <Box sx={{ mt: 1.5 }}>
-        <SegmentedControl
-          value={variant}
-          onChange={setVariant}
-          options={[
-            { value: 'card', label: 'Card' },
-            { value: 'transparent', label: 'Transparent' },
-          ]}
-        />
-      </Box>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-        {variant === 'card'
-          ? 'A solid card, ready to post as-is.'
-          : 'No background — drop it straight onto another photo.'}
-      </Typography>
+      <CardOptions format={format} onFormatChange={setFormat} variant={variant} onVariantChange={setVariant} />
 
       {/* The exportable preview. The checkerboard is on this wrapper, which
           sits OUTSIDE frameRef and so never reaches the PNG — without it a
@@ -121,17 +109,10 @@ export function SharePage() {
           ...(variant === 'transparent' ? CHECKERBOARD_SX : null),
         }}
       >
-        <ShareCard ref={frameRef} detail={detail} photoUrl={photoUrl} variant={variant} />
+        <ShareCard ref={frameRef} detail={detail} photoUrl={photoUrl} variant={variant} format={format} />
       </Box>
 
-      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-        <Button variant="contained" fullWidth disabled={busy} onClick={() => void share()}>
-          {busy ? 'Rendering…' : 'Share'}
-        </Button>
-        <Button variant="outlined" color="inherit" fullWidth disabled={busy} onClick={() => void download()}>
-          Save Image
-        </Button>
-      </Box>
+      <CardExportButtons busy={busy} onSave={() => void save()} onShare={() => void share()} />
     </Box>
   )
 }
