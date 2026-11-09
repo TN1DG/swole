@@ -1,3 +1,6 @@
+// Vercel type-checks functions against the root tsconfig.json, which has no
+// Node types (the app must not use them); tsconfig.api.json has them.
+/// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fetchPublicPost } from './_lib/convex.js'

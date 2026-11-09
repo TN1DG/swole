@@ -9,8 +9,9 @@ const MUTED = '#a89a8c'
 const ACCENT = '#c1541f'
 
 // On the Edge runtime, which @vercel/og is built for. As a Node function it
-// failed to load twice: its bundle does a dynamic require('fs'), and the
-// emitted ES module was then loaded as CommonJS. Edge bundles it cleanly.
+// failed to load (a dynamic require('fs') in its bundle), and from 1.0 its
+// Edge build imports Node's `module`, which Edge refuses, so the package is
+// pinned to 0.11.1, whose Edge build imports only its own wasm.
 export const config = { runtime: 'edge' }
 
 // Satori takes plain { type, props } element objects, so this file needs no
