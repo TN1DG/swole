@@ -408,6 +408,31 @@ function ExerciseCard({
 
 // ---------- one set row ----------
 
+type SetKind = 'normal' | 'warmup' | 'failure'
+
+function setKind(set: Pick<Doc<'sets'>, 'isWarmup' | 'toFailure'>): SetKind {
+  return set.isWarmup ? 'warmup' : set.toFailure ? 'failure' : 'normal'
+}
+
+const BADGE_TITLE: Record<SetKind, string> = {
+  normal: 'Tap to mark as warm-up',
+  warmup: 'Warm-up — tap to mark as to failure',
+  failure: 'To failure — tap to make a normal set',
+}
+
+// The badge cycles normal → warm-up → to failure → normal. The server keeps
+// warm-up and to-failure mutually exclusive.
+function nextKind(set: Pick<Doc<'sets'>, 'isWarmup' | 'toFailure'>) {
+  switch (setKind(set)) {
+    case 'normal':
+      return { isWarmup: true }
+    case 'warmup':
+      return { toFailure: true }
+    case 'failure':
+      return { toFailure: false }
+  }
+}
+
 function SetRow({
   set,
   record,
@@ -465,12 +490,14 @@ function SetRow({
         bgcolor: set.completed ? 'rgb(122 154 82 / 0.1)' : 'transparent',
       }}
     >
-      {/* Set number badge; tap to toggle warm-up. The "conquered" slash lands
+      {/* Set number badge; tap to cycle normal → warm-up → to failure. The
+          "conquered" slash lands
           here rather than on the weight/reps fields — those are live text
           inputs, and striking through what you're mid-way through typing
           reads as an error state rather than an achievement. */}
       <ButtonBase
-        title={conquered ? 'Beaten by your PR' : 'Tap to toggle warm-up'}
+        title={conquered ? 'Beaten by your PR' : BADGE_TITLE[setKind(set)]}
+        aria-label={`Set ${set.setNumber}: ${BADGE_TITLE[setKind(set)]}`}
         sx={{
           justifySelf: 'center',
           borderRadius: '6px',
@@ -480,16 +507,16 @@ function SetRow({
           py: 0.5,
           fontSize: '0.875rem',
           fontWeight: 600,
-          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+          color: set.isWarmup ? 'pr.main' : set.toFailure ? 'error.main' : 'text.secondary',
           ...(conquered && {
             textDecoration: 'line-through',
             textDecorationColor: 'var(--color-error)',
             opacity: 0.55,
           }),
         }}
-        onClick={() => updateSet({ setId: set._id, isWarmup: !set.isWarmup }).catch(onSaveError)}
+        onClick={() => updateSet({ setId: set._id, ...nextKind(set) }).catch(onSaveError)}
       >
-        {set.isWarmup ? 'W' : set.setNumber}
+        {set.isWarmup ? 'W' : set.toFailure ? 'F' : set.setNumber}
         {isPr && ' 🏆'}
       </ButtonBase>
 
@@ -512,7 +539,9 @@ function SetRow({
         value={reps}
         onChange={(e) => setReps(e.target.value)}
         onBlur={() => commit()}
-        placeholder="0"
+        // A to-failure set can be ticked off without a count; finish
+        // estimates one.
+        placeholder={set.toFailure ? 'reps?' : '0'}
         size="small"
         slotProps={{
           htmlInput: {

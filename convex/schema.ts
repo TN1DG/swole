@@ -438,6 +438,13 @@ export default defineSchema({
     reps: v.number(),
     isWarmup: v.boolean(),
     completed: v.boolean(),
+    // Taken to failure. Reps may be left at 0 ("forgot to count"), in which
+    // case `finish` writes an estimate into `reps` and sets `repsEstimated`.
+    // Mutually exclusive with isWarmup.
+    toFailure: v.optional(v.boolean()),
+    // `reps` is Swole's guess, not what was logged. Counts toward volume,
+    // never toward personal records.
+    repsEstimated: v.optional(v.boolean()),
   }).index('by_workoutExercise', ['workoutExerciseId']),
 
   // Exercises a user has starred, for the Favorites page.
