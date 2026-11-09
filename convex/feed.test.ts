@@ -409,3 +409,73 @@ describe('account deletion', () => {
     })
   })
 })
+
+describe('publicPost', () => {
+  it('shows a public post to someone who isn’t signed in', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const postId = await post(t, alice, exerciseId, 'public', 'New PB')
+
+    const shown = await t.query(api.feed.publicPost, { postId })
+    expect(shown).toMatchObject({
+      _id: postId,
+      caption: 'New PB',
+      repostedBy: null,
+      author: { username: 'alice' },
+      photoUrl: null,
+      setCount: expect.any(Number),
+    })
+    // Exactly these fields: nothing that belongs to anyone else, nothing
+    // viewer-specific. api/_lib/postMeta.ts declares the ones it reads by
+    // hand, so a rename here must fail this test before it breaks previews.
+    expect(Object.keys(shown!).sort()).toEqual([
+      '_id', 'author', 'caption', 'commentCount', 'createdAt', 'durationMs', 'exerciseNames',
+      'likeCount', 'photoHeight', 'photoUrl', 'photoWidth', 'prCount', 'repostedBy', 'setCount',
+      'volumeKg', 'workoutName', 'workoutStartedAt',
+    ])
+    expect(Object.keys(shown!.author).sort()).toEqual(['avatarUrl', 'displayName', 'username'])
+  })
+
+  it('keeps friends-only posts private', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice } = await twoFriends(t)
+    const postId = await post(t, alice, exerciseId, 'friends', 'just us')
+    expect(await t.query(api.feed.publicPost, { postId })).toBeNull()
+  })
+
+  it('treats a malformed or deleted id as not found', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const postId = await post(t, alice, exerciseId, 'public')
+    await alice.user.mutation(api.feed.deletePost, { postId })
+
+    expect(await t.query(api.feed.publicPost, { postId: 'not-an-id' })).toBeNull()
+    expect(await t.query(api.feed.publicPost, { postId })).toBeNull()
+  })
+
+  it('shows what a repost points at, while it stays public', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const bob = await userWithUsername(t, 'bob')
+    const originalId = await post(t, alice, exerciseId, 'public', 'PB day')
+    await bob.user.mutation(api.feed.repost, { postId: originalId })
+    const repostId = await t.run(async (ctx) => {
+      const rows = await ctx.db.query('posts').collect()
+      return rows.find((p) => p.repostOfId === originalId)!._id
+    })
+
+    expect(await t.query(api.feed.publicPost, { postId: repostId })).toMatchObject({
+      _id: repostId,
+      caption: 'PB day',
+      repostedBy: 'bob',
+      author: { username: 'alice' },
+    })
+
+    await alice.user.mutation(api.feed.deletePost, { postId: originalId })
+    expect(await t.query(api.feed.publicPost, { postId: repostId })).toBeNull()
+  })
+})

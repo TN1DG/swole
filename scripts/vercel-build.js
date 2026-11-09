@@ -21,9 +21,14 @@ const branch = process.env.VERCEL_GIT_COMMIT_REF ?? 'preview'
 // the schema push, is ignored on production, and only accepts one function
 // name — `seed:seedAll` fans out to every table's own idempotent seed
 // mutation (see convex/seed.ts), so it's a no-op for tables already seeded.
+//
+// The build command also records the deployment's URL for the Vercel
+// functions in api/ (link previews for shared posts), which read Convex at
+// runtime and otherwise have no way to know which deployment is theirs.
+const buildCmd = 'npm run build && node scripts/write-function-env.mjs'
 const cmd = isProduction
-  ? `npx convex deploy --cmd "npm run build"`
-  : `npx convex deploy --cmd "npm run build" --preview-name "${branch}" --preview-run seed:seedAll`
+  ? `npx convex deploy --cmd "${buildCmd}"`
+  : `npx convex deploy --cmd "${buildCmd}" --preview-name "${branch}" --preview-run seed:seedAll`
 
 console.log(`[vercel-build] VERCEL_ENV=${process.env.VERCEL_ENV ?? 'unset'} -> ${cmd}`)
 execSync(cmd, { stdio: 'inherit' })

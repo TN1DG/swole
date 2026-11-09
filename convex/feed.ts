@@ -297,6 +297,58 @@ export const getPost = query({
   },
 })
 
+/**
+ * A post as anyone on the internet may see it: the read-only /p/:id page and
+ * the link-preview tags a crawler gets (api/post-page.ts). No auth needed,
+ * so it answers for PUBLIC posts only, and carries nothing beyond what that
+ * post already shows in Discover: no comments, no other users, no ids but
+ * the post's own.
+ *
+ * Takes a plain string because the id arrives from a URL, where a malformed
+ * one must read as "not found", not throw.
+ */
+export const publicPost = query({
+  args: { postId: v.string() },
+  handler: async (ctx, args) => {
+    const postId = ctx.db.normalizeId('posts', args.postId)
+    if (!postId) return null
+    const post = await ctx.db.get(postId)
+    if (!post || post.visibility !== 'public') return null
+
+    // A repost has no workout of its own: show what was reposted, as long as
+    // it is still public (the same read-time check hydrate makes).
+    let content = post
+    let repostedBy: string | null = null
+    if (post.repostOfId) {
+      const original = await ctx.db.get(post.repostOfId)
+      if (!original || original.visibility !== 'public') return null
+      content = original
+      repostedBy = (await publicIdentityMap(ctx, [post.authorId])).get(post.authorId)!.displayName
+    }
+
+    const author = (await publicIdentityMap(ctx, [content.authorId])).get(content.authorId)!
+    return {
+      _id: post._id,
+      createdAt: content.createdAt,
+      caption: content.caption ?? null,
+      repostedBy,
+      author: { displayName: author.displayName, username: author.username, avatarUrl: author.avatarUrl },
+      photoUrl: content.photoStorageId ? await ctx.storage.getUrl(content.photoStorageId) : null,
+      photoWidth: content.photoWidth ?? null,
+      photoHeight: content.photoHeight ?? null,
+      workoutName: content.workoutName ?? null,
+      workoutStartedAt: content.workoutStartedAt ?? null,
+      durationMs: content.durationMs ?? null,
+      volumeKg: content.volumeKg ?? null,
+      setCount: content.setCount ?? null,
+      prCount: content.prCount ?? null,
+      exerciseNames: content.exerciseNames ?? [],
+      likeCount: content.likeCount,
+      commentCount: content.commentCount,
+    }
+  },
+})
+
 // ---------- writing ----------
 
 // Step 1 of the photo flow, mirroring profiles.generateAvatarUploadUrl.
