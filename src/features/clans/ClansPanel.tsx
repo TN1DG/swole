@@ -8,6 +8,7 @@ import { GlassTile } from '../../components/GlassTile'
 import { SwoleCoin } from '../../components/SwoleCoin'
 import { errorMessage } from '../../lib/errors'
 import { usePeriodStart } from '../../lib/period'
+import { shareLink } from '../../lib/shareLink'
 
 type MyClan = NonNullable<FunctionReturnType<typeof api.clans.myClan>>
 
@@ -192,17 +193,10 @@ function ClanCard({ clan }: { clan: MyClan }) {
   }
 
   async function share() {
-    const url = inviteLink(clan.inviteCode)
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: `Join ${clan.name} on Swole`, url })
-      } else {
-        await navigator.clipboard.writeText(url)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      }
-    } catch {
-      // Share sheet dismissed, or clipboard blocked; the code is on screen.
+    const result = await shareLink({ title: `Join ${clan.name} on Swole`, url: inviteLink(clan.inviteCode) })
+    if (result === 'copied') {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
