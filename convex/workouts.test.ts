@@ -24,11 +24,11 @@ type User = Awaited<ReturnType<typeof oneUser>>['user']
 type ExerciseId = Awaited<ReturnType<typeof oneUser>>['exerciseId']
 
 // Start a workout, log the given sets on one exercise, return ids.
-// Each set: [weightKg, reps, completed, isWarmup?]
+// Each set: [weightKg, reps, completed, isWarmup?, toFailure?]
 async function logWorkout(
   user: User,
   exerciseId: ExerciseId,
-  sets: [number, number, boolean, boolean?][],
+  sets: [number, number, boolean, boolean?, boolean?][],
 ) {
   const workoutId = await user.mutation(api.workouts.start, {})
   await user.mutation(api.workouts.addExercise, { workoutId, exerciseId })
@@ -42,13 +42,14 @@ async function logWorkout(
   const refreshed = await user.query(api.workouts.getActive, {})
   const setIds = refreshed!.exercises[0].sets.map((s) => s._id)
 
-  for (const [i, [weightKg, reps, completed, isWarmup]] of sets.entries()) {
+  for (const [i, [weightKg, reps, completed, isWarmup, toFailure]] of sets.entries()) {
     await user.mutation(api.workouts.updateSet, {
       setId: setIds[i],
       weightKg,
       reps,
       completed,
       ...(isWarmup ? { isWarmup } : {}),
+      ...(toFailure ? { toFailure } : {}),
     })
   }
   return { workoutId, workoutExerciseId, setIds }
@@ -469,5 +470,95 @@ describe('moveExercise', () => {
         direction: 'down',
       }),
     ).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('to-failure sets', () => {
+  const F = true
+
+  async function setsOf(user: User, workoutId: Id<'workouts'>) {
+    const detail = await user.query(api.history.getDetail, { workoutId })
+    return detail!.exercises[0].sets
+  }
+
+  it('estimates missing reps from the previous set, counting volume but no PR', async () => {
+    const { user, exerciseId } = await oneUser()
+    const { workoutId } = await logWorkout(user, exerciseId, [
+      [100, 8, true],
+      [120, 0, true, false, F], // heavier, but reps unknown
+    ])
+
+    const summary = await user.mutation(api.workouts.finish, { workoutId })
+    if (summary.discarded) throw new Error('unreachable')
+    expect(summary.totalVolumeKg).toBe(100 * 8 + 120 * 8)
+
+    const sets = await setsOf(user, workoutId)
+    expect(sets[1]).toMatchObject({ reps: 8, toFailure: true, repsEstimated: true })
+
+    // The record comes from the counted 100 kg set, not the estimated 120.
+    const [record] = await user.query(api.prs.listMine, {})
+    expect(record.bestWeightKg).toBe(100)
+  })
+
+  it('falls back to the last session when nothing else in this workout has reps', async () => {
+    const { user, exerciseId } = await oneUser()
+    const first = await logWorkout(user, exerciseId, [[80, 10, true], [80, 7, true]])
+    await user.mutation(api.workouts.finish, { workoutId: first.workoutId })
+
+    const { workoutId } = await logWorkout(user, exerciseId, [[80, 0, true, false, F]])
+    const summary = await user.mutation(api.workouts.finish, { workoutId })
+    if (summary.discarded) throw new Error('unreachable')
+    expect((await setsOf(user, workoutId))[0]).toMatchObject({ reps: 10, repsEstimated: true })
+    expect(summary.totalVolumeKg).toBe(800)
+    expect(summary.prCount).toBe(0)
+  })
+
+  it('leaves reps at 0 with no volume when there is nothing to estimate from', async () => {
+    const { user, exerciseId } = await oneUser()
+    const { workoutId } = await logWorkout(user, exerciseId, [[100, 0, true, false, F]])
+
+    const summary = await user.mutation(api.workouts.finish, { workoutId })
+    if (summary.discarded) throw new Error('unreachable')
+    expect(summary.totalVolumeKg).toBe(0)
+    expect(summary.completedSetCount).toBe(1)
+    const [set] = await setsOf(user, workoutId)
+    expect(set.reps).toBe(0)
+    expect(set.repsEstimated).toBeUndefined()
+    expect(await user.query(api.prs.listMine, {})).toEqual([])
+  })
+
+  it('uses entered reps as-is, and they can set a record', async () => {
+    const { user, exerciseId } = await oneUser()
+    const { workoutId } = await logWorkout(user, exerciseId, [[100, 5, true], [120, 3, true, false, F]])
+
+    const summary = await user.mutation(api.workouts.finish, { workoutId })
+    if (summary.discarded) throw new Error('unreachable')
+    expect(summary.totalVolumeKg).toBe(500 + 360)
+    const sets = await setsOf(user, workoutId)
+    expect(sets[1].repsEstimated).toBeUndefined()
+    const [record] = await user.query(api.prs.listMine, {})
+    expect(record.bestWeightKg).toBe(120)
+    expect(record.bestWeightReps).toBe(3)
+  })
+
+  it('keeps warm-up and to-failure mutually exclusive', async () => {
+    const { user, exerciseId } = await oneUser()
+    const { workoutId, setIds } = await logWorkout(user, exerciseId, [[100, 5, false]])
+    const setId = setIds[0]
+    const current = async () => (await user.query(api.workouts.getActive, {}))!.exercises[0].sets[0]
+
+    await user.mutation(api.workouts.updateSet, { setId, isWarmup: true })
+    await user.mutation(api.workouts.updateSet, { setId, toFailure: true })
+    expect(await current()).toMatchObject({ isWarmup: false, toFailure: true })
+
+    await user.mutation(api.workouts.updateSet, { setId, isWarmup: true })
+    const after = await current()
+    expect(after.isWarmup).toBe(true)
+    expect(after.toFailure).toBeUndefined()
+
+    await expect(
+      user.mutation(api.workouts.updateSet, { setId, isWarmup: true, toFailure: true }),
+    ).rejects.toThrow(/warm-up/i)
+    await user.mutation(api.workouts.cancel, { workoutId })
   })
 })

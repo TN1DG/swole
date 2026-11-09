@@ -8,6 +8,8 @@ import { formatWorkoutDate } from '../../lib/dates'
 import { TIER_LABELS } from '../../lib/tierLabels'
 import { useWeightUnit } from '../../lib/useWeightUnit'
 import { GlassTile } from '../../components/GlassTile'
+import { setBadge, setBadgeColor } from '../workouts/setDisplay'
+import { SetReps } from '../workouts/SetReps'
 
 // Read-only detail for a friend's (or public opt-in user's) workout — same
 // set-by-set breakdown as your own WorkoutDetailPage, minus anything that
@@ -123,11 +125,11 @@ export function FriendWorkoutDetailPage() {
                           border: 0,
                           py: 0.5,
                           px: 0,
-                          color: set.isWarmup ? 'pr.main' : 'text.secondary',
+                          color: setBadgeColor(set),
                           ...conqueredSx,
                         }}
                       >
-                        {set.isWarmup ? 'W' : set.setNumber}
+                        {setBadge(set)}
                       </TableCell>
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
@@ -137,7 +139,7 @@ export function FriendWorkoutDetailPage() {
                       <TableCell
                         sx={{ border: 0, py: 0.5, px: 0, fontVariantNumeric: 'tabular-nums', ...conqueredSx }}
                       >
-                        {set.reps}
+                        <SetReps set={set} />
                       </TableCell>
                     </TableRow>
                   )

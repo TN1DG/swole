@@ -30,7 +30,9 @@ const EXERCISE_ID = 'ex1' as never
 const RECORD = { exerciseId: EXERCISE_ID, bestWeightKg: 100, bestEst1rm: epley1rm(100, 5) }
 
 /** One exercise, one completed working set at the given weight/reps. */
-function workoutWith(sets: { weightKg: number; reps: number; completed?: boolean; isWarmup?: boolean }[]) {
+function workoutWith(
+  sets: { weightKg: number; reps: number; completed?: boolean; isWarmup?: boolean; toFailure?: boolean }[],
+) {
   return {
     _id: 'w1',
     _creationTime: 0,
@@ -50,6 +52,7 @@ function workoutWith(sets: { weightKg: number; reps: number; completed?: boolean
           reps: s.reps,
           completed: s.completed ?? true,
           isWarmup: s.isWarmup ?? false,
+          ...(s.toFailure ? { toFailure: true } : {}),
         })),
       },
     ],
@@ -201,5 +204,39 @@ describe('ActiveWorkout weight entry', () => {
     await user.tab()
 
     expect(state.mutation).toHaveBeenCalledWith(expect.objectContaining({ weightKg: 105 }))
+  })
+})
+
+// The set badge cycles normal → warm-up → to failure → normal.
+describe('ActiveWorkout to-failure sets', () => {
+  it('turns a normal set into a warm-up', async () => {
+    renderWorkout([{ weightKg: 100, reps: 5, completed: false }])
+    await userEvent.click(screen.getByRole('button', { name: /Set 1: Tap to mark as warm-up/ }))
+    expect(state.mutation).toHaveBeenCalledWith({ setId: 's0', isWarmup: true })
+  })
+
+  it('turns a warm-up into a to-failure set', async () => {
+    renderWorkout([{ weightKg: 60, reps: 5, completed: false, isWarmup: true }])
+    await userEvent.click(screen.getByRole('button', { name: /Warm-up — tap to mark as to failure/ }))
+    expect(state.mutation).toHaveBeenCalledWith({ setId: 's0', toFailure: true })
+  })
+
+  it('turns a to-failure set back into a normal one', async () => {
+    renderWorkout([{ weightKg: 100, reps: 0, completed: false, toFailure: true }])
+    expect(screen.getByText('F')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /To failure — tap to make a normal set/ }))
+    expect(state.mutation).toHaveBeenCalledWith({ setId: 's0', toFailure: false })
+  })
+
+  it('can be ticked off with the reps left empty', async () => {
+    renderWorkout([{ weightKg: 100, reps: 0, completed: false, toFailure: true }])
+    expect(screen.getByPlaceholderText('reps?')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    expect(state.mutation).toHaveBeenCalledWith({
+      setId: 's0',
+      weightKg: 100,
+      reps: 0,
+      completed: true,
+    })
   })
 })

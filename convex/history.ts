@@ -247,6 +247,9 @@ export const exerciseHistory = query({
         for (const s of workingSets(sets)) {
           setCount++
           volumeKg += s.weightKg * s.reps
+          // Estimated reps (to-failure sets logged without a count) add
+          // volume but stay out of the top set and e1RM, like records.
+          if (s.repsEstimated) continue
           bestE1rm = Math.max(bestE1rm, epley1rm(s.weightKg, s.reps))
           if (!top || s.weightKg > top.weightKg ||
               (s.weightKg === top.weightKg && s.reps > top.reps)) {
@@ -317,7 +320,7 @@ async function recomputeRecord(
         .query('sets')
         .withIndex('by_workoutExercise', (q) => q.eq('workoutExerciseId', we._id))
         .collect()
-      for (const s of workingSets(sets)) {
+      for (const s of workingSets(sets).filter((s) => !s.repsEstimated)) {
         // Read previous bests into annotated locals first — assigning `best`
         // from an expression that references `best` trips a TS inference
         // cycle inside loops (TS7022 / bogus `never`).

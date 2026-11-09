@@ -153,7 +153,7 @@ export const remove = mutation({
 
 // The user's completed sets from the most recent workout containing this
 // exercise — used to pre-fill a fresh workout with "numbers to beat".
-async function lastPerformance(
+export async function lastPerformance(
   ctx: MutationCtx,
   userId: Id<'users'>,
   exerciseId: Id<'exercises'>,

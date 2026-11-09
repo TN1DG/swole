@@ -1,6 +1,6 @@
 import type { Id } from '../../../convex/_generated/dataModel'
 
-type SetLike = { weightKg: number; reps: number; isWarmup: boolean }
+type SetLike = { weightKg: number; reps: number; isWarmup: boolean; repsEstimated?: boolean }
 type ExerciseEntry = {
   workoutExerciseId: Id<'workoutExercises'>
   exercise: { _id: Id<'exercises'>; name: string }
@@ -20,13 +20,17 @@ export function computeShareStats(exercises: ExerciseEntry[], prExerciseIds: Id<
   // Per exercise: set count + heaviest set for the summary line.
   const lines = exercises.map((entry) => {
     const working = entry.sets.filter((s) => !s.isWarmup)
+    // The headline set is a real, counted one when there is one — an
+    // estimated rep count isn't something to show off.
+    const counted = working.filter((s) => !s.repsEstimated)
+    const candidates = counted.length > 0 ? counted : working
     // An exercise with no sets at all leaves `top` undefined, which callers
     // already handle (see WorkoutBreakdown). The accumulator is typed to admit
     // that rather than pretending the seed is always present.
-    const top = working.reduce<SetLike | undefined>(
+    const top = candidates.reduce<SetLike | undefined>(
       (a, b) =>
         !a || b.weightKg > a.weightKg || (b.weightKg === a.weightKg && b.reps > a.reps) ? b : a,
-      working[0] ?? entry.sets[0],
+      candidates[0] ?? entry.sets[0],
     )
     return {
       id: entry.workoutExerciseId,
