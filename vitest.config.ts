@@ -48,7 +48,8 @@ export default defineConfig({
         test: {
           name: 'root',
           environment: 'node',
-          include: ['*.test.ts'],
+          // ...and the Vercel functions' pure helpers in api/, same needs.
+          include: ['*.test.ts', 'api/**/*.test.ts'],
         },
       },
     ],

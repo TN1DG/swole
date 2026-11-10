@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Authenticated, Unauthenticated, AuthLoading } from 'convex/react'
 import { Box } from '@mui/material'
 import { AppLayout } from './components/AppLayout'
@@ -94,6 +94,16 @@ function RouteFallback() {
   )
 }
 
+const PublicPostPage = lazy(() =>
+  import('./features/feed/PublicPostPage').then((m) => ({ default: m.PublicPostPage })),
+)
+
+/** A shared post link opened by someone signed in: show them the full post. */
+function PostLinkRedirect() {
+  const { postId } = useParams()
+  return <Navigate to={`/feed/${postId}`} replace />
+}
+
 export default function App() {
   return (
     <>
@@ -104,9 +114,15 @@ export default function App() {
         </Box>
       </AuthLoading>
 
-      {/* Not signed in -> only the sign-in screen exists. */}
+      {/* Not signed in -> the sign-in screen, plus the one page anyone may
+          see: a shared public post. */}
       <Unauthenticated>
-        <SignInPage />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/p/:postId" element={<PublicPostPage />} />
+            <Route path="*" element={<SignInPage />} />
+          </Routes>
+        </Suspense>
       </Unauthenticated>
 
       {/* Signed in -> the welcome carousel first-run, then the actual app. */}
@@ -119,6 +135,7 @@ export default function App() {
                   with its own header and no tab bar. */}
               <Route path="/friends/:userId/chat" element={<FriendChatPage />} />
               <Route path="/clans/chat" element={<ClanChatPage />} />
+              <Route path="/p/:postId" element={<PostLinkRedirect />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<WorkoutsPage />} />
                 <Route path="/history" element={<HistoryPage />} />

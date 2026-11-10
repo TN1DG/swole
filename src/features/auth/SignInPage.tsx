@@ -14,9 +14,11 @@ import { errorMessage } from '../../lib/errors'
 
 type Step = 'signIn' | 'signUp' | 'forgotPassword' | 'resetCode'
 
-export function SignInPage() {
+// `initialStep` lets a page that isn't the sign-in screen (the public post
+// page's "Join Swole") open straight on sign-up.
+export function SignInPage({ initialStep = 'signIn' }: { initialStep?: 'signIn' | 'signUp' } = {}) {
   const { signIn } = useAuthActions()
-  const [step, setStep] = useState<Step>('signIn')
+  const [step, setStep] = useState<Step>(initialStep)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
