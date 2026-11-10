@@ -17,6 +17,14 @@ import { cardToPng } from '../share/useCardExport'
 
 /** Link previews (X, iMessage, WhatsApp…) use 1200×630 pictures. */
 const LINK_CARD_WIDTH = 1200
+/**
+ * The width the card is laid out at before being scaled up to 1200. The
+ * card's type is sized for a phone-width share card, so narrower means
+ * bigger text in the preview: at 600 it filled half the height and read as
+ * tiny. 440 gives a 231px-tall frame, which fits the panel with its two
+ * exercise lines and "+ N more" (about 210px).
+ */
+const LINK_CARD_LAYOUT_WIDTH = 440
 
 type Visibility = 'public' | 'friends'
 
@@ -216,7 +224,7 @@ export function ComposePostPage() {
       {/* The link-preview card, laid out off-screen so it can be captured
           (see uploadLinkCard). Never seen, so hidden from assistive tech. */}
       {!photo && visibility === 'public' && (
-        <Box aria-hidden sx={{ position: 'fixed', left: -10_000, top: 0, width: 600, pointerEvents: 'none' }}>
+        <Box aria-hidden sx={{ position: 'fixed', left: -10_000, top: 0, width: LINK_CARD_LAYOUT_WIDTH, pointerEvents: 'none' }}>
           <ShareCard ref={linkCardRef} detail={detail} photoUrl={null} format="link" />
         </Box>
       )}
