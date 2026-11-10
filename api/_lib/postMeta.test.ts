@@ -8,6 +8,7 @@ const POST: PublicPost = {
   caption: 'New bench PB',
   author: { displayName: 'Sam' },
   photoUrl: null,
+  cardUrl: 'https://x.convex.cloud/api/storage/card',
   workoutName: 'Push Day',
   durationMs: 3_600_000,
   volumeKg: 12340.4,
@@ -34,8 +35,16 @@ describe('postMeta', () => {
 
   it('uses the workout card when there is no photo, and the stats when there is no caption', () => {
     const meta = postMeta({ ...POST, caption: null }, ORIGIN, 'p1')
-    expect(meta.image).toBe('https://swole.day/api/og-card?id=p1')
+    expect(meta.image).toBe('https://x.convex.cloud/api/storage/card')
+    expect(meta.twitterCard).toBe('summary_large_image')
     expect(meta.description).toBe('Push Day · 12,340 kg · 18 sets · 2 PRs')
+  })
+
+  it('falls back to the small Swole card for an older post with no picture', () => {
+    const meta = postMeta({ ...POST, cardUrl: null }, ORIGIN, 'p1')
+    expect(meta.image).toBe('https://swole.day/pwa-512.png')
+    expect(meta.twitterCard).toBe('summary')
+    expect(meta.title).toBe('Sam on Swole')
   })
 
   it('gives anything that isn’t a public post a plain Swole preview', () => {
@@ -60,7 +69,7 @@ describe('injectPostMeta', () => {
     expect(html).not.toContain('<title>Swole</title>')
     expect(tag(html, 'property', 'og:description')).toBe('New bench PB')
     expect(tag(html, 'name', 'twitter:card')).toBe('summary_large_image')
-    expect(tag(html, 'property', 'og:image')).toBe('https://swole.day/api/og-card?id=p1')
+    expect(tag(html, 'property', 'og:image')).toBe('https://x.convex.cloud/api/storage/card')
     expect(html).toContain('<div id="root"></div>')
   })
 

@@ -1,18 +1,26 @@
 /**
- * The shape of an exported card. Both are exported 1080px wide (see
- * useCardExport), so these give 1080×1920 and 1080×1080 PNGs.
+ * The shape of an exported card. Story and square export 1080px wide (see
+ * useCardExport), giving 1080×1920 and 1080×1080 PNGs; link exports at
+ * 1200×630.
  *
  * 'story'  — 9:16, the size Instagram and Snapchat Stories both use.
  * 'square' — 1:1, for feed posts and chats.
+ * 'link'   — 1200:630, the picture a shared post's link preview shows when
+ *            the post has no photo. Made by the composer, never picked by
+ *            hand, so it isn't in FORMAT_OPTIONS.
  */
-export type CardFormat = 'story' | 'square'
+export type CardFormat = 'story' | 'square' | 'link'
 
 export const FORMAT_ASPECT: Record<CardFormat, string> = {
   story: '9 / 16',
   square: '1 / 1',
+  link: '1200 / 630',
 }
 
-export const FORMAT_OPTIONS: { value: CardFormat; label: string }[] = [
+/** The formats a person chooses between on the share pages. */
+export type PickableFormat = Exclude<CardFormat, 'link'>
+
+export const FORMAT_OPTIONS: { value: PickableFormat; label: string }[] = [
   { value: 'story', label: 'Story' },
   { value: 'square', label: 'Square' },
 ]
@@ -20,6 +28,7 @@ export const FORMAT_OPTIONS: { value: CardFormat; label: string }[] = [
 export const FORMAT_HINTS: Record<CardFormat, string> = {
   story: 'Instagram & Snapchat Stories.',
   square: 'Feed posts and chats.',
+  link: 'Link previews.',
 }
 
 /**
@@ -34,12 +43,14 @@ export const FORMAT_HINTS: Record<CardFormat, string> = {
 export const FORMAT_SAFE_AREA: Record<CardFormat, { top: string; bottom: string }> = {
   story: { top: '14%', bottom: '20%' },
   square: { top: '12px', bottom: '12px' },
+  link: { top: '12px', bottom: '12px' },
 }
 
 /** How many exercise lines fit under the stats before "+ N more". */
 export const FORMAT_MAX_LINES: Record<CardFormat, number> = {
   story: 6,
   square: 3,
+  link: 2,
 }
 
 /** e.g. "swole-push-day-story.png". */

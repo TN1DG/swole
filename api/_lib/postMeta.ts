@@ -8,6 +8,7 @@ export type PublicPost = {
   caption: string | null
   author: { displayName: string }
   photoUrl: string | null
+  cardUrl: string | null
   workoutName: string | null
   durationMs: number | null
   volumeKg: number | null
@@ -47,8 +48,9 @@ export function workoutSummary(post: Pick<PublicPost, 'workoutName' | 'volumeKg'
 /**
  * What a link to /p/:id unfurls to. Like a post on X: the author as the
  * title, their caption as the text, and their photo as the picture, or the
- * workout card when they posted none. Anything that isn't a public post
- * gets a plain Swole preview, so a friends-only caption never leaves.
+ * workout card when they posted none (rendered by the composer; posts from
+ * before that fall back to the Swole icon). Anything that isn't a public
+ * post gets a plain Swole preview, so a friends-only caption never leaves.
  */
 export function postMeta(post: PublicPost | null, origin: string, postId: string): PageMeta {
   const url = `${origin}/p/${encodeURIComponent(postId)}`
@@ -62,12 +64,13 @@ export function postMeta(post: PublicPost | null, origin: string, postId: string
       type: 'website',
     }
   }
+  const picture = post.photoUrl ?? post.cardUrl
   return {
     title: `${post.author.displayName} on Swole`,
     description: post.caption ?? (workoutSummary(post) || GENERIC_DESCRIPTION),
     url,
-    image: post.photoUrl ?? `${origin}/api/og-card?id=${encodeURIComponent(postId)}`,
-    twitterCard: 'summary_large_image',
+    image: picture ?? `${origin}/pwa-512.png`,
+    twitterCard: picture ? 'summary_large_image' : 'summary',
     type: 'article',
   }
 }

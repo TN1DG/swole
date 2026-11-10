@@ -28,6 +28,7 @@ const POST = {
   repostedBy: null,
   author: { displayName: 'Sam', username: 'sam', avatarUrl: null },
   photoUrl: null,
+  cardUrl: null,
   photoWidth: null,
   photoHeight: null,
   workoutName: 'Push Day',
@@ -57,7 +58,7 @@ beforeEach(() => {
 })
 
 describe('PublicPostPage', () => {
-  it('shows a public post with its workout card when there is no photo', () => {
+  it('draws an older photo-less post’s stats when it has no card', () => {
     state.post = POST
     renderAt()
     expect(state.args).toContainEqual({ postId: 'p1' })
@@ -67,6 +68,13 @@ describe('PublicPostPage', () => {
     expect(screen.getByText(/Bench Press · Dips/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.getByText('❤️ 3 · 💬 2')).toBeInTheDocument()
+  })
+
+  it('shows the link card when the post has one but no photo', () => {
+    state.post = { ...POST, cardUrl: 'https://x.convex.cloud/card' }
+    const { container } = renderAt()
+    expect(container.querySelector('img[src="https://x.convex.cloud/card"]')).toHaveAttribute('alt', 'Push Day')
+    expect(screen.getByText('Push Day')).toBeInTheDocument()
   })
 
   it('shows the photo when the post has one', () => {

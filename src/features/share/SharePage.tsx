@@ -7,7 +7,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { ShareCard } from './ShareCard'
 import { useCardExport } from './useCardExport'
 import { CHECKERBOARD_SX, type CardVariant } from './cardVariant'
-import { cardFileName, type CardFormat } from './cardFormat'
+import { cardFileName, type PickableFormat } from './cardFormat'
 import { CardExportButtons, CardOptions } from './CardExportControls'
 import { GlassTile } from '../../components/GlassTile'
 
@@ -17,7 +17,7 @@ export function SharePage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const [format, setFormat] = useState<CardFormat>('story')
+  const [format, setFormat] = useState<PickableFormat>('story')
   const { frameRef, busy, share, save } = useCardExport(cardFileName(detail?.name ?? 'workout', format))
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)

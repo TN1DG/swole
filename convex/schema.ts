@@ -137,6 +137,10 @@ export default defineSchema({
     // photo's space is reserved before it loads. Absent on older posts.
     photoWidth: v.optional(v.number()),
     photoHeight: v.optional(v.number()),
+    // The 1200×630 workout card a link to this post previews with when it
+    // has no photo, rendered by the composer (public posts only; see
+    // api/post-page.ts). Absent on older posts, which preview generically.
+    cardStorageId: v.optional(v.id('_storage')),
 
     // Optional because a repost has no workout of its own, and because
     // history.deleteWorkout unlinks rather than destroying the post.

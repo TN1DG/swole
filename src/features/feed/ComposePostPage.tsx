@@ -12,6 +12,11 @@ import { GlassTile } from '../../components/GlassTile'
 import { StoredImage } from '../../components/StoredImage'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { LIMITS } from '../../../convex/validation'
+import { ShareCard } from '../share/ShareCard'
+import { cardToPng } from '../share/useCardExport'
+
+/** Link previews (X, iMessage, WhatsApp…) use 1200×630 pictures. */
+const LINK_CARD_WIDTH = 1200
 
 type Visibility = 'public' | 'friends'
 
@@ -24,6 +29,7 @@ export function ComposePostPage() {
   const createPost = useMutation(api.feed.createPost)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const linkCardRef = useRef<HTMLDivElement>(null)
   const [photo, setPhoto] = useState<(OptimizedImage & { url: string }) | null>(null)
   const [processing, setProcessing] = useState(false)
   // Friends-only is the default on purpose — the safer of the two, and the
@@ -53,12 +59,29 @@ export function ComposePostPage() {
     }
   }
 
+  /**
+   * The picture a link to a public, photo-less post previews with: the
+   * workout card, rendered here because the app already draws it. Best
+   * effort: if it fails, the post still goes out and previews generically.
+   */
+  async function uploadLinkCard(): Promise<Id<'_storage'> | undefined> {
+    const node = linkCardRef.current
+    if (photo || visibility !== 'public' || !node) return undefined
+    try {
+      return await uploadBlob(() => generateUploadUrl({}), await cardToPng(node, LINK_CARD_WIDTH))
+    } catch (err) {
+      console.error('Link card failed', err)
+      return undefined
+    }
+  }
+
   async function handlePost() {
     if (!workoutId) return
     setBusy(true)
     setError(null)
     try {
       const storageId = photo ? await uploadBlob(() => generateUploadUrl({}), photo.blob) : undefined
+      const cardStorageId = await uploadLinkCard()
 
       // Blob rejections come back as a result rather than a thrown error, so
       // the server can delete the bad upload — see convex/feed.ts:createPost.
@@ -71,6 +94,7 @@ export function ComposePostPage() {
           photoWidth: photo.width,
           photoHeight: photo.height,
         }),
+        ...(cardStorageId && { cardStorageId }),
       })
       if (!result.ok) throw new ConvexError(result.error)
       navigate('/friends')
@@ -188,6 +212,14 @@ export function ComposePostPage() {
       >
         {busy ? 'Posting…' : 'Post'}
       </Button>
+
+      {/* The link-preview card, laid out off-screen so it can be captured
+          (see uploadLinkCard). Never seen, so hidden from assistive tech. */}
+      {!photo && visibility === 'public' && (
+        <Box aria-hidden sx={{ position: 'fixed', left: -10_000, top: 0, width: 600, pointerEvents: 'none' }}>
+          <ShareCard ref={linkCardRef} detail={detail} photoUrl={null} format="link" />
+        </Box>
+      )}
     </Box>
   )
 }
