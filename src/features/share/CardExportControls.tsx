@@ -1,7 +1,7 @@
 import { Box, Button, Typography } from '@mui/material'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import type { CardVariant } from './cardVariant'
-import { FORMAT_HINTS, FORMAT_OPTIONS, type CardFormat } from './cardFormat'
+import { FORMAT_HINTS, FORMAT_OPTIONS, type PickableFormat } from './cardFormat'
 
 const VARIANT_HINTS: Record<CardVariant, string> = {
   card: 'A solid card, ready to post as-is.',
@@ -15,8 +15,8 @@ export function CardOptions({
   variant,
   onVariantChange,
 }: {
-  format: CardFormat
-  onFormatChange: (format: CardFormat) => void
+  format: PickableFormat
+  onFormatChange: (format: PickableFormat) => void
   variant: CardVariant
   onVariantChange: (variant: CardVariant) => void
 }) {

@@ -95,10 +95,12 @@ export function PublicPostPage() {
                   : null),
               }}
             />
+          ) : post.cardUrl ? (
+            // No photo: the workout card the link preview shows.
+            <Box component="img" src={post.cardUrl} alt={post.workoutName ?? 'Workout'} sx={{ mt: 1.5, width: '100%', borderRadius: '12px', display: 'block', aspectRatio: '1200 / 630' }} />
           ) : (
             post.workoutName !== null && (
-              // No photo: the workout itself is the picture, as in the
-              // link preview (api/og-card.tsx).
+              // An older post with no card: draw its stats instead.
               <Box sx={{ mt: 1.5, borderRadius: '12px', bgcolor: brandTokens.surface, p: 2, color: '#fff' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: brandTokens.accent }}>
                   <BarbellIcon size={18} />
@@ -111,7 +113,7 @@ export function PublicPostPage() {
             )
           )}
 
-          {post.photoUrl && <StatLine post={post} />}
+          {(post.photoUrl || post.cardUrl) && <StatLine post={post} />}
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
             ❤️ {post.likeCount} · 💬 {post.commentCount}

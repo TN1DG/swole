@@ -7,7 +7,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { FriendTrophyCard } from './FriendTrophyCard'
 import { useCardExport } from '../share/useCardExport'
 import { CHECKERBOARD_SX, type CardVariant } from '../share/cardVariant'
-import { cardFileName, type CardFormat } from '../share/cardFormat'
+import { cardFileName, type PickableFormat } from '../share/cardFormat'
 import { CardExportButtons, CardOptions } from '../share/CardExportControls'
 
 // A friend's download of someone else's workout — stats only, no photo step
@@ -18,7 +18,7 @@ export function FriendTrophyPage() {
     workoutId: workoutId as Id<'workouts'>,
   })
 
-  const [format, setFormat] = useState<CardFormat>('story')
+  const [format, setFormat] = useState<PickableFormat>('story')
   const [variant, setVariant] = useState<CardVariant>('card')
   const { frameRef, busy, share, save } = useCardExport(
     cardFileName(detail ? `${detail.owner.displayName} ${detail.name}` : 'workout', format),

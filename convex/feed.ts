@@ -334,6 +334,7 @@ export const publicPost = query({
       repostedBy,
       author: { displayName: author.displayName, username: author.username, avatarUrl: author.avatarUrl },
       photoUrl: content.photoStorageId ? await ctx.storage.getUrl(content.photoStorageId) : null,
+      cardUrl: content.cardStorageId ? await ctx.storage.getUrl(content.cardStorageId) : null,
       photoWidth: content.photoWidth ?? null,
       photoHeight: content.photoHeight ?? null,
       workoutName: content.workoutName ?? null,
@@ -380,6 +381,8 @@ export const createPost = mutation({
     storageId: v.optional(v.id('_storage')),
     photoWidth: v.optional(v.number()),
     photoHeight: v.optional(v.number()),
+    // The link-preview card (see schema.ts:posts.cardStorageId).
+    cardStorageId: v.optional(v.id('_storage')),
   },
   handler: async (
     ctx,
@@ -413,16 +416,21 @@ export const createPost = mutation({
         : undefined
 
     // --- everything below this line may touch storage ---
-    if (args.storageId) {
-      const metadata = await ctx.db.system.get('_storage', args.storageId)
+    for (const upload of [args.storageId, args.cardStorageId]) {
+      if (!upload) continue
+      const metadata = await ctx.db.system.get('_storage', upload)
       if (!metadata) return { ok: false, error: 'Upload not found — try again' }
       const wrongType =
         metadata.contentType !== undefined && !metadata.contentType.startsWith('image/')
       if (wrongType || metadata.size > MAX_POST_PHOTO_BYTES) {
-        await ctx.storage.delete(args.storageId)
+        await ctx.storage.delete(upload)
         return { ok: false, error: 'That file needs to be an image under 2MB' }
       }
     }
+    // Only a public post's link ever previews, so a card on any other post
+    // would be storage nobody can see.
+    const cardStorageId = args.visibility === 'public' ? args.cardStorageId : undefined
+    if (args.cardStorageId && cardStorageId === undefined) await ctx.storage.delete(args.cardStorageId)
 
     const workoutExercises = await ctx.db
       .query('workoutExercises')
@@ -442,6 +450,7 @@ export const createPost = mutation({
         ...(photoWidth !== undefined && { photoWidth }),
         ...(photoHeight !== undefined && { photoHeight }),
       }),
+      ...(cardStorageId !== undefined && { cardStorageId }),
       workoutId: args.workoutId,
       workoutName: workout.name,
       workoutStartedAt: workout.startedAt,
@@ -786,4 +795,5 @@ export async function cascadeDeletePost(ctx: MutationCtx, post: Doc<'posts'>) {
 
   await ctx.db.delete(post._id)
   if (post.photoStorageId) await ctx.storage.delete(post.photoStorageId)
+  if (post.cardStorageId) await ctx.storage.delete(post.cardStorageId)
 }

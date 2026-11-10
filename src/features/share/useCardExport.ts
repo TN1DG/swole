@@ -37,20 +37,22 @@ export function isAppleMobile(nav: Pick<Navigator, 'userAgent' | 'platform' | 'm
  * its alpha channel. Transparency is therefore purely a CSS concern in the
  * card — see cardVariant.ts. Do not add a backgroundColor here.
  */
+/**
+ * A rendered card as a PNG `width` pixels wide. Resolution is derived from
+ * the node's on-screen width, so a card's layout must not differ between
+ * variants or the output dimensions shift with it.
+ */
+export function cardToPng(node: HTMLElement, width = EXPORT_WIDTH): Promise<Blob> {
+  return domToBlob(node, { scale: width / node.clientWidth, type: 'image/png' })
+}
+
 export function useCardExport(fileName = 'swole-workout.png') {
   const frameRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
 
   async function makePng(): Promise<Blob | null> {
     const node = frameRef.current
-    if (!node) return null
-    return domToBlob(node, {
-      // Export resolution is derived from the live preview's width, so the
-      // card's layout must not differ between variants or the output
-      // dimensions shift with it.
-      scale: EXPORT_WIDTH / node.clientWidth,
-      type: 'image/png',
-    })
+    return node ? cardToPng(node) : null
   }
 
   function downloadBlob(blob: Blob) {
