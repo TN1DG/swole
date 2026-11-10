@@ -7,6 +7,7 @@ import { api } from '../../../convex/_generated/api'
 import { formatDuration } from '../../../convex/fitness'
 import { formatWorkoutDate } from '../../lib/dates'
 import { errorMessage } from '../../lib/errors'
+import { postLink, shareLink } from '../../lib/shareLink'
 import { useWeightUnit } from '../../lib/useWeightUnit'
 import { Avatar } from '../../components/Avatar'
 import { GlassTile } from '../../components/GlassTile'
@@ -25,7 +26,7 @@ type WorkoutSnapshot = {
   exerciseNames: string[]
 }
 
-function StatLine({ post: p }: { post: WorkoutSnapshot }) {
+export function StatLine({ post: p }: { post: WorkoutSnapshot }) {
   const { formatWeightWithUnit } = useWeightUnit()
   if (p.workoutName === null) return null
   return (
@@ -61,6 +62,19 @@ export function PostCard({ post }: { post: FeedPost }) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  async function sharePost() {
+    const result = await shareLink({
+      url: postLink(post._id),
+      title: `${post.author.displayName} on Swole`,
+      ...(post.caption ? { text: post.caption } : {}),
+    })
+    if (result === 'copied') {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }
 
   async function run(action: () => Promise<unknown>) {
     setError(null)
@@ -180,6 +194,19 @@ export function PostCard({ post }: { post: FeedPost }) {
             onClick={() => void run(() => repost({ postId: post._id }))}
           >
             🔁 {post.repostCount}
+          </Button>
+        )}
+        {/* Only public posts have a link worth sharing: a friends-only one
+            previews as plain "Swole" and opens to nobody outside. */}
+        {post.visibility === 'public' && (
+          <Button
+            size="small"
+            color="inherit"
+            aria-label="Share link to post"
+            sx={{ color: 'text.secondary', minWidth: 0, ml: 'auto' }}
+            onClick={() => void sharePost()}
+          >
+            {linkCopied ? 'Link copied' : '🔗 Share'}
           </Button>
         )}
       </Box>

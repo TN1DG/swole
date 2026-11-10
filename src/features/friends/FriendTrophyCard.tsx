@@ -3,55 +3,30 @@ import type { FunctionReturnType } from 'convex/server'
 import { Box, Typography } from '@mui/material'
 import type { api } from '../../../convex/_generated/api'
 import { formatShortDate } from '../../lib/dates'
-import { BarbellIcon } from '../../components/icons'
 import { TIER_LABELS } from '../../lib/tierLabels'
 import { computeShareStats } from '../share/shareStats'
 import { WorkoutBreakdown } from '../share/WorkoutBreakdown'
-import {
-  TRANSPARENT_ICON_SX,
-  TRANSPARENT_TEXT_SX,
-  type CardVariant,
-} from '../share/cardVariant'
+import { CardFrame } from '../share/CardFrame'
+import type { CardVariant } from '../share/cardVariant'
+import { FORMAT_MAX_LINES, type CardFormat } from '../share/cardFormat'
 import { brandTokens as tokens } from '../../theme/tokens'
 
 type Detail = NonNullable<FunctionReturnType<typeof api.friends.getFriendWorkoutDetail>>
 
-// A friend's stats-only export of someone else's workout — never has a
-// photo (the friend wasn't there), so unlike ShareCard this has only one
-// layout: owner identity + consistency tier up top, then the same set ×
-// weight × rep breakdown the owner's own card shows. Captured to a PNG via
-// modern-screenshot (see FriendTrophyPage.tsx) — colors hardcoded, same
-// reasoning as ShareCard.tsx.
+// A friend's stats-only export of someone else's workout. Never has a photo
+// (the friend wasn't there): owner identity + consistency tier up top, then
+// the same breakdown the owner's own card shows. Frame and formats come from
+// CardFrame, shared with ShareCard.
 export const FriendTrophyCard = forwardRef<
   HTMLDivElement,
-  { detail: Detail; variant?: CardVariant }
->(function FriendTrophyCard({ detail, variant = 'card' }, ref) {
+  { detail: Detail; variant?: CardVariant; format?: CardFormat }
+>(function FriendTrophyCard({ detail, variant = 'card', format = 'story' }, ref) {
   const durationMs = (detail.endedAt ?? detail.startedAt) - detail.startedAt
   const { volumeKg, setCount, lines } = computeShareStats(detail.exercises, detail.prExerciseIds)
   const tierLabel = TIER_LABELS[detail.consistency.tier]
-  const transparent = variant === 'transparent'
 
   return (
-    <Box
-      ref={ref}
-      sx={{
-        width: '100%',
-        borderRadius: '16px',
-        bgcolor: transparent ? 'transparent' : tokens.surface,
-        color: '#fff',
-        p: 2,
-        ...(transparent ? TRANSPARENT_TEXT_SX : null),
-      }}
-    >
-      <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: tokens.accent }}>
-        <Box sx={{ display: 'flex', ...(transparent ? TRANSPARENT_ICON_SX : null) }}>
-          <BarbellIcon size={20} />
-        </Box>
-        <Typography component="span" sx={{ fontSize: '0.75rem', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-          Swole
-        </Typography>
-      </Box>
-
+    <CardFrame ref={ref} format={format} variant={variant}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <Typography noWrap sx={{ fontSize: '1.125rem', fontWeight: 900, color: '#fff' }}>
           {detail.owner.displayName}
@@ -78,8 +53,9 @@ export const FriendTrophyCard = forwardRef<
           setCount={setCount}
           prCount={detail.prExerciseIds.length}
           lines={lines}
+          maxLines={FORMAT_MAX_LINES[format]}
         />
       </Box>
-    </Box>
+    </CardFrame>
   )
 })

@@ -409,3 +409,125 @@ describe('account deletion', () => {
     })
   })
 })
+
+describe('publicPost', () => {
+  it('shows a public post to someone who isn’t signed in', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const postId = await post(t, alice, exerciseId, 'public', 'New PB')
+
+    const shown = await t.query(api.feed.publicPost, { postId })
+    expect(shown).toMatchObject({
+      _id: postId,
+      caption: 'New PB',
+      repostedBy: null,
+      author: { username: 'alice' },
+      photoUrl: null,
+      setCount: expect.any(Number),
+    })
+    // Exactly these fields: nothing that belongs to anyone else, nothing
+    // viewer-specific. api/_lib/postMeta.ts declares the ones it reads by
+    // hand, so a rename here must fail this test before it breaks previews.
+    expect(Object.keys(shown!).sort()).toEqual([
+      '_id', 'author', 'caption', 'cardUrl', 'commentCount', 'createdAt', 'durationMs', 'exerciseNames',
+      'likeCount', 'photoHeight', 'photoUrl', 'photoWidth', 'prCount', 'repostedBy', 'setCount',
+      'volumeKg', 'workoutName', 'workoutStartedAt',
+    ])
+    expect(Object.keys(shown!.author).sort()).toEqual(['avatarUrl', 'displayName', 'username'])
+  })
+
+  it('keeps friends-only posts private', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const { alice } = await twoFriends(t)
+    const postId = await post(t, alice, exerciseId, 'friends', 'just us')
+    expect(await t.query(api.feed.publicPost, { postId })).toBeNull()
+  })
+
+  it('treats a malformed or deleted id as not found', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const postId = await post(t, alice, exerciseId, 'public')
+    await alice.user.mutation(api.feed.deletePost, { postId })
+
+    expect(await t.query(api.feed.publicPost, { postId: 'not-an-id' })).toBeNull()
+    expect(await t.query(api.feed.publicPost, { postId })).toBeNull()
+  })
+
+  it('shows what a repost points at, while it stays public', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const bob = await userWithUsername(t, 'bob')
+    const originalId = await post(t, alice, exerciseId, 'public', 'PB day')
+    await bob.user.mutation(api.feed.repost, { postId: originalId })
+    const repostId = await t.run(async (ctx) => {
+      const rows = await ctx.db.query('posts').collect()
+      return rows.find((p) => p.repostOfId === originalId)!._id
+    })
+
+    expect(await t.query(api.feed.publicPost, { postId: repostId })).toMatchObject({
+      _id: repostId,
+      caption: 'PB day',
+      repostedBy: 'bob',
+      author: { username: 'alice' },
+    })
+
+    await alice.user.mutation(api.feed.deletePost, { postId: originalId })
+    expect(await t.query(api.feed.publicPost, { postId: repostId })).toBeNull()
+  })
+})
+
+describe('link-preview card', () => {
+  async function storeImage(t: T, bytes = 3) {
+    return await t.run((ctx) => ctx.storage.store(new Blob([new Uint8Array(bytes)], { type: 'image/png' })))
+  }
+
+  it('keeps the card on a public post and serves it to previews', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const workoutId = await logWorkoutOn(t, alice.user, exerciseId)
+    const cardStorageId = await storeImage(t)
+
+    const result = await alice.user.mutation(api.feed.createPost, { workoutId, visibility: 'public', cardStorageId })
+    if (!result.ok) throw new Error(result.error)
+
+    const shown = await t.query(api.feed.publicPost, { postId: result.postId })
+    expect(shown?.cardUrl).toEqual(expect.any(String))
+    expect(shown?.photoUrl).toBeNull()
+
+    // Deleting the post takes the card with it.
+    await alice.user.mutation(api.feed.deletePost, { postId: result.postId })
+    expect(await t.run((ctx) => ctx.storage.getUrl(cardStorageId))).toBeNull()
+  })
+
+  it('drops a card sent with a friends-only post, which never previews', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const workoutId = await logWorkoutOn(t, alice.user, exerciseId)
+    const cardStorageId = await storeImage(t)
+
+    const result = await alice.user.mutation(api.feed.createPost, { workoutId, visibility: 'friends', cardStorageId })
+    if (!result.ok) throw new Error(result.error)
+
+    const row = await t.run((ctx) => ctx.db.get(result.postId))
+    expect(row?.cardStorageId).toBeUndefined()
+    expect(await t.run((ctx) => ctx.storage.getUrl(cardStorageId))).toBeNull()
+  })
+
+  it('refuses a card over the 2MB upload limit, and deletes it', async () => {
+    const t = createBackend()
+    const exerciseId = await createBuiltInExercise(t)
+    const alice = await userWithUsername(t, 'alice')
+    const workoutId = await logWorkoutOn(t, alice.user, exerciseId)
+    const cardStorageId = await storeImage(t, 2 * 1024 * 1024 + 1)
+
+    const result = await alice.user.mutation(api.feed.createPost, { workoutId, visibility: 'public', cardStorageId })
+    expect(result).toEqual({ ok: false, error: 'That file needs to be an image under 2MB' })
+    expect(await t.run((ctx) => ctx.storage.getUrl(cardStorageId))).toBeNull()
+  })
+})
