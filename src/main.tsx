@@ -7,6 +7,18 @@ import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { AppThemeProvider } from './theme/AppThemeProvider'
+import { reloadForStaleChunk } from './lib/staleChunk'
+
+// Vite reports a chunk it couldn't preload here, often before React sees
+// anything. Same cause and cure as the ErrorBoundary's stale-chunk case:
+// reload onto the current deploy. preventDefault stops Vite rethrowing it,
+// unless a reload was already tried, in which case the error surfaces.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  void reloadForStaleChunk().then((reloading) => {
+    if (!reloading) console.error('Could not load part of the app', (event as Event & { payload?: unknown }).payload)
+  })
+})
 
 // One client for the whole app. The URL comes from .env.local, which the
 // Convex CLI writes when the project is created.
